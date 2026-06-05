@@ -1,0 +1,72 @@
+#ifndef MODERNER_KRIEG_BOARD_VIEW_H
+#define MODERNER_KRIEG_BOARD_VIEW_H
+
+#include "mk_core.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define MK_BOARD_VIEW_DEFAULT_MARGIN_PX 48.0f
+#define MK_BOARD_VIEW_DEFAULT_MAX_ZOOM_MULTIPLIER 8.0f
+
+typedef struct {
+    mk_rect_t screen_rect_px;
+    mk_vec2_t origin_m;
+    float scale_px_per_m;
+    float min_scale_px_per_m;
+    float max_scale_px_per_m;
+} mk_board_view_t;
+
+typedef struct {
+    uint32_t unit_id;
+    uint32_t soldier_id;
+    mk_side_t side;
+    mk_soldier_role_t role;
+    mk_vec2_t position_m;
+    mk_vec2_t screen_position_px;
+    bool casualty;
+    bool selected_unit;
+} mk_soldier_marker_t;
+
+mk_result_t mk_board_view_fit_map(
+    mk_board_view_t *out_view,
+    const mk_map_t *map,
+    float screen_width_px,
+    float screen_height_px,
+    float margin_px
+);
+
+mk_vec2_t mk_board_view_map_to_screen(const mk_board_view_t *view, mk_vec2_t position_m);
+mk_vec2_t mk_board_view_screen_to_map(const mk_board_view_t *view, mk_vec2_t position_px);
+mk_rect_t mk_board_view_map_rect_to_screen(const mk_board_view_t *view, mk_rect_t rect_m);
+mk_rect_t mk_board_view_visible_map_bounds(const mk_board_view_t *view);
+
+mk_result_t mk_board_view_pan_pixels(
+    mk_board_view_t *view,
+    const mk_map_t *map,
+    float delta_x_px,
+    float delta_y_px
+);
+
+mk_result_t mk_board_view_zoom_at(
+    mk_board_view_t *view,
+    const mk_map_t *map,
+    float zoom_factor,
+    mk_vec2_t anchor_screen_px
+);
+
+mk_result_t mk_board_view_collect_soldier_markers(
+    const mk_board_view_t *view,
+    const mk_game_snapshot_t *snapshot,
+    mk_soldier_marker_t *out_markers,
+    size_t marker_capacity,
+    size_t *out_marker_count
+);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
+

@@ -7,7 +7,9 @@ The project starts fresh as an SDL3 + CMake codebase. `derZweiteWeltkrieg` remai
 ## Current Shape
 
 - `engine/core/` contains the pure C simulation core.
+- `engine/render/` contains renderer-independent board-view, pan/zoom, and marker projection code.
 - `engine/platform/sdl3/` contains the optional SDL3 app shell.
+- `game/mosul/` contains Mosul-specific scenario/content code built above the reusable core.
 - `tests/core/` contains headless C tests.
 - `assets/mosul/source/` is reserved for raw Mosul source art and references.
 - `PLAN.md` describes the full engine and Mosul demo direction.
@@ -30,6 +32,35 @@ cmake --build build
 ```
 
 If SDL3 is not available, CMake still builds the portable core and tests.
+
+## Current Demo Data
+
+The Mosul module currently exposes one small East Mosul block scenario with:
+
+- a CTS assault element
+- an ISIS defensive cell
+- sheltered civilians
+- road, building, and rubble terrain
+- one control objective
+
+## Interaction
+
+The core now supports deterministic board interaction without depending on SDL:
+
+- pick a unit at a map coordinate
+- select or clear a selected unit
+- issue hold/rally/other orders
+- issue a move order and advance toward the target on each simulation tick
+- trace line of sight between map positions or units
+- report blocking terrain and target cover
+- resolve deterministic unit fire, ammo spend, hits, wounds, casualties, and suppression
+- track ready, suppressed, pinned, and broken unit states from live strength, training, and suppression
+- slow or halt movement under suppression and apply fire penalties from combat stress
+- fit the tactical map to a screen rectangle
+- pan and zoom a board view
+- project terrain, objectives, units, and soldier offsets into screen space
+
+When the SDL3 app target is available, left-click selects a unit, right-click gives the selected unit a move order, arrow keys pan the board, and plus/minus zoom the board.
 
 ## Design Intent
 

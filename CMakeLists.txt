@@ -24,6 +24,10 @@ target_include_directories(modernerKriegCore
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/engine/core/include>
 )
 
+if(NOT MSVC)
+  target_link_libraries(modernerKriegCore PUBLIC m)
+endif()
+
 if(MSVC)
   target_compile_options(modernerKriegCore PRIVATE /W4)
   if(MK_WARNINGS_AS_ERRORS)
@@ -36,21 +40,75 @@ else()
   endif()
 endif()
 
+add_library(modernerKriegRender STATIC
+  engine/render/src/mk_board_view.c
+)
+
+target_include_directories(modernerKriegRender
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/engine/render/include>
+)
+
+target_link_libraries(modernerKriegRender PUBLIC modernerKriegCore)
+
+if(MSVC)
+  target_compile_options(modernerKriegRender PRIVATE /W4)
+  if(MK_WARNINGS_AS_ERRORS)
+    target_compile_options(modernerKriegRender PRIVATE /WX)
+  endif()
+else()
+  target_compile_options(modernerKriegRender PRIVATE -Wall -Wextra -Wpedantic)
+  if(MK_WARNINGS_AS_ERRORS)
+    target_compile_options(modernerKriegRender PRIVATE -Werror)
+  endif()
+endif()
+
+add_library(modernerKriegMosul STATIC
+  game/mosul/src/mk_mosul_demo.c
+)
+
+target_include_directories(modernerKriegMosul
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/game/mosul/include>
+)
+
+target_link_libraries(modernerKriegMosul PUBLIC modernerKriegCore)
+
+if(MSVC)
+  target_compile_options(modernerKriegMosul PRIVATE /W4)
+  if(MK_WARNINGS_AS_ERRORS)
+    target_compile_options(modernerKriegMosul PRIVATE /WX)
+  endif()
+else()
+  target_compile_options(modernerKriegMosul PRIVATE -Wall -Wextra -Wpedantic)
+  if(MK_WARNINGS_AS_ERRORS)
+    target_compile_options(modernerKriegMosul PRIVATE -Werror)
+  endif()
+endif()
+
 if(MK_BUILD_TESTS)
   enable_testing()
 
   add_executable(mk_core_tests
     tests/core/test_core.c
   )
-  target_link_libraries(mk_core_tests PRIVATE modernerKriegCore)
+  target_link_libraries(mk_core_tests PRIVATE modernerKriegMosul)
+
+  add_executable(mk_board_view_tests
+    tests/render/test_board_view.c
+  )
+  target_link_libraries(mk_board_view_tests PRIVATE modernerKriegRender modernerKriegMosul)
 
   if(MSVC)
     target_compile_options(mk_core_tests PRIVATE /W4)
+    target_compile_options(mk_board_view_tests PRIVATE /W4)
   else()
     target_compile_options(mk_core_tests PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(mk_board_view_tests PRIVATE -Wall -Wextra -Wpedantic)
   endif()
 
   add_test(NAME mk_core_tests COMMAND mk_core_tests)
+  add_test(NAME mk_board_view_tests COMMAND mk_board_view_tests)
 endif()
 
 if(MK_BUILD_SDL_APP)
@@ -60,7 +118,7 @@ if(MK_BUILD_SDL_APP)
     add_executable(modernerKrieg
       engine/platform/sdl3/main.c
     )
-    target_link_libraries(modernerKrieg PRIVATE modernerKriegCore SDL3::SDL3)
+    target_link_libraries(modernerKrieg PRIVATE modernerKriegRender modernerKriegMosul SDL3::SDL3)
 
     if(MSVC)
       target_compile_options(modernerKrieg PRIVATE /W4)
@@ -72,4 +130,3 @@ if(MK_BUILD_SDL_APP)
     message(STATUS "Install SDL3 or set SDL3_DIR to enable the app target.")
   endif()
 endif()
-
