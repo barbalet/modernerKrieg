@@ -1,40 +1,46 @@
 # modernerKrieg Plan
 
-`modernerKrieg` is the new portable tactical wargame engine for the MOSUL public demo. It should start fresh as a CMake project with a portable C core. SDL3 is the current experimental app shell; if it proves workable, it will be used, and if not, the contingency is a new SwiftUI GUI over the same tactical model. `derZweiteWeltkrieg` remains a proven design reference rather than a submodule or runtime dependency.
+`modernerKrieg` is the portable tactical engine and runtime for the public MOSUL demo. The engine should now be developed as a PNG-backed tactical loader and renderer with deterministic gameplay behind it: the player sees authored Mosul map art, sprites, and tactical markers, while the portable C core owns movement, line of sight, fire, suppression, casualties, civilian risk, scenario state, AI, and replayable outcomes.
 
-The guiding idea is simple: keep the game playable at unit scale, but simulate enough detail inside each unit that soldiers, weapons, casualties, suppression, civilians, and urban terrain all matter.
+The first public target is the 2003 Market / Commercial Streets demo. `derZweiteWeltkrieg` remains useful design memory for deterministic rules, tests, and thin presentation layers, but it is not a dependency, submodule, naming model, or era model for MOSUL.
 
-## Direction
+## Current Baseline
 
-Build a clean engine in this repository.
+- CMake project, portable C core, Mosul game module, renderer-independent board-view code, and headless tests exist.
+- The core already supports deterministic game state, unit selection, orders, movement ticks, line of sight, cover checks, unit fire, ammo spend, wounds, casualties, suppression, and morale state changes.
+- The render layer already projects map, terrain, objectives, units, soldier offsets, selection, and movement targets into screen space.
+- The SDL3 app shell is optional and experimental. If SDL3 is available, it provides the current launchable app path; if not, the core and tests still build.
+- Source art for the 2003 demo is imported under `assets/mosul/source/`.
+- Public source art includes line-art references, 128 px top-down sprite sheets, source-angle weapon sprites, and Market / Commercial Streets map/layer assets.
+- The current hard-coded code scenario is still a placeholder and must be redirected from the older East Mosul/Gogjali shape to the 2003 Market / Commercial Streets demo.
 
-Use `derZweiteWeltkrieg` for:
+## Runtime Shape
 
-- architecture lessons from its C rules core and thin presentation layer
-- examples of deterministic tests around tactical rules
-- useful ideas for mission state, terrain snapshots, objectives, morale, and damage resolution
-- reference code only when it is worth porting deliberately
+The playable app should behave primarily as a PNG loader and renderer with gameplay state behind it.
 
-Do not use `derZweiteWeltkrieg` as:
+- Load map art, tactical sprites, markers, and metadata from manifests.
+- Render the map as image layers or generated tiles, not as colored terrain rectangles.
+- Render units from sprite metadata, facing, role, side, stance, casualty state, and selection state.
+- Render tactical overlays for orders, routes, line of sight, objectives, suppression, hidden contacts, civilian risk, breach/search points, and rooftop access.
+- Keep SDL/SwiftUI/frontend code as presentation and input handling only.
+- Keep rules, scenario state, combat, AI, and scoring in portable C.
 
-- a git submodule
-- a package dependency
-- a naming or era model for the new codebase
-- the authority for modern-era force, weapon, civilian, intelligence, drone, IED, or urban-control systems
+This separation keeps the first app simple: art on screen, gameplay in the core, and a thin bridge between them.
 
-If code is copied rather than rewritten, copy it intentionally, preserve license/attribution, rename it into the new domain, and add tests at the same time.
+## Demo Target
 
-## Engine Goals
+The first playable demo is a compact scenario, not the whole city.
 
-- Run on macOS, Windows, and Linux.
-- Put the simulation, rules, AI, replay, and scenario logic in portable C.
-- Test SDL3 for windowing, input, audio, and cross-platform runtime services; keep the core portable enough for a SwiftUI GUI contingency.
-- Use CMake as the primary build system.
-- Keep platform, renderer, tools, and content above the core simulation.
-- Support deterministic headless tests without opening a window.
-- Make Mosul the first vertical slice and the primary design pressure.
+- Era: 2003, after Mosul's fall during Operation Iraqi Freedom.
+- Area: 500 m x 500 m Market / Commercial Streets cluster.
+- Player force: U.S. Army patrol/security element with squad-level control.
+- Opposing force: regime remnants, irregular fighters, weapons looters, early insurgent cells, and hidden armed threats.
+- Civilians: protected non-combatants whose location and movement affect player choices.
+- Terrain: streets, shopfronts, courtyards, rooftops, upper floors, checkpoints, rubble, blocked routes, cache/search zones, and breach points.
 
-## Proposed Repository Shape
+The demo is playable when the user can launch one scenario, inspect the PNG map, select units, issue orders, resolve contact, see suppression/casualties/civilian risk, and reach a clear after-action outcome.
+
+## Repository Direction
 
 ```text
 modernerKrieg/
@@ -43,23 +49,20 @@ modernerKrieg/
   README.md
   assets/
     mosul/
-      source/
-      sprites/
-      atlases/
-      maps/
-      references/
+      source/       unmodified source art and provenance notes
+      runtime/      generated runtime assets, safe to rebuild
+      manifests/    map, sprite, marker, and scenario-art metadata
+      maps/         playable map products and tile metadata
+      atlases/      packed atlas images and metadata
   docs/
-    mosul_design.md
-    engine_architecture.md
     asset_pipeline.md
+    engine_architecture.md
+    scenario_format.md
   engine/
-    core/
-      include/
-      src/
-    platform/
-      sdl3/
-    render/
-    tools/
+    core/           portable rules and state
+    render/         renderer-independent board projection
+    platform/sdl3/  optional SDL3 app shell
+    tools/          asset/scenario validation and generation
   game/
     mosul/
       data/
@@ -67,208 +70,136 @@ modernerKrieg/
       src/
   tests/
     core/
+    render/
     mosul/
+    assets/
 ```
 
-`engine/core` must not depend on SDL, graphics APIs, operating-system UI, or Mosul-specific content. The Mosul game module can depend on the engine. The SDL application can depend on both.
+`engine/core` must not depend on SDL, graphics APIs, operating-system UI, or Mosul-specific art files. The Mosul game module can depend on the engine. The app/frontend can depend on both.
 
-## Simulation Model
+## Asset Pipeline
 
-The player should mostly command units, but the engine should know the important soldiers inside each unit.
+Source assets stay unmodified. Runtime files should be generated, validated, and rebuildable.
 
-A unit owns:
+Current source asset groups:
 
-- command identity, faction, side, morale state, training quality, and current order
-- formation center, facing, movement intent, cohesion radius, and cover posture
-- communication state, suppression level, fatigue, and command disruption
-- soldier records for the people who make the unit real
+- `assets/mosul/source/line_art/`: Mosul context, combatant, weapon, vehicle, and urban tactics plates.
+- `assets/mosul/source/sprite_sheets/`: 128 px combatant, stance, vehicle, and weapon source sheets.
+- `assets/mosul/source/sprite_sheets/source_angles/weapons_128/`: approved source-angle weapon PNGs.
+- `assets/mosul/source/maps/market_commercial_streets_demo_2003/`: Market / Commercial Streets map previews, layer manifest, and source map layers.
+- `assets/mosul/source/notes/`: provenance and demo asset selection notes.
 
-A soldier owns:
+Immediate asset work:
 
-- role, weapon, ammunition, carried equipment, and optics/sensor capability
-- health, wound state, casualty state, stress, and suppression contribution
-- local offset inside the unit, stance, facing, and exposure
-- line-of-sight participation, fire participation, reload/cooldown state, and ability to move
+- Define a map manifest that records source image path, world size, pixels per meter, origin, layer kind, z order, alpha behavior, and collision/pathfinding output paths.
+- Define a sprite manifest that records source sheet path, tile size, pivot, role, side, state, facing, scale, and runtime id.
+- Define marker assets for selection, move routes, fire orders, overwatch, suppression, casualty, objective, hidden contact, breach/search, rooftop/stair access, and civilian risk.
+- Generate runtime map products outside `source/`: first a single overview image, then tiles when the image size becomes too large for smooth rendering.
+- Generate runtime sprite/atlas products outside `source/` and keep the source sheets untouched.
 
-This supports unit-based play while allowing soldier-level outcomes:
+Additional art probably needed for the first demo:
 
-- a squad can lose its machine gunner without being destroyed
-- a breacher, medic, drone operator, or marksman can matter
-- soldiers can be pinned in different parts of a building
-- infantry can become separated from a vehicle
-- civilians can occupy the same urban space without being treated as scenery
+- civilian/non-combatant top-down sprites
+- order and status UI icons
+- hidden-contact and suspected-danger markers
+- breach, search/cache, checkpoint, rooftop, stair, and blocked-route markers
+- collision/pathfinding masks for roads, interiors, rooftops, rubble, and upper-floor access
 
-## Mosul Demo Scope
+Do not block gameplay development on a large new art pass. Add missing assets only when the playable slice needs them.
 
-The first playable demo should be a small urban block, not the whole city.
+## Scenario Data
 
-Current initial scenario:
+Move Mosul content out of hard-coded C constants.
 
-- 2003 Market / Commercial Streets, after Mosul's fall during Operation Iraqi Freedom
-- U.S. Army conventional infantry associated with the 101st Airborne Division period in Mosul
-- regime remnants, irregular fighters, weapons looters, early insurgent cells, and disorder around civic/commercial spaces
-- civilians present as protected non-combatants and movement/fire constraints
-- shops, market lanes, streets, courtyards, rooftops, upper floors, rubble, checkpoints, and weapons-cache/search objectives
+Start with a compact validated data format for:
 
-Core demo loop:
-
-1. Select a unit.
-2. Give an order: move, assault move, fire, suppress, overwatch, breach, rally, or hold.
-3. Resolve soldier-level visibility, cover, shots, wounds, suppression, and morale.
-4. Advance the opposing AI response.
-5. Score the local objective with civilian-harm and force-preservation consequences.
-
-The demo is successful when it proves that modern urban combat feels meaningfully different from a WWII tabletop reskin.
-
-## First Engine Milestones
-
-### Milestone 0: Skeleton
-
-- Add top-level CMake project.
-- Add a pure C core static library.
-- Add a headless test executable.
-- Add an SDL3 app target that opens a window and runs a fixed-step loop.
-- Add CI-friendly commands for configure, build, and test.
-
-### Milestone 1: Core State
-
-- Define game, map, terrain, side, faction, unit, soldier, weapon, and scenario structs.
-- Add deterministic random seed handling.
-- Add serialization-friendly state snapshots.
-- Add tests for unit creation, soldier rosters, movement intent, and scenario loading.
-
-### Milestone 2: Tactical Board
-
-- Render a top-down board with pan/zoom.
-- Draw units, soldier offsets, cover, terrain, objectives, and selection state.
-- Support mouse selection and basic unit orders.
-- Keep rendering as a view of engine state, not the owner of game rules.
-
-### Milestone 3: Urban Combat
-
-- Add line-of-sight and cover checks.
-- Add small arms fire, machine-gun suppression, RPG direct fire, and basic wounds.
-- Add morale/suppression effects at unit and soldier levels.
-- Add hidden enemy contact markers and simple reveal logic.
-
-### Milestone 4: Mosul Systems
-
-- Add civilians and civilian-risk scoring.
-- Add simple IED detection/resolution.
-- Add breach/entry actions for buildings.
-- Add rooftops, building interiors, and alley/road movement costs.
-- Add first-pass AI for defending, ambushing, withdrawing, and counterattacking.
-
-### Milestone 5: Playable Mosul Demo
-
-- Package one polished scenario.
-- Use Mosul-specific art assets and readable UI.
-- Add scenario briefing and after-action summary.
-- Add deterministic replay logging for debugging and balancing.
-- Build and smoke-test on macOS first, then Windows and Linux.
-
-## Art Asset Direction
-
-The Mosul private brief already has a strong art start: line art maps, combatant plates, weapon plates, vehicle plates, 128 px top-down sprite sheets, and 2003 Market / Commercial Streets map layers. Treat those as source art and organize them into an engine-ready asset pipeline.
-
-Initial asset folders:
-
-```text
-assets/mosul/source/line_art/
-assets/mosul/source/sprite_sheets/
-assets/mosul/sprites/characters/
-assets/mosul/sprites/vehicles/
-assets/mosul/sprites/weapons/
-assets/mosul/atlases/
-assets/mosul/maps/
-assets/mosul/references/
-```
-
-Do this first:
-
-- copy the Mosul README art index into `docs/asset_pipeline.md`
-- bring source PNGs across without destructive edits
-- keep 128 px sheets as high-detail tactical sprites
-- do not reintroduce 64 px combatant renderings for the current demo
-- define atlas metadata before slicing sheets
-- define a consistent pivot point, facing convention, scale, and faction/role naming scheme
-
-Suggested sprite naming:
-
-```text
-us_army_rifleman_128_n.png
-us_army_squad_leader_128_n.png
-us_army_automatic_rifleman_128_n.png
-us_army_grenadier_128_n.png
-us_army_medic_128_n.png
-opposing_regime_rifleman_128_n.png
-opposing_rpg_gunner_128_n.png
-opposing_weapons_looter_128_n.png
-civilian_adult_128_n.png
-humvee_128_n.png
-```
-
-Suggested atlas metadata:
-
-```json
-{
-  "id": "mosul_characters_128",
-  "source": "assets/mosul/source/sprite_sheets/12_us_ally_troops_topdown_128.png",
-  "tile_width": 128,
-  "tile_height": 128,
-  "pivot": { "x": 64, "y": 64 },
-  "facing": "north_up",
-  "frames": [
-    {
-      "id": "us_army_rifleman",
-      "faction": "us_army_2003",
-      "role": "rifleman",
-      "x": 0,
-      "y": 0
-    }
-  ]
-}
-```
-
-Art should serve readability first. The player must be able to distinguish:
-
-- U.S. Army patrol soldiers, local security, regime remnants, irregular fighters, weapons looters, and civilians
-- rifleman, squad leader, automatic rifleman, grenadier, marksman, engineer/breacher, medic, vehicle crew, RPG gunner, machine gunner, and looter/criminal threat
-- infantry, Humvees, trucks, technicals, engineering vehicles, and static weapons
-- open street, market lane, shopfront, rubble, interior, rooftop, courtyard, obstacle, breach point, checkpoint, and suspected weapons-cache or IED zone
-
-## Data Direction
-
-Prefer data files for Mosul content rather than hard-coded scenario constants.
-
-Start with simple JSON or a compact custom text format for:
-
-- factions
-- weapons
+- scenario metadata and briefing
+- factions and sides
+- weapons and ammunition
 - soldier templates
 - unit templates
-- terrain definitions
-- map layouts
-- scenario objectives
-- AI plans
+- initial unit placement and hidden state
+- terrain/navigation regions
+- objective definitions
+- civilian-risk rules
+- opposing AI plan
+- scoring and after-action text
 
-The C core should load validated data into stable runtime structs. Tests should cover parsing and reject invalid scenario files.
+The C core should load validated runtime structs. Tests should reject invalid ids, invalid map bounds, missing assets, invalid faction references, impossible objectives, and unsupported weapon/unit combinations.
 
-## Design Principles
+## Gameplay Systems
 
-- The engine should model uncertainty, not omniscience.
-- Civilian presence should change player decisions without becoming exploitative spectacle.
-- Air support, artillery, and heavy weapons should be powerful but constrained by visibility, ROE, terrain, and civilian risk.
-- Urban combat should reward reconnaissance, suppression, breach timing, overwatch, and force preservation.
-- The game should be historically grounded without becoming a faction power fantasy.
-- Every major rule should have a deterministic test before it becomes hard to change.
+The demo should prove the modern urban problem before broadening scope.
+
+- Orders: move, hold, fire, suppress, overwatch, breach/search, rally, withdraw.
+- Combat: line of sight, cover, small arms, machine-gun suppression, RPG/direct threat, wounds, casualties, ammo, and stress.
+- Urban movement: road, alley, interior, rooftop, stair, rubble, blocked route, and breach/search interactions.
+- Civilians: presence, risk, harm scoring, movement constraints, and consequences.
+- Uncertainty: hidden contacts, suspected threats, reveal logic, and false certainty.
+- AI: defend, ambush, displace, flee, and protect hidden positions.
+- Outcome: objective state, civilian harm, force preservation, time/turn pressure, and after-action summary.
+
+## Frontend Choice
+
+SDL3 remains the fastest way to validate a cross-platform runtime, but it is still a choice, not an identity.
+
+- Keep building and testing the SDL3 app if SDL3 is available.
+- Keep the C core portable enough for a SwiftUI frontend if SDL3 does not produce the desired feel.
+- Do not put rules, scenario decisions, or asset interpretation exclusively in frontend code.
+
+## Milestones
+
+### Milestone A: PNG Map On Screen
+
+- Add map asset metadata.
+- Load a Market / Commercial Streets PNG map source or generated runtime image.
+- Render it through the current board view with pan/zoom.
+- Preserve map-to-screen and screen-to-map picking.
+- Keep headless tests passing.
+
+### Milestone B: Real Unit Sprites
+
+- Add sprite metadata for the first U.S. patrol and one opposing cell.
+- Render unit sprites from role/side/state instead of colored rectangles.
+- Render selection rings, movement targets, and order lines over sprites.
+- Add a fallback marker for missing assets.
+
+### Milestone C: 2003 Scenario Data
+
+- Create the first Market / Commercial Streets scenario data file.
+- Replace or deprecate the hard-coded East Mosul placeholder.
+- Load factions, units, objectives, and map metadata from data.
+- Add parser/validation tests.
+
+### Milestone D: Playable Contact
+
+- Add visible fire/suppression/casualty feedback.
+- Add hidden-contact reveal logic.
+- Add civilian-risk scoring and at least one non-combatant constraint.
+- Add a basic opposing AI response.
+
+### Milestone E: Demo Polish
+
+- Add briefing and after-action summary.
+- Add deterministic replay/debug logging.
+- Package one macOS-first smoke-tested build.
+- Document how to build, run, test, and regenerate runtime assets.
 
 ## Immediate Next Steps
 
-1. Create the CMake + SDL3 skeleton.
-2. Add `engine/core` with deterministic game-state and unit/soldier structs.
-3. Add the first headless tests.
-4. Import Mosul source art into `assets/mosul/source`.
-5. Write the first atlas metadata file for 128 px combatant sheets.
-6. Render a board with placeholder terrain and real Mosul unit sprites.
-7. Build the first 2003 Market / Commercial Streets scenario.
+1. Add `docs/asset_pipeline.md` describing source assets, runtime assets, manifests, scale, pivots, facings, and generated outputs.
+2. Add the first map manifest for Market / Commercial Streets.
+3. Render the Market / Commercial Streets PNG in the app through the existing board-view transform.
+4. Add the first sprite manifest and render at least one U.S. unit and one opposing unit as PNG sprites.
+5. Rename or replace the hard-coded `mk_mosul_make_east_block_scenario` path with a 2003 Market / Commercial Streets scenario path.
+6. Add tests for manifest validation and 2003 scenario loading.
+7. Add visible order, selection, suppression, casualty, objective, and hidden-contact markers.
+
+## Quality Bar
+
+- Every new rule gets a deterministic test.
+- Every manifest or scenario file gets validation.
+- Missing art should produce a readable fallback, not a crash.
+- Source assets remain unmodified.
+- Runtime assets are reproducible.
+- The demo must be playable at unit scale while preserving meaningful soldier-level consequences.
