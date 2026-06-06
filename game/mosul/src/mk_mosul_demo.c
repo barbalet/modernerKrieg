@@ -63,6 +63,90 @@ static mk_result_t mk_mosul_add_core_terrain(mk_scenario_definition_t *scenario)
     return mk_map_add_terrain(&scenario->map, &rubble, NULL);
 }
 
+static mk_result_t mk_mosul_configure_tiles(mk_scenario_definition_t *scenario) {
+    int x;
+    mk_result_t result;
+
+    result = mk_map_configure_tiles(&scenario->map, 12, 8, 20.0f, 20.0f, MK_TERRAIN_OPEN);
+    if (result != MK_OK) {
+        return result;
+    }
+
+    for (x = 0; x < 12; ++x) {
+        mk_map_tile_t road = mk_make_map_tile(
+            mk_ivec2(x, 3),
+            MK_TERRAIN_ROAD,
+            0,
+            0,
+            1,
+            false,
+            false
+        );
+        result = mk_map_set_tile(&scenario->map, &road);
+        if (result != MK_OK) {
+            return result;
+        }
+    }
+
+    {
+        mk_map_tile_t compound = mk_make_map_tile(
+            mk_ivec2(8, 3),
+            MK_TERRAIN_BUILDING,
+            1,
+            3,
+            2,
+            true,
+            false
+        );
+        result = mk_map_set_tile(&scenario->map, &compound);
+        if (result != MK_OK) {
+            return result;
+        }
+    }
+
+    {
+        mk_map_tile_t rubble = mk_make_map_tile(
+            mk_ivec2(5, 5),
+            MK_TERRAIN_RUBBLE,
+            0,
+            2,
+            3,
+            true,
+            false
+        );
+        result = mk_map_set_tile(&scenario->map, &rubble);
+        if (result != MK_OK) {
+            return result;
+        }
+    }
+
+    return MK_OK;
+}
+
+static mk_result_t mk_mosul_add_controllers(
+    mk_scenario_definition_t *scenario,
+    uint32_t *out_cts_controller_id,
+    uint32_t *out_defender_controller_id,
+    uint32_t *out_civilian_controller_id
+) {
+    mk_controller_slot_t cts = mk_make_controller_slot("CTS Tactical AI", MK_SIDE_PLAYER, MK_CONTROLLER_TACTICAL_AI);
+    mk_controller_slot_t defender = mk_make_controller_slot("Defender Tactical AI", MK_SIDE_OPFOR, MK_CONTROLLER_TACTICAL_AI);
+    mk_controller_slot_t civilians = mk_make_controller_slot("Civilian Observer", MK_SIDE_CIVILIAN, MK_CONTROLLER_OBSERVER);
+    mk_result_t result;
+
+    result = mk_scenario_add_controller(scenario, &cts, out_cts_controller_id);
+    if (result != MK_OK) {
+        return result;
+    }
+
+    result = mk_scenario_add_controller(scenario, &defender, out_defender_controller_id);
+    if (result != MK_OK) {
+        return result;
+    }
+
+    return mk_scenario_add_controller(scenario, &civilians, out_civilian_controller_id);
+}
+
 static mk_result_t mk_mosul_add_factions(
     mk_scenario_definition_t *scenario,
     uint32_t *out_cts_faction_id,
@@ -87,6 +171,40 @@ static mk_result_t mk_mosul_add_factions(
     return mk_scenario_add_faction(scenario, &civilian_faction, out_civilian_faction_id);
 }
 
+static mk_result_t mk_mosul_add_forces(
+    mk_scenario_definition_t *scenario,
+    uint32_t cts_faction_id,
+    uint32_t defender_faction_id,
+    uint32_t civilian_faction_id,
+    uint32_t cts_controller_id,
+    uint32_t defender_controller_id,
+    uint32_t civilian_controller_id,
+    uint32_t *out_cts_force_id,
+    uint32_t *out_defender_force_id,
+    uint32_t *out_civilian_force_id
+) {
+    mk_force_t cts = mk_make_force("CTS Assault Force", MK_SIDE_PLAYER, cts_faction_id, cts_controller_id);
+    mk_force_t defender = mk_make_force("ISIS Defensive Cell", MK_SIDE_OPFOR, defender_faction_id, defender_controller_id);
+    mk_force_t civilians = mk_make_force("Civilian Population", MK_SIDE_CIVILIAN, civilian_faction_id, civilian_controller_id);
+    mk_result_t result;
+
+    cts.command = mk_make_command_identity("Iraqi Counter Terrorism Service", "CTS-1", MK_SIDE_PLAYER);
+    defender.command = mk_make_command_identity("Local Defensive Cell", "CELL-1", MK_SIDE_OPFOR);
+    civilians.command = mk_make_command_identity("Protected Noncombatants", "CIV", MK_SIDE_CIVILIAN);
+
+    result = mk_scenario_add_force(scenario, &cts, out_cts_force_id);
+    if (result != MK_OK) {
+        return result;
+    }
+
+    result = mk_scenario_add_force(scenario, &defender, out_defender_force_id);
+    if (result != MK_OK) {
+        return result;
+    }
+
+    return mk_scenario_add_force(scenario, &civilians, out_civilian_force_id);
+}
+
 static mk_result_t mk_mosul_add_objectives(mk_scenario_definition_t *scenario) {
     mk_objective_t objective = mk_make_objective(
         "Secure Compound",
@@ -99,7 +217,12 @@ static mk_result_t mk_mosul_add_objectives(mk_scenario_definition_t *scenario) {
     return mk_scenario_add_objective(scenario, &objective, NULL);
 }
 
-static mk_result_t mk_mosul_add_cts_unit(mk_scenario_definition_t *scenario, uint32_t faction_id) {
+static mk_result_t mk_mosul_add_cts_unit(
+    mk_scenario_definition_t *scenario,
+    uint32_t faction_id,
+    uint32_t force_id,
+    uint32_t controller_id
+) {
     mk_weapon_profile_t m4 = mk_make_weapon("M4", 300, 2, 35, 8);
     mk_unit_t unit = mk_make_unit(
         "CTS Assault Element",
@@ -111,6 +234,9 @@ static mk_result_t mk_mosul_add_cts_unit(mk_scenario_definition_t *scenario, uin
     mk_result_t result;
 
     unit.faction_id = faction_id;
+    unit.force_id = force_id;
+    unit.controller_id = controller_id;
+    unit.command = mk_make_command_identity("CTS Assault Element", "CTS-1A", MK_SIDE_PLAYER);
 
     soldier = mk_make_soldier("CTS Lead", MK_ROLE_LEADER, m4);
     soldier.offset_m = mk_mosul_vec2(-2.0f, -2.0f);
@@ -136,7 +262,12 @@ static mk_result_t mk_mosul_add_cts_unit(mk_scenario_definition_t *scenario, uin
     return mk_scenario_add_unit(scenario, &unit, NULL);
 }
 
-static mk_result_t mk_mosul_add_defender_unit(mk_scenario_definition_t *scenario, uint32_t faction_id) {
+static mk_result_t mk_mosul_add_defender_unit(
+    mk_scenario_definition_t *scenario,
+    uint32_t faction_id,
+    uint32_t force_id,
+    uint32_t controller_id
+) {
     mk_weapon_profile_t akm = mk_make_weapon("AKM", 250, 2, 30, 7);
     mk_weapon_profile_t rpg = mk_make_weapon("RPG-7", 200, 1, 80, 12);
     mk_unit_t unit = mk_make_unit(
@@ -149,6 +280,9 @@ static mk_result_t mk_mosul_add_defender_unit(mk_scenario_definition_t *scenario
     mk_result_t result;
 
     unit.faction_id = faction_id;
+    unit.force_id = force_id;
+    unit.controller_id = controller_id;
+    unit.command = mk_make_command_identity("Hidden Defensive Cell", "CELL-1A", MK_SIDE_OPFOR);
 
     soldier = mk_make_soldier("Defender Rifleman", MK_ROLE_RIFLEMAN, akm);
     soldier.offset_m = mk_mosul_vec2(-1.5f, 0.0f);
@@ -167,7 +301,12 @@ static mk_result_t mk_mosul_add_defender_unit(mk_scenario_definition_t *scenario
     return mk_scenario_add_unit(scenario, &unit, NULL);
 }
 
-static mk_result_t mk_mosul_add_civilians(mk_scenario_definition_t *scenario, uint32_t faction_id) {
+static mk_result_t mk_mosul_add_civilians(
+    mk_scenario_definition_t *scenario,
+    uint32_t faction_id,
+    uint32_t force_id,
+    uint32_t controller_id
+) {
     mk_weapon_profile_t unarmed = mk_make_weapon("Unarmed", 0, 0, 0, 0);
     mk_unit_t unit = mk_make_unit(
         "Sheltered Civilians",
@@ -176,12 +315,21 @@ static mk_result_t mk_mosul_add_civilians(mk_scenario_definition_t *scenario, ui
         mk_mosul_vec2(132.0f, 48.0f)
     );
     mk_soldier_t soldier = mk_make_soldier("Civilian Adult", MK_ROLE_CIVILIAN, unarmed);
+    mk_civilian_t civilian = mk_make_civilian("Civilian Adult", faction_id, mk_mosul_vec2(132.0f, 48.0f));
     mk_result_t result;
 
     unit.faction_id = faction_id;
+    unit.force_id = force_id;
+    unit.controller_id = controller_id;
+    unit.command = mk_make_command_identity("Sheltered Civilians", "CIV-1", MK_SIDE_CIVILIAN);
     soldier.ammo = 0;
 
     result = mk_unit_add_soldier(&unit, &soldier, NULL);
+    if (result != MK_OK) {
+        return result;
+    }
+
+    result = mk_scenario_add_civilian(scenario, &civilian, NULL);
     if (result != MK_OK) {
         return result;
     }
@@ -190,9 +338,15 @@ static mk_result_t mk_mosul_add_civilians(mk_scenario_definition_t *scenario, ui
 }
 
 mk_result_t mk_mosul_make_east_block_scenario(mk_scenario_definition_t *out_scenario) {
+    uint32_t cts_controller_id = 0;
+    uint32_t defender_controller_id = 0;
+    uint32_t civilian_controller_id = 0;
     uint32_t cts_faction_id = 0;
     uint32_t defender_faction_id = 0;
     uint32_t civilian_faction_id = 0;
+    uint32_t cts_force_id = 0;
+    uint32_t defender_force_id = 0;
+    uint32_t civilian_force_id = 0;
     mk_result_t result;
 
     if (out_scenario == NULL) {
@@ -204,7 +358,22 @@ mk_result_t mk_mosul_make_east_block_scenario(mk_scenario_definition_t *out_scen
     out_scenario->seed = UINT64_C(0x4D4F53554C);
     out_scenario->map = mk_make_map("Gogjali District Edge", 240.0f, 160.0f);
 
+    result = mk_mosul_configure_tiles(out_scenario);
+    if (result != MK_OK) {
+        return result;
+    }
+
     result = mk_mosul_add_core_terrain(out_scenario);
+    if (result != MK_OK) {
+        return result;
+    }
+
+    result = mk_mosul_add_controllers(
+        out_scenario,
+        &cts_controller_id,
+        &defender_controller_id,
+        &civilian_controller_id
+    );
     if (result != MK_OK) {
         return result;
     }
@@ -214,20 +383,36 @@ mk_result_t mk_mosul_make_east_block_scenario(mk_scenario_definition_t *out_scen
         return result;
     }
 
+    result = mk_mosul_add_forces(
+        out_scenario,
+        cts_faction_id,
+        defender_faction_id,
+        civilian_faction_id,
+        cts_controller_id,
+        defender_controller_id,
+        civilian_controller_id,
+        &cts_force_id,
+        &defender_force_id,
+        &civilian_force_id
+    );
+    if (result != MK_OK) {
+        return result;
+    }
+
     result = mk_mosul_add_objectives(out_scenario);
     if (result != MK_OK) {
         return result;
     }
 
-    result = mk_mosul_add_cts_unit(out_scenario, cts_faction_id);
+    result = mk_mosul_add_cts_unit(out_scenario, cts_faction_id, cts_force_id, cts_controller_id);
     if (result != MK_OK) {
         return result;
     }
 
-    result = mk_mosul_add_defender_unit(out_scenario, defender_faction_id);
+    result = mk_mosul_add_defender_unit(out_scenario, defender_faction_id, defender_force_id, defender_controller_id);
     if (result != MK_OK) {
         return result;
     }
 
-    return mk_mosul_add_civilians(out_scenario, civilian_faction_id);
+    return mk_mosul_add_civilians(out_scenario, civilian_faction_id, civilian_force_id, civilian_controller_id);
 }

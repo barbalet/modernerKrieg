@@ -1,0 +1,81 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default",
+      "description": "Configure the core, tests, headless runner, and optional SDL3 app.",
+      "binaryDir": "${sourceDir}/build/default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "MK_BUILD_TESTS": "ON",
+        "MK_BUILD_SDL_APP": "ON"
+      }
+    },
+    {
+      "name": "headless",
+      "displayName": "Headless",
+      "description": "Configure the portable core, tests, and headless runner without SDL3.",
+      "binaryDir": "${sourceDir}/build/headless",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "MK_BUILD_TESTS": "ON",
+        "MK_BUILD_SDL_APP": "OFF"
+      }
+    },
+    {
+      "name": "strict",
+      "displayName": "Strict",
+      "description": "Configure a headless warning-clean build for CI-style checks.",
+      "binaryDir": "${sourceDir}/build/strict",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "MK_BUILD_TESTS": "ON",
+        "MK_BUILD_SDL_APP": "OFF",
+        "MK_WARNINGS_AS_ERRORS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default"
+    },
+    {
+      "name": "headless",
+      "configurePreset": "headless"
+    },
+    {
+      "name": "strict",
+      "configurePreset": "strict"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "headless",
+      "configurePreset": "headless",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "strict",
+      "configurePreset": "strict",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

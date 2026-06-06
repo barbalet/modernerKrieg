@@ -8,7 +8,10 @@ The first public target is the 2003 Market / Commercial Streets demo. `derZweite
 
 - CMake project, portable C core, Mosul game module, renderer-independent board-view code, and headless tests exist.
 - The core already supports deterministic game state, unit selection, orders, movement ticks, line of sight, cover checks, unit fire, ammo spend, wounds, casualties, suppression, and morale state changes.
+- The core state model now includes controller slots, force records, command identities, map tiles with elevation/cover/movement costs, richer weapon/ammunition metadata, richer soldier state, standalone civilian records, and snapshot/load support for those containers.
 - The render layer already projects map, terrain, objectives, units, soldier offsets, selection, and movement targets into screen space.
+- A deterministic headless runner exists for smoke tests and future AI-vs-AI/autoplay work.
+- CMake presets exist for default, headless, and strict warning-as-error builds.
 - The SDL3 app shell is optional and experimental. If SDL3 is available, it provides the current launchable app path; if not, the core and tests still build.
 - Source art for the 2003 demo is imported under `assets/mosul/source/`.
 - Public source art includes line-art references, 128 px top-down sprite sheets, source-angle weapon sprites, and Market / Commercial Streets map/layer assets.
@@ -56,19 +59,27 @@ modernerKrieg/
       atlases/      packed atlas images and metadata
   docs/
     asset_pipeline.md
+    build_matrix.md
     engine_architecture.md
+    milestone_0_review.md
+    milestone_1_progress.md
     scenario_format.md
+    third_party.md
   engine/
+    ai/             controller policies that emit core orders
     core/           portable rules and state
     render/         renderer-independent board projection
     platform/sdl3/  optional SDL3 app shell
-    tools/          asset/scenario validation and generation
+    tools/
+      autoplay/     headless runs, future AI-vs-AI batches
+      assets/       asset/scenario validation and generation
   game/
     mosul/
       data/
       scenarios/
       src/
   tests/
+    autoplay/
     core/
     render/
     mosul/
@@ -115,11 +126,16 @@ Start with a compact validated data format for:
 
 - scenario metadata and briefing
 - factions and sides
+- controller assignments
+- forces and command identities
 - weapons and ammunition
 - soldier templates
 - unit templates
 - initial unit placement and hidden state
+- civilian placement and civilian state
 - terrain/navigation regions
+- map image/layer manifests
+- sprite/marker manifests
 - objective definitions
 - civilian-risk rules
 - opposing AI plan
@@ -147,6 +163,14 @@ SDL3 remains the fastest way to validate a cross-platform runtime, but it is sti
 - Keep the C core portable enough for a SwiftUI frontend if SDL3 does not produce the desired feel.
 - Do not put rules, scenario decisions, or asset interpretation exclusively in frontend code.
 
+## Completed Foundation
+
+The following baseline work is complete and should be preserved while the plan pivots to PNG-backed public-demo work:
+
+- Milestone 0 skeleton: CMake, optional SDL3 app shell, headless runner, fixed-step loop, test helper layer, build presets, CI notes, asset folder stubs, core-no-SDL smoke test, and architecture/third-party docs.
+- Milestone 1 core-state first half: stable containers for controllers, forces, command identities, terrain tiles, civilians, units, soldiers, weapons, objectives, snapshots, scenario loading, and validation.
+- Current tests cover deterministic RNG, scenario loading, snapshots, movement, LOS, firing, suppression, board-view transforms, fixed-step runs, and the core/SDL boundary.
+
 ## Milestones
 
 ### Milestone A: PNG Map On Screen
@@ -168,7 +192,7 @@ SDL3 remains the fastest way to validate a cross-platform runtime, but it is sti
 
 - Create the first Market / Commercial Streets scenario data file.
 - Replace or deprecate the hard-coded East Mosul placeholder.
-- Load factions, units, objectives, and map metadata from data.
+- Load controller slots, factions, forces, units, civilians, objectives, map metadata, and asset references from data.
 - Add parser/validation tests.
 
 ### Milestone D: Playable Contact
@@ -188,12 +212,14 @@ SDL3 remains the fastest way to validate a cross-platform runtime, but it is sti
 ## Immediate Next Steps
 
 1. Add `docs/asset_pipeline.md` describing source assets, runtime assets, manifests, scale, pivots, facings, and generated outputs.
-2. Add the first map manifest for Market / Commercial Streets.
-3. Render the Market / Commercial Streets PNG in the app through the existing board-view transform.
-4. Add the first sprite manifest and render at least one U.S. unit and one opposing unit as PNG sprites.
-5. Rename or replace the hard-coded `mk_mosul_make_east_block_scenario` path with a 2003 Market / Commercial Streets scenario path.
-6. Add tests for manifest validation and 2003 scenario loading.
-7. Add visible order, selection, suppression, casualty, objective, and hidden-contact markers.
+2. Add the first map manifest for Market / Commercial Streets, using the existing imported layer set and recording world size, origin, pixels-per-meter, z order, and layer type.
+3. Add the first sprite manifest for U.S. patrol, armed threat, civilian, and fallback marker sprites.
+4. Add manifest validation tests before the app relies on those files.
+5. Render the Market / Commercial Streets PNG in the app through the existing board-view transform.
+6. Rename or replace the hard-coded `mk_mosul_make_east_block_scenario` path with a 2003 Market / Commercial Streets scenario path.
+7. Load the 2003 controller slots, forces, civilians, objectives, and initial unit placement from scenario data instead of C constants.
+8. Add visible order, selection, suppression, casualty, objective, and hidden-contact markers.
+9. Keep `mk_headless_run` able to load and advance the current scenario path after each data/manifest change.
 
 ## Quality Bar
 

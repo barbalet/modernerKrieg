@@ -197,6 +197,21 @@ static bool mk_position_fits_map(mk_vec2_t position, const mk_map_t *map) {
         && position.y <= map->height_m;
 }
 
+static bool mk_map_tile_coordinate_is_valid(const mk_map_t *map, mk_ivec2_t coordinate) {
+    if (map == NULL || map->tile_columns <= 0 || map->tile_rows <= 0) {
+        return false;
+    }
+
+    return coordinate.x >= 0
+        && coordinate.y >= 0
+        && coordinate.x < map->tile_columns
+        && coordinate.y < map->tile_rows;
+}
+
+static size_t mk_map_tile_index(const mk_map_t *map, mk_ivec2_t coordinate) {
+    return (size_t)coordinate.y * (size_t)map->tile_columns + (size_t)coordinate.x;
+}
+
 static float mk_distance_squared(mk_vec2_t first, mk_vec2_t second) {
     float dx = first.x - second.x;
     float dy = first.y - second.y;
@@ -463,6 +478,38 @@ static bool mk_faction_id_exists(const mk_scenario_definition_t *scenario, uint3
     return false;
 }
 
+static bool mk_controller_id_exists(const mk_scenario_definition_t *scenario, uint32_t controller_id) {
+    size_t index;
+
+    if (controller_id == 0) {
+        return true;
+    }
+
+    for (index = 0; index < scenario->controller_count; ++index) {
+        if (scenario->controllers[index].id == controller_id) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool mk_force_id_exists(const mk_scenario_definition_t *scenario, uint32_t force_id) {
+    size_t index;
+
+    if (force_id == 0) {
+        return true;
+    }
+
+    for (index = 0; index < scenario->force_count; ++index) {
+        if (scenario->forces[index].id == force_id) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static bool mk_scenario_is_valid(const mk_scenario_definition_t *scenario) {
     size_t index;
 
@@ -474,11 +521,45 @@ static bool mk_scenario_is_valid(const mk_scenario_definition_t *scenario) {
         return false;
     }
 
-    if (scenario->faction_count > MK_MAX_FACTIONS
+    if (scenario->controller_count > MK_MAX_CONTROLLERS
+        || scenario->faction_count > MK_MAX_FACTIONS
+        || scenario->force_count > MK_MAX_FORCES
         || scenario->map.terrain_count > MK_MAX_TERRAIN_ZONES
+        || scenario->map.tile_count > MK_MAX_MAP_TILES
         || scenario->objective_count > MK_MAX_OBJECTIVES
+        || scenario->civilian_count > MK_MAX_CIVILIANS
         || scenario->unit_count > MK_MAX_UNITS) {
         return false;
+    }
+
+    if (scenario->map.tile_count > 0) {
+        size_t expected_tile_count;
+
+        if (scenario->map.tile_columns <= 0
+            || scenario->map.tile_rows <= 0
+            || scenario->map.tile_width_m <= 0.0f
+            || scenario->map.tile_height_m <= 0.0f) {
+            return false;
+        }
+
+        expected_tile_count = (size_t)scenario->map.tile_columns * (size_t)scenario->map.tile_rows;
+        if (expected_tile_count != scenario->map.tile_count || expected_tile_count > MK_MAX_MAP_TILES) {
+            return false;
+        }
+    }
+
+    for (index = 0; index < scenario->controller_count; ++index) {
+        size_t other_index;
+
+        if (scenario->controllers[index].id == 0 || scenario->controllers[index].kind == MK_CONTROLLER_NONE) {
+            return false;
+        }
+
+        for (other_index = index + 1; other_index < scenario->controller_count; ++other_index) {
+            if (scenario->controllers[index].id == scenario->controllers[other_index].id) {
+                return false;
+            }
+        }
     }
 
     for (index = 0; index < scenario->faction_count; ++index) {
@@ -492,6 +573,33 @@ static bool mk_scenario_is_valid(const mk_scenario_definition_t *scenario) {
             if (scenario->factions[index].id == scenario->factions[other_index].id) {
                 return false;
             }
+        }
+    }
+
+    for (index = 0; index < scenario->force_count; ++index) {
+        size_t other_index;
+
+        if (scenario->forces[index].id == 0
+            || !mk_faction_id_exists(scenario, scenario->forces[index].faction_id)
+            || !mk_controller_id_exists(scenario, scenario->forces[index].controller_id)) {
+            return false;
+        }
+
+        for (other_index = index + 1; other_index < scenario->force_count; ++other_index) {
+            if (scenario->forces[index].id == scenario->forces[other_index].id) {
+                return false;
+            }
+        }
+    }
+
+    for (index = 0; index < scenario->map.tile_count; ++index) {
+        const mk_map_tile_t *tile = &scenario->map.tiles[index];
+
+        if (tile->id == 0
+            || !mk_map_tile_coordinate_is_valid(&scenario->map, tile->coordinate)
+            || mk_map_tile_index(&scenario->map, tile->coordinate) != index
+            || tile->movement_cost < 0) {
+            return false;
         }
     }
 
@@ -511,6 +619,14 @@ static bool mk_scenario_is_valid(const mk_scenario_definition_t *scenario) {
         }
     }
 
+    for (index = 0; index < scenario->civilian_count; ++index) {
+        if (scenario->civilians[index].id == 0
+            || !mk_faction_id_exists(scenario, scenario->civilians[index].faction_id)
+            || !mk_position_fits_map(scenario->civilians[index].position_m, &scenario->map)) {
+            return false;
+        }
+    }
+
     for (index = 0; index < scenario->unit_count; ++index) {
         const mk_unit_t *unit = &scenario->units[index];
 
@@ -518,7 +634,9 @@ static bool mk_scenario_is_valid(const mk_scenario_definition_t *scenario) {
             || unit->soldier_count > MK_MAX_SOLDIERS_PER_UNIT
             || !mk_position_fits_map(unit->position_m, &scenario->map)
             || (unit->has_move_target && !mk_position_fits_map(unit->target_position_m, &scenario->map))
-            || !mk_faction_id_exists(scenario, unit->faction_id)) {
+            || !mk_faction_id_exists(scenario, unit->faction_id)
+            || !mk_force_id_exists(scenario, unit->force_id)
+            || !mk_controller_id_exists(scenario, unit->controller_id)) {
             return false;
         }
     }
@@ -528,6 +646,79 @@ static bool mk_scenario_is_valid(const mk_scenario_definition_t *scenario) {
 
 const char *mk_version(void) {
     return "0.1.0";
+}
+
+mk_vec2_t mk_vec2(float x, float y) {
+    mk_vec2_t value;
+
+    value.x = x;
+    value.y = y;
+
+    return value;
+}
+
+mk_ivec2_t mk_ivec2(int x, int y) {
+    mk_ivec2_t value;
+
+    value.x = x;
+    value.y = y;
+
+    return value;
+}
+
+mk_rect_t mk_rect(float x, float y, float width, float height) {
+    mk_rect_t value;
+
+    value.x = x;
+    value.y = y;
+    value.width = width;
+    value.height = height;
+
+    return value;
+}
+
+float mk_clamp_f32(float value, float minimum, float maximum) {
+    if (minimum > maximum) {
+        float swap = minimum;
+        minimum = maximum;
+        maximum = swap;
+    }
+
+    if (value < minimum) {
+        return minimum;
+    }
+
+    if (value > maximum) {
+        return maximum;
+    }
+
+    return value;
+}
+
+int mk_clamp_i32(int value, int minimum, int maximum) {
+    if (minimum > maximum) {
+        int swap = minimum;
+        minimum = maximum;
+        maximum = swap;
+    }
+
+    if (value < minimum) {
+        return minimum;
+    }
+
+    if (value > maximum) {
+        return maximum;
+    }
+
+    return value;
+}
+
+bool mk_rect_contains_point(mk_rect_t rect, mk_vec2_t point) {
+    return mk_rect_is_valid(rect) && mk_point_in_rect(point, rect);
+}
+
+float mk_vec2_distance(mk_vec2_t first, mk_vec2_t second) {
+    return mk_distance(first, second);
 }
 
 void mk_game_init(mk_game_t *game, uint64_t seed) {
@@ -592,6 +783,36 @@ void mk_game_step(mk_game_t *game) {
     }
 }
 
+mk_result_t mk_game_run_fixed_steps(
+    mk_game_t *game,
+    uint32_t step_count,
+    mk_step_observer_fn observer,
+    void *user_data
+) {
+    uint32_t step_index;
+
+    if (game == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    for (step_index = 0; step_index < step_count; ++step_index) {
+        mk_result_t observer_result;
+
+        mk_game_step(game);
+
+        if (observer == NULL) {
+            continue;
+        }
+
+        observer_result = observer(game, user_data);
+        if (observer_result != MK_OK) {
+            return observer_result;
+        }
+    }
+
+    return MK_OK;
+}
+
 mk_result_t mk_game_snapshot(const mk_game_t *game, mk_game_snapshot_t *out_snapshot) {
     if (game == NULL || out_snapshot == NULL) {
         return MK_ERROR_INVALID_ARGUMENT;
@@ -603,10 +824,16 @@ mk_result_t mk_game_snapshot(const mk_game_t *game, mk_game_snapshot_t *out_snap
     out_snapshot->rng_state = game->rng_state;
     out_snapshot->selected_unit_id = game->selected_unit_id;
     out_snapshot->map = game->map;
+    out_snapshot->controller_count = game->controller_count;
+    memcpy(out_snapshot->controllers, game->controllers, sizeof(game->controllers));
     out_snapshot->faction_count = game->faction_count;
     memcpy(out_snapshot->factions, game->factions, sizeof(game->factions));
+    out_snapshot->force_count = game->force_count;
+    memcpy(out_snapshot->forces, game->forces, sizeof(game->forces));
     out_snapshot->objective_count = game->objective_count;
     memcpy(out_snapshot->objectives, game->objectives, sizeof(game->objectives));
+    out_snapshot->civilian_count = game->civilian_count;
+    memcpy(out_snapshot->civilians, game->civilians, sizeof(game->civilians));
     out_snapshot->unit_count = game->unit_count;
     memcpy(out_snapshot->units, game->units, sizeof(game->units));
 
@@ -628,10 +855,16 @@ mk_result_t mk_game_load_scenario(mk_game_t *game, const mk_scenario_definition_
     mk_copy_scenario_name(game->scenario_name, scenario->name);
     game->selected_unit_id = 0;
     game->map = scenario->map;
+    game->controller_count = scenario->controller_count;
+    memcpy(game->controllers, scenario->controllers, sizeof(scenario->controllers));
     game->faction_count = scenario->faction_count;
     memcpy(game->factions, scenario->factions, sizeof(scenario->factions));
+    game->force_count = scenario->force_count;
+    memcpy(game->forces, scenario->forces, sizeof(scenario->forces));
     game->objective_count = scenario->objective_count;
     memcpy(game->objectives, scenario->objectives, sizeof(scenario->objectives));
+    game->civilian_count = scenario->civilian_count;
+    memcpy(game->civilians, scenario->civilians, sizeof(scenario->civilians));
     game->unit_count = scenario->unit_count;
     memcpy(game->units, scenario->units, sizeof(scenario->units));
 
@@ -960,10 +1193,15 @@ mk_weapon_profile_t mk_make_weapon(
 
     memset(&weapon, 0, sizeof(weapon));
     mk_copy_name(weapon.name, name);
+    weapon.fire_mode = shots_per_action > 1 ? MK_FIRE_MODE_BURST : MK_FIRE_MODE_SINGLE;
+    weapon.ammo_kind = shots_per_action > 0 ? MK_AMMO_SMALL_ARMS : MK_AMMO_NONE;
     weapon.effective_range_m = effective_range_m;
     weapon.shots_per_action = shots_per_action;
     weapon.damage = damage;
     weapon.suppression = suppression;
+    weapon.magazine_capacity = shots_per_action > 0 ? 30 : 0;
+    weapon.reload_ticks = shots_per_action > 0 ? 2 : 0;
+    weapon.cooldown_ticks = shots_per_action > 0 ? 1 : 0;
 
     return weapon;
 }
@@ -980,7 +1218,12 @@ mk_soldier_t mk_make_soldier(
     soldier.role = role;
     soldier.weapon = weapon;
     soldier.health = 100;
+    soldier.max_health = 100;
     soldier.ammo = 120;
+    soldier.ammo_capacity = 120;
+    soldier.stance = MK_STANCE_STANDING;
+    soldier.wound_state = MK_WOUND_NONE;
+    soldier.can_move = true;
     soldier.facing_degrees = 0.0f;
 
     return soldier;
@@ -999,12 +1242,16 @@ mk_unit_t mk_make_unit(
     unit.side = side;
     unit.training = training;
     unit.order = MK_ORDER_HOLD;
+    unit.order_source = MK_ORDER_SOURCE_NONE;
     unit.position_m = position_m;
     unit.target_position_m = position_m;
     unit.facing_degrees = 0.0f;
     unit.cohesion_radius_m = 8.0f;
     unit.move_speed_m_per_tick = MK_DEFAULT_MOVE_SPEED_M_PER_TICK;
+    unit.morale = 100;
     unit.status = MK_UNIT_READY;
+    unit.communications_up = true;
+    unit.cover_posture = false;
 
     return unit;
 }
@@ -1020,6 +1267,17 @@ mk_color_t mk_make_color(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
     return color;
 }
 
+mk_controller_slot_t mk_make_controller_slot(const char *name, mk_side_t side, mk_controller_kind_t kind) {
+    mk_controller_slot_t controller;
+
+    memset(&controller, 0, sizeof(controller));
+    mk_copy_name(controller.name, name);
+    controller.side = side;
+    controller.kind = kind;
+
+    return controller;
+}
+
 mk_faction_t mk_make_faction(const char *name, mk_side_t side, mk_color_t color) {
     mk_faction_t faction;
 
@@ -1031,6 +1289,35 @@ mk_faction_t mk_make_faction(const char *name, mk_side_t side, mk_color_t color)
     return faction;
 }
 
+mk_command_identity_t mk_make_command_identity(const char *name, const char *callsign, mk_side_t side) {
+    mk_command_identity_t command;
+
+    memset(&command, 0, sizeof(command));
+    mk_copy_name(command.name, name);
+    mk_copy_name(command.callsign, callsign);
+    command.side = side;
+
+    return command;
+}
+
+mk_force_t mk_make_force(
+    const char *name,
+    mk_side_t side,
+    uint32_t faction_id,
+    uint32_t controller_id
+) {
+    mk_force_t force;
+
+    memset(&force, 0, sizeof(force));
+    mk_copy_name(force.name, name);
+    force.side = side;
+    force.faction_id = faction_id;
+    force.controller_id = controller_id;
+    force.command = mk_make_command_identity(name, name, side);
+
+    return force;
+}
+
 mk_map_t mk_make_map(const char *name, float width_m, float height_m) {
     mk_map_t map;
 
@@ -1040,6 +1327,29 @@ mk_map_t mk_make_map(const char *name, float width_m, float height_m) {
     map.height_m = height_m;
 
     return map;
+}
+
+mk_map_tile_t mk_make_map_tile(
+    mk_ivec2_t coordinate,
+    mk_terrain_kind_t kind,
+    int elevation,
+    int cover,
+    int movement_cost,
+    bool blocks_line_of_sight,
+    bool blocks_movement
+) {
+    mk_map_tile_t tile;
+
+    memset(&tile, 0, sizeof(tile));
+    tile.coordinate = coordinate;
+    tile.kind = kind;
+    tile.elevation = elevation;
+    tile.cover = cover;
+    tile.movement_cost = movement_cost;
+    tile.blocks_line_of_sight = blocks_line_of_sight;
+    tile.blocks_movement = blocks_movement;
+
+    return tile;
 }
 
 mk_terrain_zone_t mk_make_terrain_zone(
@@ -1083,6 +1393,107 @@ mk_objective_t mk_make_objective(
     return objective;
 }
 
+mk_civilian_t mk_make_civilian(const char *name, uint32_t faction_id, mk_vec2_t position_m) {
+    mk_civilian_t civilian;
+
+    memset(&civilian, 0, sizeof(civilian));
+    mk_copy_name(civilian.name, name);
+    civilian.faction_id = faction_id;
+    civilian.position_m = position_m;
+    civilian.state = MK_CIVILIAN_SHELTERING;
+    civilian.protected_noncombatant = true;
+
+    return civilian;
+}
+
+mk_result_t mk_map_configure_tiles(
+    mk_map_t *map,
+    int columns,
+    int rows,
+    float tile_width_m,
+    float tile_height_m,
+    mk_terrain_kind_t default_kind
+) {
+    size_t tile_count;
+    int y;
+    int x;
+
+    if (map == NULL || columns <= 0 || rows <= 0 || tile_width_m <= 0.0f || tile_height_m <= 0.0f) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    tile_count = (size_t)columns * (size_t)rows;
+    if (tile_count > MK_MAX_MAP_TILES) {
+        return MK_ERROR_CAPACITY;
+    }
+
+    map->tile_width_m = tile_width_m;
+    map->tile_height_m = tile_height_m;
+    map->tile_columns = columns;
+    map->tile_rows = rows;
+    map->tile_count = tile_count;
+
+    for (y = 0; y < rows; ++y) {
+        for (x = 0; x < columns; ++x) {
+            size_t index = (size_t)y * (size_t)columns + (size_t)x;
+            mk_map_tile_t tile = mk_make_map_tile(
+                mk_ivec2(x, y),
+                default_kind,
+                0,
+                0,
+                1,
+                false,
+                false
+            );
+
+            tile.id = (uint32_t)(index + 1);
+            map->tiles[index] = tile;
+        }
+    }
+
+    return MK_OK;
+}
+
+mk_map_tile_t *mk_map_get_tile(mk_map_t *map, mk_ivec2_t coordinate) {
+    if (!mk_map_tile_coordinate_is_valid(map, coordinate)) {
+        return NULL;
+    }
+
+    return &map->tiles[mk_map_tile_index(map, coordinate)];
+}
+
+const mk_map_tile_t *mk_map_get_tile_const(const mk_map_t *map, mk_ivec2_t coordinate) {
+    if (!mk_map_tile_coordinate_is_valid(map, coordinate)) {
+        return NULL;
+    }
+
+    return &map->tiles[mk_map_tile_index(map, coordinate)];
+}
+
+mk_result_t mk_map_set_tile(mk_map_t *map, const mk_map_tile_t *tile) {
+    mk_map_tile_t copy;
+    size_t index;
+
+    if (map == NULL || tile == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (!mk_map_tile_coordinate_is_valid(map, tile->coordinate) || tile->movement_cost < 0) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    index = mk_map_tile_index(map, tile->coordinate);
+    if (index >= map->tile_count) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    copy = *tile;
+    copy.id = (uint32_t)(index + 1);
+    map->tiles[index] = copy;
+
+    return MK_OK;
+}
+
 mk_result_t mk_map_add_terrain(mk_map_t *map, const mk_terrain_zone_t *terrain, uint32_t *out_terrain_id) {
     mk_terrain_zone_t copy;
 
@@ -1102,6 +1513,38 @@ mk_result_t mk_map_add_terrain(mk_map_t *map, const mk_terrain_zone_t *terrain, 
 
     if (out_terrain_id != NULL) {
         *out_terrain_id = copy.id;
+    }
+
+    return MK_OK;
+}
+
+mk_result_t mk_scenario_add_controller(
+    mk_scenario_definition_t *scenario,
+    const mk_controller_slot_t *controller,
+    uint32_t *out_controller_id
+) {
+    mk_controller_slot_t copy;
+
+    if (scenario == NULL || controller == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (controller->kind == MK_CONTROLLER_NONE) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    if (scenario->controller_count >= MK_MAX_CONTROLLERS) {
+        return MK_ERROR_CAPACITY;
+    }
+
+    copy = *controller;
+    copy.id = (uint32_t)(scenario->controller_count + 1);
+
+    scenario->controllers[scenario->controller_count] = copy;
+    scenario->controller_count += 1;
+
+    if (out_controller_id != NULL) {
+        *out_controller_id = copy.id;
     }
 
     return MK_OK;
@@ -1131,6 +1574,38 @@ mk_result_t mk_scenario_add_faction(mk_scenario_definition_t *scenario, const mk
     return MK_OK;
 }
 
+mk_result_t mk_scenario_add_force(mk_scenario_definition_t *scenario, const mk_force_t *force, uint32_t *out_force_id) {
+    mk_force_t copy;
+
+    if (scenario == NULL || force == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (!mk_faction_id_exists(scenario, force->faction_id)
+        || !mk_controller_id_exists(scenario, force->controller_id)) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    if (scenario->force_count >= MK_MAX_FORCES) {
+        return MK_ERROR_CAPACITY;
+    }
+
+    copy = *force;
+    copy.id = (uint32_t)(scenario->force_count + 1);
+    if (copy.command.id == 0) {
+        copy.command.id = copy.id;
+    }
+
+    scenario->forces[scenario->force_count] = copy;
+    scenario->force_count += 1;
+
+    if (out_force_id != NULL) {
+        *out_force_id = copy.id;
+    }
+
+    return MK_OK;
+}
+
 mk_result_t mk_scenario_add_objective(mk_scenario_definition_t *scenario, const mk_objective_t *objective, uint32_t *out_objective_id) {
     mk_objective_t copy;
 
@@ -1150,6 +1625,39 @@ mk_result_t mk_scenario_add_objective(mk_scenario_definition_t *scenario, const 
 
     if (out_objective_id != NULL) {
         *out_objective_id = copy.id;
+    }
+
+    return MK_OK;
+}
+
+mk_result_t mk_scenario_add_civilian(
+    mk_scenario_definition_t *scenario,
+    const mk_civilian_t *civilian,
+    uint32_t *out_civilian_id
+) {
+    mk_civilian_t copy;
+
+    if (scenario == NULL || civilian == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (scenario->civilian_count >= MK_MAX_CIVILIANS) {
+        return MK_ERROR_CAPACITY;
+    }
+
+    if (!mk_faction_id_exists(scenario, civilian->faction_id)
+        || !mk_position_fits_map(civilian->position_m, &scenario->map)) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    copy = *civilian;
+    copy.id = (uint32_t)(scenario->civilian_count + 1);
+
+    scenario->civilians[scenario->civilian_count] = copy;
+    scenario->civilian_count += 1;
+
+    if (out_civilian_id != NULL) {
+        *out_civilian_id = copy.id;
     }
 
     return MK_OK;

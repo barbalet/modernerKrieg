@@ -1,4 +1,5 @@
 #include "mk_core.h"
+#include "mk_log.h"
 #include "mk_mosul_demo.h"
 
 #include <assert.h>
@@ -58,6 +59,40 @@ static void test_rng_is_deterministic(void) {
     }
 }
 
+static void test_result_names_are_stable(void) {
+    assert(strcmp(mk_result_name(MK_OK), "MK_OK") == 0);
+    assert(strcmp(mk_result_name(MK_ERROR_INVALID_ARGUMENT), "MK_ERROR_INVALID_ARGUMENT") == 0);
+    assert(strcmp(mk_result_name(MK_ERROR_CAPACITY), "MK_ERROR_CAPACITY") == 0);
+    assert(strcmp(mk_result_name(MK_ERROR_NOT_FOUND), "MK_ERROR_NOT_FOUND") == 0);
+    assert(strcmp(mk_result_name(MK_ERROR_INVALID_DATA), "MK_ERROR_INVALID_DATA") == 0);
+    assert(strcmp(mk_result_name((mk_result_t)-999), "MK_ERROR_UNKNOWN") == 0);
+    assert(strcmp(mk_log_level_name(MK_LOG_INFO), "info") == 0);
+    assert(strcmp(mk_log_level_name(MK_LOG_ERROR), "error") == 0);
+}
+
+static void test_math_value_helpers(void) {
+    mk_vec2_t first = mk_vec2(3.0f, 4.0f);
+    mk_vec2_t second = mk_vec2(0.0f, 0.0f);
+    mk_ivec2_t tile = mk_ivec2(7, -2);
+    mk_rect_t rect = mk_rect(2.0f, 3.0f, 10.0f, 8.0f);
+
+    assert_close(first.x, 3.0f);
+    assert_close(first.y, 4.0f);
+    assert(tile.x == 7);
+    assert(tile.y == -2);
+    assert_close(rect.x, 2.0f);
+    assert_close(rect.height, 8.0f);
+    assert_close(mk_vec2_distance(first, second), 5.0f);
+    assert(mk_clamp_i32(12, 0, 10) == 10);
+    assert(mk_clamp_i32(-2, 0, 10) == 0);
+    assert(mk_clamp_i32(5, 10, 0) == 5);
+    assert_close(mk_clamp_f32(12.0f, 0.0f, 10.0f), 10.0f);
+    assert_close(mk_clamp_f32(-2.0f, 0.0f, 10.0f), 0.0f);
+    assert_close(mk_clamp_f32(5.0f, 10.0f, 0.0f), 5.0f);
+    assert(mk_rect_contains_point(rect, mk_vec2(4.0f, 5.0f)));
+    assert(!mk_rect_contains_point(rect, mk_vec2(20.0f, 5.0f)));
+}
+
 static void test_unit_and_soldier_creation(void) {
     mk_game_t game;
     mk_weapon_profile_t rifle;
@@ -88,6 +123,43 @@ static void test_unit_and_soldier_creation(void) {
     assert(strcmp(stored_unit->name, "CTS Assault Element") == 0);
     assert(stored_unit->soldier_count == 1);
     assert(stored_unit->soldiers[0].id == 1);
+    assert(stored_unit->morale == 100);
+    assert(stored_unit->communications_up);
+    assert(stored_unit->soldiers[0].max_health == 100);
+    assert(stored_unit->soldiers[0].ammo_capacity == 120);
+    assert(stored_unit->soldiers[0].stance == MK_STANCE_STANDING);
+    assert(stored_unit->soldiers[0].wound_state == MK_WOUND_NONE);
+    assert(stored_unit->soldiers[0].can_move);
+    assert(stored_unit->soldiers[0].weapon.fire_mode == MK_FIRE_MODE_BURST);
+    assert(stored_unit->soldiers[0].weapon.ammo_kind == MK_AMMO_SMALL_ARMS);
+}
+
+static void test_map_tiles_are_configurable_and_addressable(void) {
+    mk_map_t map = mk_make_map("Tile Map", 40.0f, 40.0f);
+    mk_map_tile_t tile;
+    mk_map_tile_t *stored_tile;
+
+    assert(mk_map_configure_tiles(&map, 4, 4, 10.0f, 10.0f, MK_TERRAIN_OPEN) == MK_OK);
+    assert(map.tile_columns == 4);
+    assert(map.tile_rows == 4);
+    assert(map.tile_count == 16);
+    assert(map.tiles[0].id == 1);
+    assert(map.tiles[15].id == 16);
+    assert(map.tiles[15].coordinate.x == 3);
+    assert(map.tiles[15].coordinate.y == 3);
+
+    tile = mk_make_map_tile(mk_ivec2(2, 1), MK_TERRAIN_RUBBLE, 1, 2, 3, true, false);
+    assert(mk_map_set_tile(&map, &tile) == MK_OK);
+    stored_tile = mk_map_get_tile(&map, mk_ivec2(2, 1));
+    assert(stored_tile != NULL);
+    assert(stored_tile->id == 7);
+    assert(stored_tile->kind == MK_TERRAIN_RUBBLE);
+    assert(stored_tile->elevation == 1);
+    assert(stored_tile->cover == 2);
+    assert(stored_tile->movement_cost == 3);
+    assert(stored_tile->blocks_line_of_sight);
+    assert(mk_map_get_tile(&map, mk_ivec2(4, 1)) == NULL);
+    assert(mk_map_configure_tiles(&map, 100, 100, 1.0f, 1.0f, MK_TERRAIN_OPEN) == MK_ERROR_CAPACITY);
 }
 
 static void test_capacity_limits_are_reported(void) {
@@ -142,11 +214,27 @@ static void test_scenario_loading_populates_core_state(void) {
     assert(strcmp(game.scenario_name, "East Mosul Block") == 0);
     assert(game.rng_state == scenario.seed);
     assert(strcmp(game.map.name, "Gogjali District Edge") == 0);
+    assert(game.map.tile_count == 96);
+    assert(game.map.tile_columns == 12);
+    assert(game.map.tile_rows == 8);
+    assert(game.map.tiles[44].kind == MK_TERRAIN_BUILDING);
     assert(game.map.terrain_count == 3);
+    assert(game.controller_count == 3);
     assert(game.faction_count == 3);
+    assert(game.force_count == 3);
     assert(game.objective_count == 1);
+    assert(game.civilian_count == 1);
     assert(game.unit_count == 3);
+    assert(game.controllers[0].kind == MK_CONTROLLER_TACTICAL_AI);
+    assert(game.controllers[2].kind == MK_CONTROLLER_OBSERVER);
+    assert(game.forces[0].controller_id == 1);
+    assert(strcmp(game.forces[0].command.callsign, "CTS-1") == 0);
+    assert(game.civilians[0].protected_noncombatant);
+    assert(game.civilians[0].state == MK_CIVILIAN_SHELTERING);
     assert(game.units[0].faction_id == 1);
+    assert(game.units[0].force_id == 1);
+    assert(game.units[0].controller_id == 1);
+    assert(strcmp(game.units[0].command.callsign, "CTS-1A") == 0);
     assert(game.units[0].soldier_count == 3);
     assert(game.units[1].soldiers[1].role == MK_ROLE_RPG);
     assert(game.units[2].side == MK_SIDE_CIVILIAN);
@@ -169,10 +257,21 @@ static void test_snapshot_is_stable_copy(void) {
     assert(snapshot.units[0].suppression == 3);
     assert(snapshot.units[0].soldiers[0].suppression == 0);
     assert(snapshot.map.terrain[1].blocks_line_of_sight);
+    assert(snapshot.controller_count == 3);
+    assert(snapshot.force_count == 3);
+    assert(snapshot.civilian_count == 1);
+    assert(snapshot.map.tile_count == 96);
+    assert(snapshot.controllers[1].side == MK_SIDE_OPFOR);
+    assert(snapshot.forces[1].faction_id == 2);
+    assert(snapshot.civilians[0].position_m.x == 132.0f);
     assert(strcmp(snapshot.objectives[0].name, "Secure Compound") == 0);
 
     game.units[0].suppression = 99;
+    game.controllers[0].kind = MK_CONTROLLER_HUMAN;
+    game.civilians[0].stress = 99;
     assert(snapshot.units[0].suppression == 3);
+    assert(snapshot.controllers[0].kind == MK_CONTROLLER_TACTICAL_AI);
+    assert(snapshot.civilians[0].stress == 0);
 }
 
 static void test_pick_select_and_move_order(void) {
@@ -455,12 +554,31 @@ static void test_invalid_scenario_is_rejected(void) {
     scenario = make_east_mosul_block_scenario_fixture();
     scenario.units[0].faction_id = 99;
     assert(mk_game_load_scenario(&game, &scenario) == MK_ERROR_INVALID_DATA);
+
+    scenario = make_east_mosul_block_scenario_fixture();
+    scenario.controllers[0].kind = MK_CONTROLLER_NONE;
+    assert(mk_game_load_scenario(&game, &scenario) == MK_ERROR_INVALID_DATA);
+
+    scenario = make_east_mosul_block_scenario_fixture();
+    scenario.forces[0].controller_id = 99;
+    assert(mk_game_load_scenario(&game, &scenario) == MK_ERROR_INVALID_DATA);
+
+    scenario = make_east_mosul_block_scenario_fixture();
+    scenario.civilians[0].position_m = make_vec2(-1.0f, 48.0f);
+    assert(mk_game_load_scenario(&game, &scenario) == MK_ERROR_INVALID_DATA);
+
+    scenario = make_east_mosul_block_scenario_fixture();
+    scenario.map.tiles[0].movement_cost = -1;
+    assert(mk_game_load_scenario(&game, &scenario) == MK_ERROR_INVALID_DATA);
 }
 
 int main(void) {
     test_version_is_present();
     test_rng_is_deterministic();
+    test_result_names_are_stable();
+    test_math_value_helpers();
     test_unit_and_soldier_creation();
+    test_map_tiles_are_configurable_and_addressable();
     test_capacity_limits_are_reported();
     test_step_recovers_suppression();
     test_scenario_loading_populates_core_state();

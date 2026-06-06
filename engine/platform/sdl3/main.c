@@ -1,9 +1,24 @@
 #include "mk_core.h"
 #include "mk_board_view.h"
+#include "mk_log.h"
 #include "mk_mosul_demo.h"
 
 #include <SDL3/SDL.h>
 #include <stdbool.h>
+#include <string.h>
+
+typedef struct {
+    bool quit_requested;
+    bool pan_left;
+    bool pan_right;
+    bool pan_up;
+    bool pan_down;
+    bool zoom_in;
+    bool zoom_out;
+    bool select_pressed;
+    bool order_pressed;
+    mk_vec2_t mouse_screen_position;
+} mk_sdl_input_t;
 
 static SDL_FRect mk_sdl_rect(mk_rect_t rect) {
     SDL_FRect output;
@@ -23,6 +38,109 @@ static mk_vec2_t mk_screen_center(const mk_board_view_t *view) {
     center.y = view->screen_rect_px.y + view->screen_rect_px.height * 0.5f;
 
     return center;
+}
+
+static void mk_sdl_input_begin_frame(mk_sdl_input_t *input) {
+    if (input == NULL) {
+        return;
+    }
+
+    memset(input, 0, sizeof(*input));
+}
+
+static void mk_sdl_input_handle_event(mk_sdl_input_t *input, const SDL_Event *event) {
+    if (input == NULL || event == NULL) {
+        return;
+    }
+
+    if (event->type == SDL_EVENT_QUIT) {
+        input->quit_requested = true;
+    } else if (event->type == SDL_EVENT_KEY_DOWN) {
+        switch (event->key.key) {
+            case SDLK_ESCAPE:
+                input->quit_requested = true;
+                break;
+            case SDLK_RIGHT:
+                input->pan_right = true;
+                break;
+            case SDLK_LEFT:
+                input->pan_left = true;
+                break;
+            case SDLK_DOWN:
+                input->pan_down = true;
+                break;
+            case SDLK_UP:
+                input->pan_up = true;
+                break;
+            case SDLK_EQUALS:
+                input->zoom_in = true;
+                break;
+            case SDLK_MINUS:
+                input->zoom_out = true;
+                break;
+            default:
+                break;
+        }
+    } else if (event->type == SDL_EVENT_MOUSE_MOTION) {
+        input->mouse_screen_position.x = event->motion.x;
+        input->mouse_screen_position.y = event->motion.y;
+    } else if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+        input->mouse_screen_position.x = event->button.x;
+        input->mouse_screen_position.y = event->button.y;
+
+        if (event->button.button == SDL_BUTTON_LEFT) {
+            input->select_pressed = true;
+        } else if (event->button.button == SDL_BUTTON_RIGHT) {
+            input->order_pressed = true;
+        }
+    }
+}
+
+static void mk_sdl_apply_input(mk_game_t *game, mk_board_view_t *view, const mk_sdl_input_t *input) {
+    const float pan_pixels = 48.0f;
+
+    if (game == NULL || view == NULL || input == NULL) {
+        return;
+    }
+
+    if (input->pan_right) {
+        (void)mk_board_view_pan_pixels(view, &game->map, pan_pixels, 0.0f);
+    }
+
+    if (input->pan_left) {
+        (void)mk_board_view_pan_pixels(view, &game->map, -pan_pixels, 0.0f);
+    }
+
+    if (input->pan_down) {
+        (void)mk_board_view_pan_pixels(view, &game->map, 0.0f, pan_pixels);
+    }
+
+    if (input->pan_up) {
+        (void)mk_board_view_pan_pixels(view, &game->map, 0.0f, -pan_pixels);
+    }
+
+    if (input->zoom_in) {
+        (void)mk_board_view_zoom_at(view, &game->map, 1.25f, mk_screen_center(view));
+    }
+
+    if (input->zoom_out) {
+        (void)mk_board_view_zoom_at(view, &game->map, 0.8f, mk_screen_center(view));
+    }
+
+    if (input->select_pressed || input->order_pressed) {
+        mk_vec2_t map_position = mk_board_view_screen_to_map(view, input->mouse_screen_position);
+
+        if (input->select_pressed) {
+            uint32_t selected_unit_id = 0;
+            if (mk_game_select_unit_at(game, map_position, MK_UNIT_PICK_RADIUS_M, &selected_unit_id) != MK_OK) {
+                mk_game_clear_selection(game);
+            }
+        }
+
+        if (input->order_pressed) {
+            (void)mk_game_issue_selected_move_order(game, map_position);
+        }
+    }
 }
 
 static void mk_set_terrain_color(SDL_Renderer *renderer, mk_terrain_kind_t kind) {
@@ -143,6 +261,7 @@ int main(int argc, char **argv) {
     mk_game_t game;
     mk_scenario_definition_t scenario;
     mk_board_view_t view;
+    mk_result_t result;
 
     (void)argc;
     (void)argv;
@@ -167,17 +286,22 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (mk_mosul_make_east_block_scenario(&scenario) != MK_OK
-        || mk_game_load_scenario(&game, &scenario) != MK_OK) {
-        SDL_Log("Failed to load Mosul demo scenario.");
+    result = mk_mosul_make_east_block_scenario(&scenario);
+    if (result == MK_OK) {
+        result = mk_game_load_scenario(&game, &scenario);
+    }
+
+    if (result != MK_OK) {
+        SDL_Log("Failed to load Mosul demo scenario: %s", mk_result_name(result));
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
         SDL_Quit();
         return 1;
     }
 
-    if (mk_board_view_fit_map(&view, &game.map, 960.0f, 640.0f, MK_BOARD_VIEW_DEFAULT_MARGIN_PX) != MK_OK) {
-        SDL_Log("Failed to create board view.");
+    result = mk_board_view_fit_map(&view, &game.map, 960.0f, 640.0f, MK_BOARD_VIEW_DEFAULT_MARGIN_PX);
+    if (result != MK_OK) {
+        SDL_Log("Failed to create board view: %s", mk_result_name(result));
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
         SDL_Quit();
@@ -186,44 +310,20 @@ int main(int argc, char **argv) {
 
     while (running) {
         SDL_Event event;
+        mk_sdl_input_t input;
 
+        mk_sdl_input_begin_frame(&input);
         while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_EVENT_QUIT) {
-                running = false;
-            } else if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE) {
-                running = false;
-            } else if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_RIGHT) {
-                (void)mk_board_view_pan_pixels(&view, &game.map, 48.0f, 0.0f);
-            } else if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_LEFT) {
-                (void)mk_board_view_pan_pixels(&view, &game.map, -48.0f, 0.0f);
-            } else if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_DOWN) {
-                (void)mk_board_view_pan_pixels(&view, &game.map, 0.0f, 48.0f);
-            } else if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_UP) {
-                (void)mk_board_view_pan_pixels(&view, &game.map, 0.0f, -48.0f);
-            } else if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_EQUALS) {
-                (void)mk_board_view_zoom_at(&view, &game.map, 1.25f, mk_screen_center(&view));
-            } else if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_MINUS) {
-                (void)mk_board_view_zoom_at(&view, &game.map, 0.8f, mk_screen_center(&view));
-            } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
-                mk_vec2_t screen_position;
-                mk_vec2_t map_position;
-
-                screen_position.x = event.button.x;
-                screen_position.y = event.button.y;
-                map_position = mk_board_view_screen_to_map(&view, screen_position);
-
-                if (event.button.button == SDL_BUTTON_LEFT) {
-                    uint32_t selected_unit_id = 0;
-                    if (mk_game_select_unit_at(&game, map_position, MK_UNIT_PICK_RADIUS_M, &selected_unit_id) != MK_OK) {
-                        mk_game_clear_selection(&game);
-                    }
-                } else if (event.button.button == SDL_BUTTON_RIGHT) {
-                    (void)mk_game_issue_selected_move_order(&game, map_position);
-                }
-            }
+            mk_sdl_input_handle_event(&input, &event);
         }
 
-        mk_game_step(&game);
+        if (input.quit_requested) {
+            running = false;
+            continue;
+        }
+
+        mk_sdl_apply_input(&game, &view, &input);
+        (void)mk_game_run_fixed_steps(&game, 1, NULL, NULL);
         mk_render(renderer, &game, &view);
         SDL_Delay(16);
     }
