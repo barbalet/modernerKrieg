@@ -203,6 +203,30 @@ static bool mk_asset_required_float(const mk_asset_entry_list_t *entries, const 
     return true;
 }
 
+static bool mk_asset_required_color(const mk_asset_entry_list_t *entries, const char *key, mk_color_t *out_color) {
+    const char *value = mk_asset_entry_value(entries, key);
+    int r;
+    int g;
+    int b;
+    int a;
+    char trailing;
+
+    if (value == NULL || out_color == NULL) {
+        return false;
+    }
+
+    if (sscanf(value, " %d , %d , %d , %d %c", &r, &g, &b, &a, &trailing) != 4) {
+        return false;
+    }
+
+    if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255 || a < 0 || a > 255) {
+        return false;
+    }
+
+    *out_color = mk_make_color((uint8_t)r, (uint8_t)g, (uint8_t)b, (uint8_t)a);
+    return true;
+}
+
 static void mk_asset_make_indexed_key(char *out_key, size_t capacity, const char *prefix, size_t index, const char *field) {
     (void)snprintf(out_key, capacity, "%s.%u.%s", prefix, (unsigned)index, field);
 }
@@ -241,6 +265,22 @@ static bool mk_asset_sprite_ids_are_unique(const mk_asset_sprite_manifest_t *man
 
         for (other_index = index + 1; other_index < manifest->frame_count; ++other_index) {
             if (strcmp(manifest->frames[index].runtime_id, manifest->frames[other_index].runtime_id) == 0) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+static bool mk_asset_marker_ids_are_unique(const mk_asset_marker_manifest_t *manifest) {
+    size_t index;
+
+    for (index = 0; index < manifest->marker_count; ++index) {
+        size_t other_index;
+
+        for (other_index = index + 1; other_index < manifest->marker_count; ++other_index) {
+            if (strcmp(manifest->markers[index].id, manifest->markers[other_index].id) == 0) {
                 return false;
             }
         }
@@ -488,6 +528,84 @@ mk_result_t mk_asset_load_sprite_manifest(
     return MK_OK;
 }
 
+mk_result_t mk_asset_load_marker_manifest(
+    const char *manifest_path,
+    mk_asset_marker_manifest_t *out_manifest
+) {
+    mk_asset_entry_list_t entries;
+    const char *manifest_type;
+    int marker_count;
+    int marker_index;
+    mk_result_t result;
+
+    if (out_manifest == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    memset(out_manifest, 0, sizeof(*out_manifest));
+    result = mk_asset_read_entries(manifest_path, &entries);
+    if (result != MK_OK) {
+        return result;
+    }
+
+    manifest_type = mk_asset_entry_value(&entries, "manifest_type");
+    if (manifest_type == NULL || strcmp(manifest_type, "markers") != 0) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    if (!mk_asset_required_text(&entries, "id", out_manifest->id, sizeof(out_manifest->id))
+        || !mk_asset_required_text(&entries, "name", out_manifest->name, sizeof(out_manifest->name))
+        || !mk_asset_required_int(&entries, "marker_count", &marker_count)) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    if (marker_count <= 0 || marker_count > MK_ASSET_MAX_MARKERS) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    out_manifest->marker_count = (size_t)marker_count;
+    for (marker_index = 0; marker_index < marker_count; ++marker_index) {
+        mk_asset_marker_t *marker = &out_manifest->markers[marker_index];
+        char key[64];
+
+        mk_asset_make_indexed_key(key, sizeof(key), "marker", (size_t)marker_index, "id");
+        if (!mk_asset_required_text(&entries, key, marker->id, sizeof(marker->id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_asset_make_indexed_key(key, sizeof(key), "marker", (size_t)marker_index, "kind");
+        if (!mk_asset_required_text(&entries, key, marker->kind, sizeof(marker->kind))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_asset_make_indexed_key(key, sizeof(key), "marker", (size_t)marker_index, "shape");
+        if (!mk_asset_required_text(&entries, key, marker->shape, sizeof(marker->shape))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_asset_make_indexed_key(key, sizeof(key), "marker", (size_t)marker_index, "color");
+        if (!mk_asset_required_color(&entries, key, &marker->color)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_asset_make_indexed_key(key, sizeof(key), "marker", (size_t)marker_index, "radius_m");
+        if (!mk_asset_required_float(&entries, key, &marker->radius_m) || marker->radius_m < 0.0f) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_asset_make_indexed_key(key, sizeof(key), "marker", (size_t)marker_index, "line_width_px");
+        if (!mk_asset_required_int(&entries, key, &marker->line_width_px) || marker->line_width_px <= 0) {
+            return MK_ERROR_INVALID_DATA;
+        }
+    }
+
+    if (!mk_asset_marker_ids_are_unique(out_manifest)) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    return MK_OK;
+}
+
 const mk_asset_sprite_sheet_t *mk_asset_find_sprite_sheet(
     const mk_asset_sprite_manifest_t *manifest,
     const char *sheet_id
@@ -501,6 +619,25 @@ const mk_asset_sprite_sheet_t *mk_asset_find_sprite_sheet(
     for (index = 0; index < manifest->sheet_count; ++index) {
         if (strcmp(manifest->sheets[index].id, sheet_id) == 0) {
             return &manifest->sheets[index];
+        }
+    }
+
+    return NULL;
+}
+
+const mk_asset_marker_t *mk_asset_find_marker(
+    const mk_asset_marker_manifest_t *manifest,
+    const char *marker_id
+) {
+    size_t index;
+
+    if (manifest == NULL || marker_id == NULL) {
+        return NULL;
+    }
+
+    for (index = 0; index < manifest->marker_count; ++index) {
+        if (strcmp(manifest->markers[index].id, marker_id) == 0) {
+            return &manifest->markers[index];
         }
     }
 

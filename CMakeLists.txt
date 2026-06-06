@@ -62,6 +62,19 @@ target_link_libraries(modernerKriegAssets PUBLIC modernerKriegCore)
 
 mk_apply_warnings(modernerKriegAssets)
 
+add_library(modernerKriegAi STATIC
+  engine/ai/src/mk_ai.c
+)
+
+target_include_directories(modernerKriegAi
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/engine/ai/include>
+)
+
+target_link_libraries(modernerKriegAi PUBLIC modernerKriegCore)
+
+mk_apply_warnings(modernerKriegAi)
+
 add_library(modernerKriegRender STATIC
   engine/render/src/mk_board_view.c
 )
@@ -77,6 +90,7 @@ mk_apply_warnings(modernerKriegRender)
 
 add_library(modernerKriegMosul STATIC
   game/mosul/src/mk_mosul_demo.c
+  game/mosul/src/mk_mosul_scenario_data.c
 )
 
 target_include_directories(modernerKriegMosul
@@ -84,14 +98,23 @@ target_include_directories(modernerKriegMosul
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/game/mosul/include>
 )
 
-target_link_libraries(modernerKriegMosul PUBLIC modernerKriegCore)
+target_link_libraries(modernerKriegMosul PUBLIC modernerKriegCore modernerKriegAssets)
+
+target_compile_definitions(modernerKriegMosul
+  PRIVATE
+    MK_PROJECT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
 
 mk_apply_warnings(modernerKriegMosul)
 
 add_executable(mk_headless_run
   engine/tools/autoplay/mk_headless_run.c
 )
-target_link_libraries(mk_headless_run PRIVATE modernerKriegMosul)
+target_link_libraries(mk_headless_run PRIVATE modernerKriegAi modernerKriegMosul)
+target_compile_definitions(mk_headless_run
+  PRIVATE
+    MK_PROJECT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
 mk_apply_warnings(mk_headless_run)
 
 if(MK_BUILD_TESTS)
@@ -115,6 +138,12 @@ if(MK_BUILD_TESTS)
   target_link_libraries(mk_fixed_loop_tests PRIVATE modernerKriegMosul)
   target_include_directories(mk_fixed_loop_tests PRIVATE tests)
 
+  add_executable(mk_basic_ai_tests
+    tests/autoplay/test_basic_ai.c
+  )
+  target_link_libraries(mk_basic_ai_tests PRIVATE modernerKriegAi modernerKriegMosul)
+  target_include_directories(mk_basic_ai_tests PRIVATE tests)
+
   add_executable(mk_asset_manifest_tests
     tests/assets/test_asset_manifest.c
   )
@@ -126,16 +155,32 @@ if(MK_BUILD_TESTS)
       MK_TEST_BINARY_DIR="${CMAKE_CURRENT_BINARY_DIR}"
   )
 
+  add_executable(mk_mosul_scenario_data_tests
+    tests/mosul/test_mosul_scenario_data.c
+  )
+  target_link_libraries(mk_mosul_scenario_data_tests PRIVATE modernerKriegMosul)
+  target_include_directories(mk_mosul_scenario_data_tests PRIVATE tests)
+  target_compile_definitions(mk_mosul_scenario_data_tests
+    PRIVATE
+      MK_TEST_PROJECT_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
+      MK_TEST_BINARY_DIR="${CMAKE_CURRENT_BINARY_DIR}"
+  )
+
   mk_apply_warnings(mk_core_tests)
   mk_apply_warnings(mk_board_view_tests)
   mk_apply_warnings(mk_fixed_loop_tests)
+  mk_apply_warnings(mk_basic_ai_tests)
   mk_apply_warnings(mk_asset_manifest_tests)
+  mk_apply_warnings(mk_mosul_scenario_data_tests)
 
   add_test(NAME mk_core_tests COMMAND mk_core_tests)
   add_test(NAME mk_board_view_tests COMMAND mk_board_view_tests)
   add_test(NAME mk_fixed_loop_tests COMMAND mk_fixed_loop_tests)
+  add_test(NAME mk_basic_ai_tests COMMAND mk_basic_ai_tests)
   add_test(NAME mk_asset_manifest_tests COMMAND mk_asset_manifest_tests)
+  add_test(NAME mk_mosul_scenario_data_tests COMMAND mk_mosul_scenario_data_tests)
   add_test(NAME mk_headless_run_smoke COMMAND mk_headless_run --steps 3 --quiet)
+  add_test(NAME mk_headless_run_ai_smoke COMMAND mk_headless_run --steps 3 --quiet --ai-only)
   add_test(
     NAME mk_core_no_sdl_headers
     COMMAND ${CMAKE_COMMAND}

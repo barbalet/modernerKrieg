@@ -34,6 +34,18 @@ Sprite manifests describe source sheets and runtime sprite IDs. They record:
 - side, role, state, facing, and runtime ID for each frame
 - fallback marker to use when a sprite is missing
 
+## Marker Manifests
+
+Marker manifests describe tactical overlay presentation without requiring final marker artwork. They record:
+
+- marker ID and gameplay kind
+- fallback shape
+- color and alpha
+- world-space radius hint
+- screen-space line width hint
+
+The first marker manifest covers selection, movement, fire, overwatch, suppression, casualty, objective, hidden contact, breach/search, rooftop/stair access, and civilian-risk markers.
+
 ## Validation
 
 Every committed manifest should be validated by CTest. Validation should reject:
@@ -43,8 +55,13 @@ Every committed manifest should be validated by CTest. Validation should reject:
 - missing source files
 - invalid layer/frame counts
 - duplicate or empty IDs
+- invalid marker colors or impossible marker dimensions
 - paths that point outside the repository asset tree
 
 ## Runtime Generation
 
 Generated assets should be reproducible. Do not edit generated files by hand. The initial app can load a single map overview image; later work can add tiled map products and packed sprite atlases when the image size or sprite count requires it.
+
+Current runtime product:
+
+- `assets/mosul/runtime/maps/market_commercial_streets_2003/overview.png`: copied from the source `preview_1400.png` as the first runtime map overview.

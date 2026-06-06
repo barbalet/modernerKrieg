@@ -8,16 +8,17 @@ The project starts fresh as an SDL3 + CMake codebase. `derZweiteWeltkrieg` remai
 
 - `engine/core/` contains the pure C simulation core.
 - `engine/render/` contains renderer-independent board-view, pan/zoom, and marker projection code.
-- `engine/assets/` contains manifest parsing and validation for map/sprite metadata.
-- `engine/ai/` is reserved for controller policies that will emit normal core orders.
+- `engine/assets/` contains manifest parsing and validation for map, sprite, and marker metadata.
+- `engine/ai/` contains controller policies that emit normal core orders.
 - `engine/platform/sdl3/` contains the optional SDL3 app shell.
 - `engine/tools/autoplay/` contains the deterministic headless run tool.
 - `game/mosul/` contains Mosul-specific scenario/content code built above the reusable core.
 - `tests/autoplay/` contains fixed-step/headless runner tests.
 - `tests/core/` contains headless C tests.
 - `tests/render/` contains renderer-independent board-view tests.
-- `docs/` contains architecture, build matrix, attribution, and milestone progress notes.
+- `docs/` contains architecture, build matrix, scenario-format, attribution, and milestone progress notes.
 - `assets/mosul/source/` contains raw Mosul source art and references for the 2003 Market / Commercial Streets demo.
+- `assets/mosul/runtime/` contains generated or copied runtime products, including the current map overview.
 - `assets/mosul/maps/`, `assets/mosul/atlases/`, and `assets/mosul/sprites/` are placeholders for generated/runtime-ready assets.
 - `PLAN.md` describes the full engine and Mosul demo direction.
 
@@ -59,6 +60,22 @@ With the headless preset build directory:
 ./build/headless/bin/mk_headless_run --steps 10
 ```
 
+Run an explicit scenario file, override the deterministic seed, and write a transcript:
+
+```sh
+./build/bin/mk_headless_run \
+  --scenario game/mosul/scenarios/market_commercial_streets_2003.mkscenario \
+  --max-ticks 10 \
+  --seed 12345 \
+  --transcript build/mosul_transcript.txt
+```
+
+Run both tactical sides under deterministic AI:
+
+```sh
+./build/bin/mk_headless_run --ai-only --max-ticks 10
+```
+
 The SDL3 app target is provisional. If SDL3 proves workable for the game feel and deployment path, it will be used. If not, the contingency is a new SwiftUI GUI over the same tactical model. The SDL3 target is enabled automatically when CMake can find SDL3. If SDL3 is installed in a custom prefix, pass its CMake package location:
 
 ```sh
@@ -78,14 +95,17 @@ The public MOSUL demo target is the 2003 Market / Commercial Streets scenario: a
 - source-angle weapon sprites
 - reference plates for combatants, weapons, vehicles, and urban tactics
 
-The current code scenario has been renamed to the 2003 Market / Commercial Streets path, but it is still constructed in C while the data and manifest layer is brought online. That placeholder now exercises the expanded core state model: tactical AI controller slots, force records, command callsigns, map tiles, standalone civilians, objectives, units, soldiers, weapons, and deterministic snapshots.
+The current demo scenario now loads from validated data at `game/mosul/scenarios/market_commercial_streets_2003.mkscenario`. A C fixture remains available for tests so the data-backed path can be compared against the original scenario shape.
 
-The first asset manifests are in place:
+The first scenario and asset manifests are in place:
 
+- `game/mosul/scenarios/market_commercial_streets_2003.mkscenario`
 - `assets/mosul/manifests/market_commercial_streets_2003.mapmanifest`
 - `assets/mosul/manifests/mosul_2003_sprites.spritemanifest`
+- `assets/mosul/manifests/mosul_2003_markers.markermanifest`
+- `assets/mosul/runtime/maps/market_commercial_streets_2003/overview.png`
 
-CTest validates those manifests and rejects broken references.
+CTest validates those files and rejects broken references.
 
 ## Interaction
 
@@ -106,10 +126,14 @@ The core now supports deterministic board interaction without depending on SDL:
 - fit the tactical map to a screen rectangle
 - pan and zoom a board view
 - project terrain, objectives, units, and soldier offsets into screen space
-- validate map and sprite manifests without SDL
-- hand the map manifest to the SDL app, which can load the overview PNG when SDL3_image is available and fall back otherwise
+- project tactical overlays for selection, movement, suppression, casualties, objectives, and civilian risk
+- validate map, sprite, and marker manifests without SDL
+- load the 2003 scenario from data with parser-side and core-side validation
+- run a selected scenario through the headless tool with seed, tick-count, quiet, and transcript controls
+- run player and opposing tactical controllers as deterministic AI-only headless runs
+- hand map, sprite, and marker manifests to the SDL app, which can load PNGs when SDL3_image is available and fall back otherwise
 
-The next implementation push is scenario-data facing: move the 2003 controller slots, forces, civilians, objectives, units, weapons, and placement out of C constants and into validated data files.
+The next implementation push is contact-facing: visible fire feedback, hidden-contact reveal logic, civilian-risk scoring, and stronger AI-vs-AI transcript checks.
 
 When the SDL3 app target is available, left-click selects a unit, right-click gives the selected unit a move order, arrow keys pan the board, and plus/minus zoom the board.
 

@@ -3,6 +3,21 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifndef MK_PROJECT_SOURCE_DIR
+#define MK_PROJECT_SOURCE_DIR "."
+#endif
+
+static bool mk_mosul_make_default_scenario_path(char *out_path, size_t capacity) {
+    int written;
+
+    if (out_path == NULL || capacity == 0) {
+        return false;
+    }
+
+    written = snprintf(out_path, capacity, "%s/%s", MK_PROJECT_SOURCE_DIR, MK_MOSUL_DEFAULT_SCENARIO_PATH);
+    return written > 0 && (size_t)written < capacity;
+}
+
 static mk_vec2_t mk_mosul_vec2(float x, float y) {
     mk_vec2_t value;
 
@@ -337,7 +352,7 @@ static mk_result_t mk_mosul_add_civilians(
     return mk_scenario_add_unit(scenario, &unit, NULL);
 }
 
-mk_result_t mk_mosul_make_market_2003_scenario(mk_scenario_definition_t *out_scenario) {
+mk_result_t mk_mosul_make_market_2003_fixture_scenario(mk_scenario_definition_t *out_scenario) {
     uint32_t cts_controller_id = 0;
     uint32_t defender_controller_id = 0;
     uint32_t civilian_controller_id = 0;
@@ -415,6 +430,20 @@ mk_result_t mk_mosul_make_market_2003_scenario(mk_scenario_definition_t *out_sce
     }
 
     return mk_mosul_add_civilians(out_scenario, civilian_faction_id, civilian_force_id, civilian_controller_id);
+}
+
+mk_result_t mk_mosul_make_market_2003_scenario(mk_scenario_definition_t *out_scenario) {
+    char scenario_path[512];
+
+    if (out_scenario == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (!mk_mosul_make_default_scenario_path(scenario_path, sizeof(scenario_path))) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    return mk_mosul_load_scenario_file(scenario_path, MK_PROJECT_SOURCE_DIR, out_scenario);
 }
 
 mk_result_t mk_mosul_make_east_block_scenario(mk_scenario_definition_t *out_scenario) {

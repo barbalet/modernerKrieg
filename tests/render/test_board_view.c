@@ -110,10 +110,94 @@ static void test_soldier_markers_from_snapshot(void) {
     assert(markers[5].side == MK_SIDE_CIVILIAN);
 }
 
+static void test_tactical_overlays_from_snapshot(void) {
+    mk_scenario_definition_t scenario;
+    mk_game_t game;
+    mk_game_snapshot_t snapshot;
+    mk_board_view_t view;
+    mk_tactical_overlay_t overlays[MK_BOARD_VIEW_MAX_TACTICAL_OVERLAYS];
+    size_t overlay_count = 0;
+    bool saw_selection = false;
+    bool saw_route = false;
+    bool saw_target = false;
+    bool saw_suppression = false;
+    bool saw_casualty = false;
+    bool saw_objective = false;
+    bool saw_civilian_risk = false;
+    size_t index;
+
+    assert(mk_mosul_make_east_block_scenario(&scenario) == MK_OK);
+    assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
+    assert(mk_game_select_unit(&game, 1) == MK_OK);
+    assert(mk_game_issue_selected_move_order(&game, make_vec2(112.0f, 246.0f)) == MK_OK);
+    game.units[1].suppression = 9;
+    game.units[1].status = MK_UNIT_PINNED;
+    game.units[1].soldiers[0].casualty = true;
+    game.civilians[0].risk = 4;
+    assert(mk_game_snapshot(&game, &snapshot) == MK_OK);
+    assert(mk_board_view_fit_map(&view, &snapshot.map, 960.0f, 640.0f, 48.0f) == MK_OK);
+
+    assert(mk_board_view_collect_tactical_overlays(&view, &snapshot, NULL, 0, &overlay_count) == MK_OK);
+    assert(overlay_count == 7);
+    assert(mk_board_view_collect_tactical_overlays(&view, &snapshot, overlays, 3, &overlay_count) == MK_ERROR_CAPACITY);
+    assert(overlay_count == 7);
+    assert(mk_board_view_collect_tactical_overlays(
+        &view,
+        &snapshot,
+        overlays,
+        sizeof(overlays) / sizeof(overlays[0]),
+        &overlay_count
+    ) == MK_OK);
+    assert(overlay_count == 7);
+
+    for (index = 0; index < overlay_count; ++index) {
+        const mk_tactical_overlay_t *overlay = &overlays[index];
+
+        if (overlay->kind == MK_TACTICAL_OVERLAY_SELECTION) {
+            saw_selection = true;
+            assert(overlay->unit_id == 1);
+            assert_close(overlay->screen_radius_px, MK_UNIT_PICK_RADIUS_M * view.scale_px_per_m);
+        } else if (overlay->kind == MK_TACTICAL_OVERLAY_MOVE_ROUTE) {
+            saw_route = true;
+            assert(overlay->unit_id == 1);
+            assert_close(overlay->target_position_m.x, 112.0f);
+        } else if (overlay->kind == MK_TACTICAL_OVERLAY_MOVE_TARGET) {
+            saw_target = true;
+            assert(overlay->unit_id == 1);
+            assert_close(overlay->position_m.x, 112.0f);
+        } else if (overlay->kind == MK_TACTICAL_OVERLAY_SUPPRESSION) {
+            saw_suppression = true;
+            assert(overlay->unit_id == 2);
+            assert(overlay->intensity == 9);
+        } else if (overlay->kind == MK_TACTICAL_OVERLAY_CASUALTY) {
+            saw_casualty = true;
+            assert(overlay->unit_id == 2);
+            assert(overlay->soldier_id == 1);
+        } else if (overlay->kind == MK_TACTICAL_OVERLAY_OBJECTIVE) {
+            saw_objective = true;
+            assert(overlay->objective_id == 1);
+            assert_close(overlay->radius_m, 28.0f);
+        } else if (overlay->kind == MK_TACTICAL_OVERLAY_CIVILIAN_RISK) {
+            saw_civilian_risk = true;
+            assert(overlay->civilian_id == 1);
+            assert(overlay->intensity == 4);
+        }
+    }
+
+    assert(saw_selection);
+    assert(saw_route);
+    assert(saw_target);
+    assert(saw_suppression);
+    assert(saw_casualty);
+    assert(saw_objective);
+    assert(saw_civilian_risk);
+}
+
 int main(void) {
     test_fit_and_round_trip();
     test_zoom_and_pan();
     test_soldier_markers_from_snapshot();
+    test_tactical_overlays_from_snapshot();
 
     puts("mk_board_view_tests: ok");
     return 0;

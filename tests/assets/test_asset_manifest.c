@@ -34,8 +34,20 @@ static void write_text_file(const char *path, const char *text) {
     MK_TEST_ASSERT(fclose(file) == 0);
 }
 
+static bool file_exists(const char *path) {
+    FILE *file = fopen(path, "rb");
+
+    if (file == NULL) {
+        return false;
+    }
+
+    fclose(file);
+    return true;
+}
+
 static void test_map_manifest_loads_market_layers(void) {
     char path[512];
+    char runtime_path[512];
     mk_asset_map_manifest_t manifest;
 
     make_project_path(
@@ -57,6 +69,9 @@ static void test_map_manifest_loads_market_layers(void) {
     MK_TEST_ASSERT(strcmp(manifest.layers[4].id, "multistorey_mask") == 0);
     MK_TEST_ASSERT(strcmp(manifest.layers[4].alpha, "mask") == 0);
     MK_TEST_ASSERT(strcmp(manifest.overview_path, "assets/mosul/source/maps/market_commercial_streets_demo_2003/imgs/market_commercial_streets_demo_7000/preview_1400.png") == 0);
+
+    make_project_path(runtime_path, sizeof(runtime_path), manifest.runtime_overview_path);
+    MK_TEST_ASSERT(file_exists(runtime_path));
 }
 
 static void test_sprite_manifest_loads_first_frames(void) {
@@ -86,6 +101,31 @@ static void test_sprite_manifest_loads_first_frames(void) {
     frame = mk_asset_find_sprite_frame(&manifest, "fallback_unit_marker");
     MK_TEST_ASSERT(frame != NULL);
     MK_TEST_ASSERT(strcmp(frame->state, "fallback") == 0);
+}
+
+static void test_marker_manifest_loads_tactical_markers(void) {
+    char path[512];
+    mk_asset_marker_manifest_t manifest;
+    const mk_asset_marker_t *marker;
+
+    make_project_path(path, sizeof(path), "assets/mosul/manifests/mosul_2003_markers.markermanifest");
+    MK_TEST_ASSERT(mk_asset_load_marker_manifest(path, &manifest) == MK_OK);
+    MK_TEST_ASSERT(strcmp(manifest.id, "mosul_2003_markers") == 0);
+    MK_TEST_ASSERT(manifest.marker_count == 12);
+
+    marker = mk_asset_find_marker(&manifest, "selection_ring");
+    MK_TEST_ASSERT(marker != NULL);
+    MK_TEST_ASSERT(strcmp(marker->kind, "selection") == 0);
+    MK_TEST_ASSERT(strcmp(marker->shape, "ring") == 0);
+    MK_TEST_ASSERT(marker->color.r == 220);
+    MK_TEST_ASSERT(marker->color.a == 255);
+    MK_TEST_ASSERT_CLOSE(marker->radius_m, 8.0f);
+    MK_TEST_ASSERT(marker->line_width_px == 2);
+
+    marker = mk_asset_find_marker(&manifest, "civilian_risk");
+    MK_TEST_ASSERT(marker != NULL);
+    MK_TEST_ASSERT(strcmp(marker->kind, "civilian_risk") == 0);
+    MK_TEST_ASSERT(strcmp(marker->shape, "halo") == 0);
 }
 
 static void test_missing_map_layer_is_rejected(void) {
@@ -153,11 +193,35 @@ static void test_sprite_manifest_rejects_missing_sheet_reference(void) {
     MK_TEST_ASSERT(mk_asset_load_sprite_manifest(path, MK_TEST_PROJECT_ROOT, &manifest) == MK_ERROR_INVALID_DATA);
 }
 
+static void test_marker_manifest_rejects_bad_color(void) {
+    char path[512];
+    mk_asset_marker_manifest_t manifest;
+
+    make_binary_path(path, sizeof(path), "bad_marker_color.markermanifest");
+    write_text_file(
+        path,
+        "manifest_type=markers\n"
+        "id=bad_markers\n"
+        "name=Bad Markers\n"
+        "marker_count=1\n"
+        "marker.0.id=bad\n"
+        "marker.0.kind=selection\n"
+        "marker.0.shape=ring\n"
+        "marker.0.color=999,216,156,255\n"
+        "marker.0.radius_m=8\n"
+        "marker.0.line_width_px=2\n"
+    );
+
+    MK_TEST_ASSERT(mk_asset_load_marker_manifest(path, &manifest) == MK_ERROR_INVALID_DATA);
+}
+
 int main(void) {
     test_map_manifest_loads_market_layers();
     test_sprite_manifest_loads_first_frames();
+    test_marker_manifest_loads_tactical_markers();
     test_missing_map_layer_is_rejected();
     test_sprite_manifest_rejects_missing_sheet_reference();
+    test_marker_manifest_rejects_bad_color();
 
     puts("mk_asset_manifest_tests: ok");
     return 0;

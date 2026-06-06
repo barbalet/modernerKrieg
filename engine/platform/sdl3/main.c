@@ -12,6 +12,26 @@
 #include <string.h>
 
 #define MK_SDL_MAP_MANIFEST_PATH "assets/mosul/manifests/market_commercial_streets_2003.mapmanifest"
+#define MK_SDL_SPRITE_MANIFEST_PATH "assets/mosul/manifests/mosul_2003_sprites.spritemanifest"
+#define MK_SDL_MARKER_MANIFEST_PATH "assets/mosul/manifests/mosul_2003_markers.markermanifest"
+
+typedef struct {
+    char id[MK_NAME_CAPACITY];
+    SDL_Texture *texture;
+} mk_sdl_sprite_sheet_texture_t;
+
+typedef struct {
+    mk_asset_sprite_manifest_t manifest;
+    mk_sdl_sprite_sheet_texture_t sheets[MK_ASSET_MAX_SPRITE_SHEETS];
+    size_t sheet_count;
+    bool manifest_loaded;
+    bool textures_loaded;
+} mk_sdl_sprite_assets_t;
+
+typedef struct {
+    mk_asset_marker_manifest_t manifest;
+    bool loaded;
+} mk_sdl_marker_assets_t;
 
 typedef struct {
     bool quit_requested;
@@ -44,6 +64,21 @@ static mk_vec2_t mk_screen_center(const mk_board_view_t *view) {
     center.y = view->screen_rect_px.y + view->screen_rect_px.height * 0.5f;
 
     return center;
+}
+
+static void mk_sdl_copy_name(char *destination, size_t capacity, const char *source) {
+    const char *text = source == NULL ? "" : source;
+    size_t index = 0;
+
+    if (destination == NULL || capacity == 0) {
+        return;
+    }
+
+    for (; index + 1 < capacity && text[index] != '\0'; ++index) {
+        destination[index] = text[index];
+    }
+
+    destination[index] = '\0';
 }
 
 static void mk_sdl_input_begin_frame(mk_sdl_input_t *input) {
@@ -169,6 +204,89 @@ static void mk_set_terrain_color(SDL_Renderer *renderer, mk_terrain_kind_t kind)
     }
 }
 
+static const char *mk_sdl_side_name(mk_side_t side) {
+    switch (side) {
+        case MK_SIDE_PLAYER:
+            return "player";
+        case MK_SIDE_OPFOR:
+            return "opfor";
+        case MK_SIDE_CIVILIAN:
+            return "civilian";
+        case MK_SIDE_NEUTRAL:
+        default:
+            return "neutral";
+    }
+}
+
+static const char *mk_sdl_role_name(mk_soldier_role_t role) {
+    switch (role) {
+        case MK_ROLE_LEADER:
+            return "leader";
+        case MK_ROLE_MACHINE_GUNNER:
+            return "machine_gunner";
+        case MK_ROLE_RPG:
+            return "rpg";
+        case MK_ROLE_MARKSMAN:
+            return "marksman";
+        case MK_ROLE_ENGINEER:
+            return "engineer";
+        case MK_ROLE_MEDIC:
+            return "medic";
+        case MK_ROLE_DRONE_OPERATOR:
+            return "drone_operator";
+        case MK_ROLE_CIVILIAN:
+            return "civilian";
+        case MK_ROLE_RIFLEMAN:
+        default:
+            return "rifleman";
+    }
+}
+
+static const char *mk_sdl_overlay_marker_id(mk_tactical_overlay_kind_t kind) {
+    switch (kind) {
+        case MK_TACTICAL_OVERLAY_SELECTION:
+            return "selection_ring";
+        case MK_TACTICAL_OVERLAY_MOVE_ROUTE:
+            return "move_route";
+        case MK_TACTICAL_OVERLAY_MOVE_TARGET:
+            return "move_target";
+        case MK_TACTICAL_OVERLAY_SUPPRESSION:
+            return "suppression";
+        case MK_TACTICAL_OVERLAY_CASUALTY:
+            return "casualty";
+        case MK_TACTICAL_OVERLAY_OBJECTIVE:
+            return "objective";
+        case MK_TACTICAL_OVERLAY_HIDDEN_CONTACT:
+            return "hidden_contact";
+        case MK_TACTICAL_OVERLAY_CIVILIAN_RISK:
+            return "civilian_risk";
+        default:
+            return "selection_ring";
+    }
+}
+
+static void mk_sdl_set_color(SDL_Renderer *renderer, mk_color_t color) {
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+}
+
+static void mk_sdl_set_side_color(SDL_Renderer *renderer, mk_side_t side, bool casualty) {
+    if (casualty) {
+        SDL_SetRenderDrawColor(renderer, 95, 46, 42, 255);
+    } else if (side == MK_SIDE_PLAYER) {
+        SDL_SetRenderDrawColor(renderer, 91, 143, 186, 255);
+    } else if (side == MK_SIDE_OPFOR) {
+        SDL_SetRenderDrawColor(renderer, 153, 83, 67, 255);
+    } else if (side == MK_SIDE_CIVILIAN) {
+        SDL_SetRenderDrawColor(renderer, 180, 166, 120, 255);
+    } else {
+        SDL_SetRenderDrawColor(renderer, 180, 180, 180, 255);
+    }
+}
+
+static float mk_sdl_max_float(float first, float second) {
+    return first > second ? first : second;
+}
+
 static void mk_render_map_background(
     SDL_Renderer *renderer,
     const mk_board_view_t *view,
@@ -190,15 +308,163 @@ static void mk_render_map_background(
     SDL_RenderRect(renderer, &board);
 }
 
+static const mk_asset_sprite_frame_t *mk_sdl_find_soldier_sprite_frame(
+    const mk_sdl_sprite_assets_t *assets,
+    const mk_soldier_marker_t *marker
+) {
+    const char *side;
+    const char *role;
+    const char *state;
+    size_t index;
+
+    if (assets == NULL || marker == NULL || !assets->manifest_loaded) {
+        return NULL;
+    }
+
+    side = mk_sdl_side_name(marker->side);
+    role = mk_sdl_role_name(marker->role);
+    state = marker->side == MK_SIDE_CIVILIAN ? "sheltering" : "ready";
+
+    for (index = 0; index < assets->manifest.frame_count; ++index) {
+        const mk_asset_sprite_frame_t *frame = &assets->manifest.frames[index];
+
+        if (strcmp(frame->side, side) == 0
+            && strcmp(frame->role, role) == 0
+            && strcmp(frame->state, state) == 0) {
+            return frame;
+        }
+    }
+
+    return mk_asset_find_sprite_frame(&assets->manifest, assets->manifest.fallback_runtime_id);
+}
+
+static SDL_Texture *mk_sdl_find_sheet_texture(
+    const mk_sdl_sprite_assets_t *assets,
+    const char *sheet_id
+) {
+    size_t index;
+
+    if (assets == NULL || sheet_id == NULL || !assets->textures_loaded) {
+        return NULL;
+    }
+
+    for (index = 0; index < assets->sheet_count; ++index) {
+        if (strcmp(assets->sheets[index].id, sheet_id) == 0) {
+            return assets->sheets[index].texture;
+        }
+    }
+
+    return NULL;
+}
+
+static void mk_render_soldier_fallback(
+    SDL_Renderer *renderer,
+    const mk_soldier_marker_t *marker
+) {
+    SDL_FRect rect;
+
+    rect.x = marker->screen_position_px.x - 5.0f;
+    rect.y = marker->screen_position_px.y - 5.0f;
+    rect.w = 10.0f;
+    rect.h = 10.0f;
+
+    mk_sdl_set_side_color(renderer, marker->side, marker->casualty);
+    SDL_RenderFillRect(renderer, &rect);
+}
+
+static void mk_render_soldier_marker(
+    SDL_Renderer *renderer,
+    const mk_board_view_t *view,
+    const mk_sdl_sprite_assets_t *sprite_assets,
+    const mk_soldier_marker_t *marker
+) {
+    const mk_asset_sprite_frame_t *frame = mk_sdl_find_soldier_sprite_frame(sprite_assets, marker);
+    SDL_Texture *texture = frame != NULL ? mk_sdl_find_sheet_texture(sprite_assets, frame->sheet) : NULL;
+
+    if (frame != NULL && texture != NULL) {
+        const mk_asset_sprite_sheet_t *sheet = mk_asset_find_sprite_sheet(&sprite_assets->manifest, frame->sheet);
+        float size_px = mk_sdl_max_float(16.0f, frame->scale_m * view->scale_px_per_m * 8.0f);
+        SDL_FRect source_rect;
+        SDL_FRect target_rect;
+
+        source_rect.x = (float)frame->x;
+        source_rect.y = (float)frame->y;
+        source_rect.w = sheet != NULL ? (float)sheet->tile_width : 128.0f;
+        source_rect.h = sheet != NULL ? (float)sheet->tile_height : 128.0f;
+        target_rect.x = marker->screen_position_px.x - size_px * 0.5f;
+        target_rect.y = marker->screen_position_px.y - size_px * 0.5f;
+        target_rect.w = size_px;
+        target_rect.h = size_px;
+        SDL_RenderTexture(renderer, texture, &source_rect, &target_rect);
+        return;
+    }
+
+    mk_render_soldier_fallback(renderer, marker);
+}
+
+static void mk_render_overlay(
+    SDL_Renderer *renderer,
+    const mk_sdl_marker_assets_t *marker_assets,
+    const mk_tactical_overlay_t *overlay
+) {
+    const char *marker_id = mk_sdl_overlay_marker_id(overlay->kind);
+    const mk_asset_marker_t *marker = marker_assets != NULL && marker_assets->loaded
+        ? mk_asset_find_marker(&marker_assets->manifest, marker_id)
+        : NULL;
+    float radius_px = overlay->screen_radius_px > 0.0f ? overlay->screen_radius_px : 6.0f;
+    SDL_FRect rect;
+
+    if (marker != NULL) {
+        mk_sdl_set_color(renderer, marker->color);
+        if (marker->radius_m > 0.0f && overlay->screen_radius_px <= 0.0f) {
+            radius_px = marker->radius_m;
+        }
+    } else {
+        SDL_SetRenderDrawColor(renderer, 220, 216, 156, 220);
+    }
+
+    if (overlay->kind == MK_TACTICAL_OVERLAY_MOVE_ROUTE) {
+        SDL_RenderLine(
+            renderer,
+            overlay->screen_position_px.x,
+            overlay->screen_position_px.y,
+            overlay->target_screen_position_px.x,
+            overlay->target_screen_position_px.y
+        );
+        return;
+    }
+
+    rect.x = overlay->screen_position_px.x - radius_px;
+    rect.y = overlay->screen_position_px.y - radius_px;
+    rect.w = radius_px * 2.0f;
+    rect.h = radius_px * 2.0f;
+
+    if (overlay->kind == MK_TACTICAL_OVERLAY_MOVE_TARGET) {
+        SDL_RenderLine(renderer, rect.x, overlay->screen_position_px.y, rect.x + rect.w, overlay->screen_position_px.y);
+        SDL_RenderLine(renderer, overlay->screen_position_px.x, rect.y, overlay->screen_position_px.x, rect.y + rect.h);
+    } else if (overlay->kind == MK_TACTICAL_OVERLAY_CASUALTY) {
+        SDL_RenderLine(renderer, rect.x, rect.y, rect.x + rect.w, rect.y + rect.h);
+        SDL_RenderLine(renderer, rect.x + rect.w, rect.y, rect.x, rect.y + rect.h);
+    } else {
+        SDL_RenderRect(renderer, &rect);
+    }
+}
+
 static void mk_render(
     SDL_Renderer *renderer,
     const mk_game_t *game,
     const mk_board_view_t *view,
-    SDL_Texture *map_texture
+    SDL_Texture *map_texture,
+    const mk_sdl_sprite_assets_t *sprite_assets,
+    const mk_sdl_marker_assets_t *marker_assets
 ) {
+    mk_game_snapshot_t snapshot;
+    mk_soldier_marker_t soldier_markers[MK_MAX_UNITS * MK_MAX_SOLDIERS_PER_UNIT];
+    mk_tactical_overlay_t overlays[MK_BOARD_VIEW_MAX_TACTICAL_OVERLAYS];
+    size_t soldier_marker_count = 0;
+    size_t overlay_count = 0;
     size_t terrain_index;
-    size_t objective_index;
-    size_t unit_index;
+    size_t index;
 
     SDL_SetRenderDrawColor(renderer, 18, 22, 24, 255);
     SDL_RenderClear(renderer);
@@ -218,63 +484,37 @@ static void mk_render(
         }
     }
 
-    for (objective_index = 0; objective_index < game->objective_count; ++objective_index) {
-        const mk_objective_t *objective = &game->objectives[objective_index];
-        mk_vec2_t objective_center = mk_board_view_map_to_screen(view, objective->position_m);
-        SDL_FRect objective_rect;
-
-        objective_rect.x = objective_center.x - objective->radius_m * view->scale_px_per_m;
-        objective_rect.y = objective_center.y - objective->radius_m * view->scale_px_per_m;
-        objective_rect.w = objective->radius_m * 2.0f * view->scale_px_per_m;
-        objective_rect.h = objective->radius_m * 2.0f * view->scale_px_per_m;
-
-        SDL_SetRenderDrawColor(renderer, 139, 128, 74, 255);
-        SDL_RenderRect(renderer, &objective_rect);
-    }
-
-    for (unit_index = 0; unit_index < game->unit_count; ++unit_index) {
-        const mk_unit_t *unit = &game->units[unit_index];
-        mk_vec2_t unit_position = mk_board_view_map_to_screen(view, unit->position_m);
-        SDL_FRect unit_rect;
-
-        unit_rect.x = unit_position.x - 12.0f;
-        unit_rect.y = unit_position.y - 12.0f;
-        unit_rect.w = 24.0f;
-        unit_rect.h = 24.0f;
-
-        if (unit->side == MK_SIDE_PLAYER) {
-            SDL_SetRenderDrawColor(renderer, 91, 143, 186, 255);
-        } else if (unit->side == MK_SIDE_OPFOR) {
-            SDL_SetRenderDrawColor(renderer, 153, 83, 67, 255);
-        } else {
-            SDL_SetRenderDrawColor(renderer, 180, 166, 120, 255);
+    if (mk_game_snapshot(game, &snapshot) == MK_OK
+        && mk_board_view_collect_tactical_overlays(
+            view,
+            &snapshot,
+            overlays,
+            sizeof(overlays) / sizeof(overlays[0]),
+            &overlay_count
+        ) == MK_OK
+        && mk_board_view_collect_soldier_markers(
+            view,
+            &snapshot,
+            soldier_markers,
+            sizeof(soldier_markers) / sizeof(soldier_markers[0]),
+            &soldier_marker_count
+        ) == MK_OK) {
+        for (index = 0; index < overlay_count; ++index) {
+            if (overlays[index].kind != MK_TACTICAL_OVERLAY_SELECTION
+                && overlays[index].kind != MK_TACTICAL_OVERLAY_CASUALTY) {
+                mk_render_overlay(renderer, marker_assets, &overlays[index]);
+            }
         }
 
-        SDL_RenderFillRect(renderer, &unit_rect);
-
-        if (unit->id == game->selected_unit_id) {
-            SDL_FRect selection_rect = unit_rect;
-
-            selection_rect.x -= 4.0f;
-            selection_rect.y -= 4.0f;
-            selection_rect.w += 8.0f;
-            selection_rect.h += 8.0f;
-
-            SDL_SetRenderDrawColor(renderer, 220, 216, 156, 255);
-            SDL_RenderRect(renderer, &selection_rect);
+        for (index = 0; index < soldier_marker_count; ++index) {
+            mk_render_soldier_marker(renderer, view, sprite_assets, &soldier_markers[index]);
         }
 
-        if (unit->has_move_target) {
-            mk_vec2_t target_position = mk_board_view_map_to_screen(view, unit->target_position_m);
-            float start_x = unit_position.x;
-            float start_y = unit_position.y;
-            float target_x = target_position.x;
-            float target_y = target_position.y;
-            SDL_FRect target_rect = { target_x - 5.0f, target_y - 5.0f, 10.0f, 10.0f };
-
-            SDL_SetRenderDrawColor(renderer, 220, 216, 156, 255);
-            SDL_RenderLine(renderer, start_x, start_y, target_x, target_y);
-            SDL_RenderRect(renderer, &target_rect);
+        for (index = 0; index < overlay_count; ++index) {
+            if (overlays[index].kind == MK_TACTICAL_OVERLAY_SELECTION
+                || overlays[index].kind == MK_TACTICAL_OVERLAY_CASUALTY) {
+                mk_render_overlay(renderer, marker_assets, &overlays[index]);
+            }
         }
     }
 
@@ -293,7 +533,11 @@ static SDL_Texture *mk_load_manifest_map_texture(SDL_Renderer *renderer) {
 
 #ifdef MK_HAS_SDL3_IMAGE
     {
-        SDL_Texture *texture = IMG_LoadTexture(renderer, manifest.overview_path);
+        SDL_Texture *texture = IMG_LoadTexture(renderer, manifest.runtime_overview_path);
+
+        if (texture == NULL) {
+            texture = IMG_LoadTexture(renderer, manifest.overview_path);
+        }
 
         if (texture == NULL) {
             SDL_Log("Failed to load map PNG \"%s\": %s", manifest.overview_path, SDL_GetError());
@@ -310,10 +554,89 @@ static SDL_Texture *mk_load_manifest_map_texture(SDL_Renderer *renderer) {
 #endif
 }
 
+static void mk_sdl_load_sprite_assets(SDL_Renderer *renderer, mk_sdl_sprite_assets_t *assets) {
+    mk_result_t result;
+    size_t index;
+
+    if (assets == NULL) {
+        return;
+    }
+
+    memset(assets, 0, sizeof(*assets));
+    result = mk_asset_load_sprite_manifest(MK_SDL_SPRITE_MANIFEST_PATH, ".", &assets->manifest);
+    if (result != MK_OK) {
+        SDL_Log("Sprite manifest unavailable: %s", mk_result_name(result));
+        return;
+    }
+
+    assets->manifest_loaded = true;
+    assets->sheet_count = assets->manifest.sheet_count;
+
+#ifdef MK_HAS_SDL3_IMAGE
+    for (index = 0; index < assets->manifest.sheet_count; ++index) {
+        const mk_asset_sprite_sheet_t *sheet = &assets->manifest.sheets[index];
+
+        mk_sdl_copy_name(assets->sheets[index].id, sizeof(assets->sheets[index].id), sheet->id);
+        assets->sheets[index].texture = IMG_LoadTexture(renderer, sheet->path);
+        if (assets->sheets[index].texture == NULL) {
+            SDL_Log("Failed to load sprite sheet \"%s\": %s", sheet->path, SDL_GetError());
+            assets->textures_loaded = false;
+            return;
+        }
+
+        SDL_SetTextureScaleMode(assets->sheets[index].texture, SDL_SCALEMODE_NEAREST);
+    }
+
+    assets->textures_loaded = true;
+    SDL_Log("Loaded sprite manifest \"%s\" with %u sheets.", assets->manifest.id, (unsigned)assets->sheet_count);
+#else
+    (void)renderer;
+    for (index = 0; index < assets->manifest.sheet_count; ++index) {
+        mk_sdl_copy_name(assets->sheets[index].id, sizeof(assets->sheets[index].id), assets->manifest.sheets[index].id);
+    }
+    SDL_Log("Loaded sprite manifest \"%s\"; SDL3_image is unavailable, using fallback unit markers.", assets->manifest.id);
+#endif
+}
+
+static void mk_sdl_destroy_sprite_assets(mk_sdl_sprite_assets_t *assets) {
+    size_t index;
+
+    if (assets == NULL) {
+        return;
+    }
+
+    for (index = 0; index < assets->sheet_count; ++index) {
+        if (assets->sheets[index].texture != NULL) {
+            SDL_DestroyTexture(assets->sheets[index].texture);
+            assets->sheets[index].texture = NULL;
+        }
+    }
+}
+
+static void mk_sdl_load_marker_assets(mk_sdl_marker_assets_t *assets) {
+    mk_result_t result;
+
+    if (assets == NULL) {
+        return;
+    }
+
+    memset(assets, 0, sizeof(*assets));
+    result = mk_asset_load_marker_manifest(MK_SDL_MARKER_MANIFEST_PATH, &assets->manifest);
+    if (result != MK_OK) {
+        SDL_Log("Marker manifest unavailable: %s", mk_result_name(result));
+        return;
+    }
+
+    assets->loaded = true;
+    SDL_Log("Loaded marker manifest \"%s\" with %u markers.", assets->manifest.id, (unsigned)assets->manifest.marker_count);
+}
+
 int main(int argc, char **argv) {
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Texture *map_texture = NULL;
+    mk_sdl_sprite_assets_t sprite_assets;
+    mk_sdl_marker_assets_t marker_assets;
     bool running = true;
     mk_game_t game;
     mk_scenario_definition_t scenario;
@@ -366,6 +689,8 @@ int main(int argc, char **argv) {
     }
 
     map_texture = mk_load_manifest_map_texture(renderer);
+    mk_sdl_load_sprite_assets(renderer, &sprite_assets);
+    mk_sdl_load_marker_assets(&marker_assets);
 
     while (running) {
         SDL_Event event;
@@ -383,9 +708,11 @@ int main(int argc, char **argv) {
 
         mk_sdl_apply_input(&game, &view, &input);
         (void)mk_game_run_fixed_steps(&game, 1, NULL, NULL);
-        mk_render(renderer, &game, &view, map_texture);
+        mk_render(renderer, &game, &view, map_texture, &sprite_assets, &marker_assets);
         SDL_Delay(16);
     }
+
+    mk_sdl_destroy_sprite_assets(&sprite_assets);
 
     if (map_texture != NULL) {
         SDL_DestroyTexture(map_texture);

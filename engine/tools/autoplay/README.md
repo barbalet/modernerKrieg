@@ -2,4 +2,16 @@
 
 This directory contains command-line tools for headless game runs.
 
-The first tool, `mk_headless_run`, loads the current MOSUL demo fixture and advances it for a fixed number of deterministic ticks. Future cycles should extend this into AI-vs-AI autoplay with scenario selection, controller assignment, replay output, and batch balance summaries.
+The first tool, `mk_headless_run`, loads a MOSUL scenario and advances it for a fixed number of deterministic ticks.
+
+Useful options:
+
+- `--scenario PATH`: load a specific `.mkscenario` file.
+- `--project-root PATH`: resolve repo-relative asset references from a specific root.
+- `--steps N` or `--max-ticks N`: run a fixed number of ticks.
+- `--seed N`: override the scenario seed for repeatable variants.
+- `--quiet`: suppress console transcript output.
+- `--transcript PATH`: write the run transcript to a file.
+- `--ai-only`: let tactical AI controllers issue orders for both non-civilian sides before each tick.
+
+Future cycles should extend this into richer AI-vs-AI autoplay with controller assignment, replay output, and batch balance summaries.

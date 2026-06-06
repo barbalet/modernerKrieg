@@ -29,6 +29,44 @@ static bool mk_render_view_is_valid(const mk_board_view_t *view) {
         && view->scale_px_per_m > 0.0f;
 }
 
+static mk_tactical_overlay_t mk_board_view_make_overlay(
+    const mk_board_view_t *view,
+    mk_tactical_overlay_kind_t kind,
+    mk_vec2_t position_m,
+    float radius_m
+) {
+    mk_tactical_overlay_t overlay;
+
+    memset(&overlay, 0, sizeof(overlay));
+    overlay.kind = kind;
+    overlay.position_m = position_m;
+    overlay.target_position_m = position_m;
+    overlay.screen_position_px = mk_board_view_map_to_screen(view, position_m);
+    overlay.target_screen_position_px = overlay.screen_position_px;
+    overlay.radius_m = radius_m;
+    overlay.screen_radius_px = radius_m * view->scale_px_per_m;
+    return overlay;
+}
+
+static mk_result_t mk_board_view_push_overlay(
+    mk_tactical_overlay_t *out_overlays,
+    size_t overlay_capacity,
+    size_t *overlay_index,
+    const mk_tactical_overlay_t *overlay
+) {
+    if (out_overlays == NULL || overlay_index == NULL || overlay == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (*overlay_index >= overlay_capacity) {
+        return MK_ERROR_CAPACITY;
+    }
+
+    out_overlays[*overlay_index] = *overlay;
+    *overlay_index += 1;
+    return MK_OK;
+}
+
 static void mk_board_view_clamp_origin(mk_board_view_t *view, const mk_map_t *map) {
     float visible_width_m;
     float visible_height_m;
@@ -78,6 +116,201 @@ mk_result_t mk_board_view_fit_map(
     out_view->max_scale_px_per_m = out_view->scale_px_per_m * MK_BOARD_VIEW_DEFAULT_MAX_ZOOM_MULTIPLIER;
     out_view->origin_m.x = 0.0f;
     out_view->origin_m.y = 0.0f;
+
+    return MK_OK;
+}
+
+mk_result_t mk_board_view_collect_tactical_overlays(
+    const mk_board_view_t *view,
+    const mk_game_snapshot_t *snapshot,
+    mk_tactical_overlay_t *out_overlays,
+    size_t overlay_capacity,
+    size_t *out_overlay_count
+) {
+    size_t needed = 0;
+    size_t overlay_index = 0;
+    size_t objective_index;
+    size_t unit_index;
+    size_t civilian_index;
+
+    if (!mk_render_view_is_valid(view) || snapshot == NULL || out_overlay_count == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    needed += snapshot->objective_count;
+    for (unit_index = 0; unit_index < snapshot->unit_count; ++unit_index) {
+        const mk_unit_t *unit = &snapshot->units[unit_index];
+        size_t soldier_index;
+
+        if (unit->id == snapshot->selected_unit_id) {
+            needed += 1;
+        }
+
+        if (unit->has_move_target) {
+            needed += 2;
+        }
+
+        if (unit->suppression > 0 || unit->status != MK_UNIT_READY) {
+            needed += 1;
+        }
+
+        for (soldier_index = 0; soldier_index < unit->soldier_count; ++soldier_index) {
+            if (unit->soldiers[soldier_index].casualty) {
+                needed += 1;
+            }
+        }
+    }
+
+    for (civilian_index = 0; civilian_index < snapshot->civilian_count; ++civilian_index) {
+        if (snapshot->civilians[civilian_index].risk > 0) {
+            needed += 1;
+        }
+    }
+
+    *out_overlay_count = needed;
+
+    if (out_overlays == NULL) {
+        return overlay_capacity == 0 ? MK_OK : MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (overlay_capacity < needed) {
+        return MK_ERROR_CAPACITY;
+    }
+
+    for (objective_index = 0; objective_index < snapshot->objective_count; ++objective_index) {
+        const mk_objective_t *objective = &snapshot->objectives[objective_index];
+        mk_tactical_overlay_t overlay = mk_board_view_make_overlay(
+            view,
+            MK_TACTICAL_OVERLAY_OBJECTIVE,
+            objective->position_m,
+            objective->radius_m
+        );
+        mk_result_t result;
+
+        overlay.objective_id = objective->id;
+        overlay.side = objective->controlling_side;
+        overlay.intensity = objective->value;
+        result = mk_board_view_push_overlay(out_overlays, overlay_capacity, &overlay_index, &overlay);
+        if (result != MK_OK) {
+            return result;
+        }
+    }
+
+    for (unit_index = 0; unit_index < snapshot->unit_count; ++unit_index) {
+        const mk_unit_t *unit = &snapshot->units[unit_index];
+        size_t soldier_index;
+
+        if (unit->id == snapshot->selected_unit_id) {
+            mk_tactical_overlay_t overlay = mk_board_view_make_overlay(
+                view,
+                MK_TACTICAL_OVERLAY_SELECTION,
+                unit->position_m,
+                MK_UNIT_PICK_RADIUS_M
+            );
+            mk_result_t result;
+
+            overlay.unit_id = unit->id;
+            overlay.side = unit->side;
+            result = mk_board_view_push_overlay(out_overlays, overlay_capacity, &overlay_index, &overlay);
+            if (result != MK_OK) {
+                return result;
+            }
+        }
+
+        if (unit->has_move_target) {
+            mk_tactical_overlay_t route = mk_board_view_make_overlay(
+                view,
+                MK_TACTICAL_OVERLAY_MOVE_ROUTE,
+                unit->position_m,
+                0.0f
+            );
+            mk_tactical_overlay_t target = mk_board_view_make_overlay(
+                view,
+                MK_TACTICAL_OVERLAY_MOVE_TARGET,
+                unit->target_position_m,
+                5.0f
+            );
+            mk_result_t result;
+
+            route.unit_id = unit->id;
+            route.side = unit->side;
+            route.target_position_m = unit->target_position_m;
+            route.target_screen_position_px = mk_board_view_map_to_screen(view, unit->target_position_m);
+            target.unit_id = unit->id;
+            target.side = unit->side;
+
+            result = mk_board_view_push_overlay(out_overlays, overlay_capacity, &overlay_index, &route);
+            if (result != MK_OK) {
+                return result;
+            }
+
+            result = mk_board_view_push_overlay(out_overlays, overlay_capacity, &overlay_index, &target);
+            if (result != MK_OK) {
+                return result;
+            }
+        }
+
+        if (unit->suppression > 0 || unit->status != MK_UNIT_READY) {
+            mk_tactical_overlay_t overlay = mk_board_view_make_overlay(
+                view,
+                MK_TACTICAL_OVERLAY_SUPPRESSION,
+                unit->position_m,
+                7.0f
+            );
+            mk_result_t result;
+
+            overlay.unit_id = unit->id;
+            overlay.side = unit->side;
+            overlay.intensity = unit->suppression;
+            result = mk_board_view_push_overlay(out_overlays, overlay_capacity, &overlay_index, &overlay);
+            if (result != MK_OK) {
+                return result;
+            }
+        }
+
+        for (soldier_index = 0; soldier_index < unit->soldier_count; ++soldier_index) {
+            const mk_soldier_t *soldier = &unit->soldiers[soldier_index];
+
+            if (soldier->casualty) {
+                mk_vec2_t position_m;
+                mk_tactical_overlay_t overlay;
+                mk_result_t result;
+
+                position_m.x = unit->position_m.x + soldier->offset_m.x;
+                position_m.y = unit->position_m.y + soldier->offset_m.y;
+                overlay = mk_board_view_make_overlay(view, MK_TACTICAL_OVERLAY_CASUALTY, position_m, 5.0f);
+                overlay.unit_id = unit->id;
+                overlay.soldier_id = soldier->id;
+                overlay.side = unit->side;
+                result = mk_board_view_push_overlay(out_overlays, overlay_capacity, &overlay_index, &overlay);
+                if (result != MK_OK) {
+                    return result;
+                }
+            }
+        }
+    }
+
+    for (civilian_index = 0; civilian_index < snapshot->civilian_count; ++civilian_index) {
+        const mk_civilian_t *civilian = &snapshot->civilians[civilian_index];
+
+        if (civilian->risk > 0) {
+            mk_tactical_overlay_t overlay = mk_board_view_make_overlay(
+                view,
+                MK_TACTICAL_OVERLAY_CIVILIAN_RISK,
+                civilian->position_m,
+                10.0f
+            );
+            mk_result_t result;
+
+            overlay.civilian_id = civilian->id;
+            overlay.side = MK_SIDE_CIVILIAN;
+            overlay.intensity = civilian->risk;
+            result = mk_board_view_push_overlay(out_overlays, overlay_capacity, &overlay_index, &overlay);
+            if (result != MK_OK) {
+                return result;
+            }
+        }
+    }
 
     return MK_OK;
 }

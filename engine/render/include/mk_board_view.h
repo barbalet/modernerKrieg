@@ -9,6 +9,7 @@ extern "C" {
 
 #define MK_BOARD_VIEW_DEFAULT_MARGIN_PX 48.0f
 #define MK_BOARD_VIEW_DEFAULT_MAX_ZOOM_MULTIPLIER 8.0f
+#define MK_BOARD_VIEW_MAX_TACTICAL_OVERLAYS 256
 
 typedef struct {
     mk_rect_t screen_rect_px;
@@ -28,6 +29,33 @@ typedef struct {
     bool casualty;
     bool selected_unit;
 } mk_soldier_marker_t;
+
+typedef enum {
+    MK_TACTICAL_OVERLAY_SELECTION = 0,
+    MK_TACTICAL_OVERLAY_MOVE_ROUTE = 1,
+    MK_TACTICAL_OVERLAY_MOVE_TARGET = 2,
+    MK_TACTICAL_OVERLAY_SUPPRESSION = 3,
+    MK_TACTICAL_OVERLAY_CASUALTY = 4,
+    MK_TACTICAL_OVERLAY_OBJECTIVE = 5,
+    MK_TACTICAL_OVERLAY_HIDDEN_CONTACT = 6,
+    MK_TACTICAL_OVERLAY_CIVILIAN_RISK = 7
+} mk_tactical_overlay_kind_t;
+
+typedef struct {
+    mk_tactical_overlay_kind_t kind;
+    uint32_t unit_id;
+    uint32_t soldier_id;
+    uint32_t objective_id;
+    uint32_t civilian_id;
+    mk_side_t side;
+    mk_vec2_t position_m;
+    mk_vec2_t target_position_m;
+    mk_vec2_t screen_position_px;
+    mk_vec2_t target_screen_position_px;
+    float radius_m;
+    float screen_radius_px;
+    int intensity;
+} mk_tactical_overlay_t;
 
 mk_result_t mk_board_view_fit_map(
     mk_board_view_t *out_view,
@@ -64,9 +92,16 @@ mk_result_t mk_board_view_collect_soldier_markers(
     size_t *out_marker_count
 );
 
+mk_result_t mk_board_view_collect_tactical_overlays(
+    const mk_board_view_t *view,
+    const mk_game_snapshot_t *snapshot,
+    mk_tactical_overlay_t *out_overlays,
+    size_t overlay_capacity,
+    size_t *out_overlay_count
+);
+
 #ifdef __cplusplus
 }
 #endif
 
 #endif
-

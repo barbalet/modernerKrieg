@@ -14,6 +14,7 @@ extern "C" {
 #define MK_ASSET_MAX_MAP_LAYERS 16
 #define MK_ASSET_MAX_SPRITE_SHEETS 16
 #define MK_ASSET_MAX_SPRITE_FRAMES 128
+#define MK_ASSET_MAX_MARKERS 64
 
 typedef struct {
     char id[MK_NAME_CAPACITY];
@@ -72,6 +73,22 @@ typedef struct {
     mk_asset_sprite_frame_t frames[MK_ASSET_MAX_SPRITE_FRAMES];
 } mk_asset_sprite_manifest_t;
 
+typedef struct {
+    char id[MK_NAME_CAPACITY];
+    char kind[MK_ASSET_KIND_CAPACITY];
+    char shape[MK_ASSET_KIND_CAPACITY];
+    mk_color_t color;
+    float radius_m;
+    int line_width_px;
+} mk_asset_marker_t;
+
+typedef struct {
+    char id[MK_NAME_CAPACITY];
+    char name[MK_NAME_CAPACITY];
+    size_t marker_count;
+    mk_asset_marker_t markers[MK_ASSET_MAX_MARKERS];
+} mk_asset_marker_manifest_t;
+
 mk_result_t mk_asset_load_map_manifest(
     const char *manifest_path,
     const char *project_root,
@@ -84,6 +101,11 @@ mk_result_t mk_asset_load_sprite_manifest(
     mk_asset_sprite_manifest_t *out_manifest
 );
 
+mk_result_t mk_asset_load_marker_manifest(
+    const char *manifest_path,
+    mk_asset_marker_manifest_t *out_manifest
+);
+
 const mk_asset_sprite_sheet_t *mk_asset_find_sprite_sheet(
     const mk_asset_sprite_manifest_t *manifest,
     const char *sheet_id
@@ -92,6 +114,11 @@ const mk_asset_sprite_sheet_t *mk_asset_find_sprite_sheet(
 const mk_asset_sprite_frame_t *mk_asset_find_sprite_frame(
     const mk_asset_sprite_manifest_t *manifest,
     const char *runtime_id
+);
+
+const mk_asset_marker_t *mk_asset_find_marker(
+    const mk_asset_marker_manifest_t *manifest,
+    const char *marker_id
 );
 
 #ifdef __cplusplus
