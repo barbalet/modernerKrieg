@@ -37,7 +37,7 @@ static mk_game_snapshot_t make_snapshot(void) {
 static void test_fit_and_round_trip(void) {
     mk_game_snapshot_t snapshot = make_snapshot();
     mk_board_view_t view;
-    mk_vec2_t map_position = make_vec2(34.0f, 82.0f);
+    mk_vec2_t map_position = make_vec2(80.0f, 246.0f);
     mk_vec2_t screen_position;
     mk_vec2_t round_trip;
 
@@ -46,11 +46,11 @@ static void test_fit_and_round_trip(void) {
     assert_close(view.screen_rect_px.y, 48.0f);
     assert_close(view.screen_rect_px.width, 864.0f);
     assert_close(view.screen_rect_px.height, 544.0f);
-    assert_close(view.scale_px_per_m, 3.4f);
+    assert_close(view.scale_px_per_m, 1.088f);
 
     screen_position = mk_board_view_map_to_screen(&view, map_position);
-    assert_close(screen_position.x, 163.6f);
-    assert_close(screen_position.y, 326.8f);
+    assert_close(screen_position.x, 135.04f);
+    assert_close(screen_position.y, 315.65f);
 
     round_trip = mk_board_view_screen_to_map(&view, screen_position);
     assert_close(round_trip.x, map_position.x);
@@ -60,7 +60,7 @@ static void test_fit_and_round_trip(void) {
 static void test_zoom_and_pan(void) {
     mk_game_snapshot_t snapshot = make_snapshot();
     mk_board_view_t view;
-    mk_vec2_t anchor_screen = make_vec2(400.0f, 300.0f);
+    mk_vec2_t anchor_screen = make_vec2(120.0f, 120.0f);
     mk_vec2_t anchor_before;
     mk_vec2_t anchor_after;
     mk_rect_t visible_bounds;
@@ -70,16 +70,16 @@ static void test_zoom_and_pan(void) {
     assert(mk_board_view_zoom_at(&view, &snapshot.map, 2.0f, anchor_screen) == MK_OK);
     anchor_after = mk_board_view_screen_to_map(&view, anchor_screen);
 
-    assert_close(view.scale_px_per_m, 6.8f);
+    assert_close(view.scale_px_per_m, 2.176f);
     assert_close(anchor_before.x, anchor_after.x);
     assert_close(anchor_before.y, anchor_after.y);
 
     assert(mk_board_view_pan_pixels(&view, &snapshot.map, 68.0f, 34.0f) == MK_OK);
     visible_bounds = mk_board_view_visible_map_bounds(&view);
-    assert_close(visible_bounds.x, 61.76f);
-    assert_close(visible_bounds.y, 42.06f);
-    assert_close(visible_bounds.width, 127.06f);
-    assert_close(visible_bounds.height, 80.0f);
+    assert_close(visible_bounds.x, 64.34f);
+    assert_close(visible_bounds.y, 48.71f);
+    assert_close(visible_bounds.width, 397.06f);
+    assert_close(visible_bounds.height, 250.0f);
 }
 
 static void test_soldier_markers_from_snapshot(void) {
@@ -101,8 +101,8 @@ static void test_soldier_markers_from_snapshot(void) {
     assert(markers[0].soldier_id == 1);
     assert(markers[0].role == MK_ROLE_LEADER);
     assert(markers[0].selected_unit);
-    assert_close(markers[0].position_m.x, 32.0f);
-    assert_close(markers[0].position_m.y, 80.0f);
+    assert_close(markers[0].position_m.x, 76.0f);
+    assert_close(markers[0].position_m.y, 243.0f);
 
     assert(markers[3].unit_id == 2);
     assert(markers[3].role == MK_ROLE_RIFLEMAN);

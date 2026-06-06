@@ -49,6 +49,19 @@ endif()
 
 mk_apply_warnings(modernerKriegCore)
 
+add_library(modernerKriegAssets STATIC
+  engine/assets/src/mk_asset_manifest.c
+)
+
+target_include_directories(modernerKriegAssets
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/engine/assets/include>
+)
+
+target_link_libraries(modernerKriegAssets PUBLIC modernerKriegCore)
+
+mk_apply_warnings(modernerKriegAssets)
+
 add_library(modernerKriegRender STATIC
   engine/render/src/mk_board_view.c
 )
@@ -102,13 +115,26 @@ if(MK_BUILD_TESTS)
   target_link_libraries(mk_fixed_loop_tests PRIVATE modernerKriegMosul)
   target_include_directories(mk_fixed_loop_tests PRIVATE tests)
 
+  add_executable(mk_asset_manifest_tests
+    tests/assets/test_asset_manifest.c
+  )
+  target_link_libraries(mk_asset_manifest_tests PRIVATE modernerKriegAssets)
+  target_include_directories(mk_asset_manifest_tests PRIVATE tests)
+  target_compile_definitions(mk_asset_manifest_tests
+    PRIVATE
+      MK_TEST_PROJECT_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
+      MK_TEST_BINARY_DIR="${CMAKE_CURRENT_BINARY_DIR}"
+  )
+
   mk_apply_warnings(mk_core_tests)
   mk_apply_warnings(mk_board_view_tests)
   mk_apply_warnings(mk_fixed_loop_tests)
+  mk_apply_warnings(mk_asset_manifest_tests)
 
   add_test(NAME mk_core_tests COMMAND mk_core_tests)
   add_test(NAME mk_board_view_tests COMMAND mk_board_view_tests)
   add_test(NAME mk_fixed_loop_tests COMMAND mk_fixed_loop_tests)
+  add_test(NAME mk_asset_manifest_tests COMMAND mk_asset_manifest_tests)
   add_test(NAME mk_headless_run_smoke COMMAND mk_headless_run --steps 3 --quiet)
   add_test(
     NAME mk_core_no_sdl_headers
@@ -125,7 +151,16 @@ if(MK_BUILD_SDL_APP)
     add_executable(modernerKrieg
       engine/platform/sdl3/main.c
     )
-    target_link_libraries(modernerKrieg PRIVATE modernerKriegRender modernerKriegMosul SDL3::SDL3)
+    target_link_libraries(modernerKrieg PRIVATE modernerKriegAssets modernerKriegRender modernerKriegMosul SDL3::SDL3)
+
+    find_package(SDL3_image CONFIG QUIET)
+    if(SDL3_image_FOUND)
+      target_link_libraries(modernerKrieg PRIVATE SDL3_image::SDL3_image)
+      target_compile_definitions(modernerKrieg PRIVATE MK_HAS_SDL3_IMAGE=1)
+    else()
+      message(STATUS "SDL3_image was not found; the SDL app will use the manifest-driven fallback map renderer.")
+    endif()
+
     mk_apply_warnings(modernerKrieg)
   else()
     message(STATUS "SDL3 was not found; skipping the modernerKrieg SDL app target.")

@@ -8,6 +8,7 @@ The project starts fresh as an SDL3 + CMake codebase. `derZweiteWeltkrieg` remai
 
 - `engine/core/` contains the pure C simulation core.
 - `engine/render/` contains renderer-independent board-view, pan/zoom, and marker projection code.
+- `engine/assets/` contains manifest parsing and validation for map/sprite metadata.
 - `engine/ai/` is reserved for controller policies that will emit normal core orders.
 - `engine/platform/sdl3/` contains the optional SDL3 app shell.
 - `engine/tools/autoplay/` contains the deterministic headless run tool.
@@ -77,7 +78,14 @@ The public MOSUL demo target is the 2003 Market / Commercial Streets scenario: a
 - source-angle weapon sprites
 - reference plates for combatants, weapons, vehicles, and urban tactics
 
-The current code scenario remains a small East Mosul/Gogjali placeholder while the data, manifest, and scenario layer is redirected to the 2003 demo. That placeholder now exercises the expanded core state model: tactical AI controller slots, force records, command callsigns, map tiles, standalone civilians, objectives, units, soldiers, weapons, and deterministic snapshots.
+The current code scenario has been renamed to the 2003 Market / Commercial Streets path, but it is still constructed in C while the data and manifest layer is brought online. That placeholder now exercises the expanded core state model: tactical AI controller slots, force records, command callsigns, map tiles, standalone civilians, objectives, units, soldiers, weapons, and deterministic snapshots.
+
+The first asset manifests are in place:
+
+- `assets/mosul/manifests/market_commercial_streets_2003.mapmanifest`
+- `assets/mosul/manifests/mosul_2003_sprites.spritemanifest`
+
+CTest validates those manifests and rejects broken references.
 
 ## Interaction
 
@@ -98,8 +106,10 @@ The core now supports deterministic board interaction without depending on SDL:
 - fit the tactical map to a screen rectangle
 - pan and zoom a board view
 - project terrain, objectives, units, and soldier offsets into screen space
+- validate map and sprite manifests without SDL
+- hand the map manifest to the SDL app, which can load the overview PNG when SDL3_image is available and fall back otherwise
 
-The next implementation push is asset/data facing: map manifests, sprite manifests, manifest validation tests, and rendering the Market / Commercial Streets PNG through the existing board transform.
+The next implementation push is scenario-data facing: move the 2003 controller slots, forces, civilians, objectives, units, weapons, and placement out of C constants and into validated data files.
 
 When the SDL3 app target is available, left-click selects a unit, right-click gives the selected unit a move order, arrow keys pan the board, and plus/minus zoom the board.
 

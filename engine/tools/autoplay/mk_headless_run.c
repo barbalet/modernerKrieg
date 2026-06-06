@@ -129,7 +129,7 @@ static void mk_headless_print_usage(const char *program_name) {
         stderr,
         "usage: %s [--steps N] [--seed N] [--quiet]\n"
         "\n"
-        "Runs the East Mosul block scenario headlessly for deterministic smoke tests.\n",
+        "Runs the MOSUL demo scenario headlessly for deterministic smoke tests.\n",
         program_name
     );
 }

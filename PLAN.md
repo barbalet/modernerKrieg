@@ -12,10 +12,12 @@ The first public target is the 2003 Market / Commercial Streets demo. `derZweite
 - The render layer already projects map, terrain, objectives, units, soldier offsets, selection, and movement targets into screen space.
 - A deterministic headless runner exists for smoke tests and future AI-vs-AI/autoplay work.
 - CMake presets exist for default, headless, and strict warning-as-error builds.
+- Asset pipeline documentation, the first Market / Commercial Streets map manifest, the first 2003 sprite manifest, and C manifest validation tests exist.
+- The SDL app can read the map manifest and, when SDL3_image is available, load the manifest overview PNG; otherwise it keeps the fallback tactical renderer.
 - The SDL3 app shell is optional and experimental. If SDL3 is available, it provides the current launchable app path; if not, the core and tests still build.
 - Source art for the 2003 demo is imported under `assets/mosul/source/`.
 - Public source art includes line-art references, 128 px top-down sprite sheets, source-angle weapon sprites, and Market / Commercial Streets map/layer assets.
-- The current hard-coded code scenario is still a placeholder and must be redirected from the older East Mosul/Gogjali shape to the 2003 Market / Commercial Streets demo.
+- The current hard-coded code scenario has been renamed to the 2003 Market / Commercial Streets path, but it must still move out of C constants into validated scenario data.
 
 ## Runtime Shape
 
@@ -169,7 +171,8 @@ The following baseline work is complete and should be preserved while the plan p
 
 - Milestone 0 skeleton: CMake, optional SDL3 app shell, headless runner, fixed-step loop, test helper layer, build presets, CI notes, asset folder stubs, core-no-SDL smoke test, and architecture/third-party docs.
 - Milestone 1 core-state first half: stable containers for controllers, forces, command identities, terrain tiles, civilians, units, soldiers, weapons, objectives, snapshots, scenario loading, and validation.
-- Current tests cover deterministic RNG, scenario loading, snapshots, movement, LOS, firing, suppression, board-view transforms, fixed-step runs, and the core/SDL boundary.
+- Asset/data foundation pass: source-safe asset pipeline docs, map manifest, sprite manifest, manifest parser/validator, manifest CTests, SDL manifest handoff, and 2003 scenario entry point.
+- Current tests cover deterministic RNG, scenario loading, snapshots, movement, LOS, firing, suppression, board-view transforms, fixed-step runs, asset manifests, and the core/SDL boundary.
 
 ## Milestones
 
@@ -191,7 +194,7 @@ The following baseline work is complete and should be preserved while the plan p
 ### Milestone C: 2003 Scenario Data
 
 - Create the first Market / Commercial Streets scenario data file.
-- Replace or deprecate the hard-coded East Mosul placeholder.
+- Replace or deprecate the hard-coded C placeholder.
 - Load controller slots, factions, forces, units, civilians, objectives, map metadata, and asset references from data.
 - Add parser/validation tests.
 
@@ -211,15 +214,15 @@ The following baseline work is complete and should be preserved while the plan p
 
 ## Immediate Next Steps
 
-1. Add `docs/asset_pipeline.md` describing source assets, runtime assets, manifests, scale, pivots, facings, and generated outputs.
-2. Add the first map manifest for Market / Commercial Streets, using the existing imported layer set and recording world size, origin, pixels-per-meter, z order, and layer type.
-3. Add the first sprite manifest for U.S. patrol, armed threat, civilian, and fallback marker sprites.
-4. Add manifest validation tests before the app relies on those files.
-5. Render the Market / Commercial Streets PNG in the app through the existing board-view transform.
-6. Rename or replace the hard-coded `mk_mosul_make_east_block_scenario` path with a 2003 Market / Commercial Streets scenario path.
-7. Load the 2003 controller slots, forces, civilians, objectives, and initial unit placement from scenario data instead of C constants.
-8. Add visible order, selection, suppression, casualty, objective, and hidden-contact markers.
-9. Keep `mk_headless_run` able to load and advance the current scenario path after each data/manifest change.
+1. Add a compact 2003 scenario data file for controller slots, forces, civilians, objectives, units, weapons, and initial placement.
+2. Add scenario data parsing and validation tests, reusing the current C-built 2003 scenario as the expected shape.
+3. Replace the hard-coded 2003 scenario construction with data loading, while keeping a fixture helper for tests.
+4. Extend `mk_headless_run` with scenario path, seed, max ticks, and quiet/transcript output options.
+5. Render unit sprites from `mosul_2003_sprites.spritemanifest` when the SDL image path is available, with fallback unit markers otherwise.
+6. Add marker metadata for selection, move route, fire, overwatch, suppression, casualty, objective, hidden contact, breach/search, rooftop/stair, and civilian risk markers.
+7. Add visible suppression, casualty, objective, and hidden-contact overlays in renderer-independent view data.
+8. Generate or copy the first runtime map overview into `assets/mosul/runtime/maps/market_commercial_streets_2003/`.
+9. Keep all manifest/scenario changes covered by CTest, including missing asset and invalid-reference failures.
 
 ## Quality Bar
 

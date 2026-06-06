@@ -1,11 +1,17 @@
+#include "mk_asset_manifest.h"
 #include "mk_core.h"
 #include "mk_board_view.h"
 #include "mk_log.h"
 #include "mk_mosul_demo.h"
 
 #include <SDL3/SDL.h>
+#ifdef MK_HAS_SDL3_IMAGE
+#include <SDL3_image/SDL_image.h>
+#endif
 #include <stdbool.h>
 #include <string.h>
+
+#define MK_SDL_MAP_MANIFEST_PATH "assets/mosul/manifests/market_commercial_streets_2003.mapmanifest"
 
 typedef struct {
     bool quit_requested;
@@ -163,8 +169,33 @@ static void mk_set_terrain_color(SDL_Renderer *renderer, mk_terrain_kind_t kind)
     }
 }
 
-static void mk_render(SDL_Renderer *renderer, const mk_game_t *game, const mk_board_view_t *view) {
+static void mk_render_map_background(
+    SDL_Renderer *renderer,
+    const mk_board_view_t *view,
+    SDL_Texture *map_texture
+) {
     SDL_FRect board = mk_sdl_rect(view->screen_rect_px);
+
+    if (map_texture != NULL) {
+        SDL_RenderTexture(renderer, map_texture, NULL, &board);
+        SDL_SetRenderDrawColor(renderer, 114, 124, 107, 255);
+        SDL_RenderRect(renderer, &board);
+        return;
+    }
+
+    SDL_SetRenderDrawColor(renderer, 45, 52, 54, 255);
+    SDL_RenderFillRect(renderer, &board);
+
+    SDL_SetRenderDrawColor(renderer, 114, 124, 107, 255);
+    SDL_RenderRect(renderer, &board);
+}
+
+static void mk_render(
+    SDL_Renderer *renderer,
+    const mk_game_t *game,
+    const mk_board_view_t *view,
+    SDL_Texture *map_texture
+) {
     size_t terrain_index;
     size_t objective_index;
     size_t unit_index;
@@ -172,11 +203,7 @@ static void mk_render(SDL_Renderer *renderer, const mk_game_t *game, const mk_bo
     SDL_SetRenderDrawColor(renderer, 18, 22, 24, 255);
     SDL_RenderClear(renderer);
 
-    SDL_SetRenderDrawColor(renderer, 45, 52, 54, 255);
-    SDL_RenderFillRect(renderer, &board);
-
-    SDL_SetRenderDrawColor(renderer, 114, 124, 107, 255);
-    SDL_RenderRect(renderer, &board);
+    mk_render_map_background(renderer, view, map_texture);
 
     for (terrain_index = 0; terrain_index < game->map.terrain_count; ++terrain_index) {
         const mk_terrain_zone_t *terrain = &game->map.terrain[terrain_index];
@@ -254,9 +281,39 @@ static void mk_render(SDL_Renderer *renderer, const mk_game_t *game, const mk_bo
     SDL_RenderPresent(renderer);
 }
 
+static SDL_Texture *mk_load_manifest_map_texture(SDL_Renderer *renderer) {
+    mk_asset_map_manifest_t manifest;
+    mk_result_t result;
+
+    result = mk_asset_load_map_manifest(MK_SDL_MAP_MANIFEST_PATH, ".", &manifest);
+    if (result != MK_OK) {
+        SDL_Log("Map manifest unavailable: %s", mk_result_name(result));
+        return NULL;
+    }
+
+#ifdef MK_HAS_SDL3_IMAGE
+    {
+        SDL_Texture *texture = IMG_LoadTexture(renderer, manifest.overview_path);
+
+        if (texture == NULL) {
+            SDL_Log("Failed to load map PNG \"%s\": %s", manifest.overview_path, SDL_GetError());
+            return NULL;
+        }
+
+        SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_LINEAR);
+        SDL_Log("Loaded map PNG \"%s\" from manifest \"%s\".", manifest.overview_path, manifest.id);
+        return texture;
+    }
+#else
+    SDL_Log("Loaded map manifest \"%s\"; SDL3_image is unavailable, using fallback map renderer.", manifest.id);
+    return NULL;
+#endif
+}
+
 int main(int argc, char **argv) {
     SDL_Window *window;
     SDL_Renderer *renderer;
+    SDL_Texture *map_texture = NULL;
     bool running = true;
     mk_game_t game;
     mk_scenario_definition_t scenario;
@@ -286,7 +343,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    result = mk_mosul_make_east_block_scenario(&scenario);
+    result = mk_mosul_make_market_2003_scenario(&scenario);
     if (result == MK_OK) {
         result = mk_game_load_scenario(&game, &scenario);
     }
@@ -308,6 +365,8 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    map_texture = mk_load_manifest_map_texture(renderer);
+
     while (running) {
         SDL_Event event;
         mk_sdl_input_t input;
@@ -324,8 +383,12 @@ int main(int argc, char **argv) {
 
         mk_sdl_apply_input(&game, &view, &input);
         (void)mk_game_run_fixed_steps(&game, 1, NULL, NULL);
-        mk_render(renderer, &game, &view);
+        mk_render(renderer, &game, &view, map_texture);
         SDL_Delay(16);
+    }
+
+    if (map_texture != NULL) {
+        SDL_DestroyTexture(map_texture);
     }
 
     SDL_DestroyRenderer(renderer);

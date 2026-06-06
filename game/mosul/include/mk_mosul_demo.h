@@ -8,10 +8,10 @@ extern "C" {
 #endif
 
 mk_result_t mk_mosul_make_east_block_scenario(mk_scenario_definition_t *out_scenario);
+mk_result_t mk_mosul_make_market_2003_scenario(mk_scenario_definition_t *out_scenario);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif
-
