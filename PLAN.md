@@ -174,6 +174,24 @@ The following baseline work is complete and should be preserved while the plan p
 - Asset/data foundation pass: source-safe asset pipeline docs, map manifest, sprite manifest, manifest parser/validator, manifest CTests, SDL manifest handoff, and 2003 scenario entry point.
 - Current tests cover deterministic RNG, scenario loading, snapshots, movement, LOS, firing, suppression, board-view transforms, fixed-step runs, asset manifests, and the core/SDL boundary.
 
+## Development Cycle Ledger
+
+Cycle accounting starts from the current checked-in PNG-backed Mosul demo plan state, after the completed foundation above. Earlier foundation work is preserved as baseline work and is not renumbered into this ledger.
+
+- Ledger baseline date: 2026-06-06.
+- Planned cycle budget: 100 cycles.
+- Planned cycle shape: 5 milestones x 20 cycles each.
+- Completed cycles in this ledger: 0.
+- Current cycle: 0.
+- Remaining planned cycles: 100.
+- Next cycle batch: cycles 1-10.
+
+When a development batch is completed, increment `Completed cycles in this ledger`, advance `Current cycle`, reduce `Remaining planned cycles`, and update `Next cycle batch`. Add one log row describing the cycle range, milestone focus, completed work, and verification.
+
+| Date | Cycles Completed | Current Cycle | Remaining Cycles | Milestone Focus | Notes |
+| --- | ---: | ---: | ---: | --- | --- |
+| 2026-06-06 | 0 | 0 | 100 | Baseline | Ledger added after the completed foundation pass; next work starts at cycles 1-10. |
+
 ## Milestones
 
 ### Milestone A: PNG Map On Screen
