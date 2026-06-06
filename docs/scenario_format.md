@@ -31,7 +31,8 @@ The current loader supports:
 - `objective.*` records
 - `weapon.*` records
 - `civilian.*` records
-- `unit.*` records with nested `unit.N.soldier.M.*` records
+- `unit.*` records with optional `hidden`, `revealed`, and `concealment` fields
+- nested `unit.N.soldier.M.*` records
 
 References use zero-based indexes within their section. For example, `force.0.faction_index=0` references `faction.0`, while `unit.1.soldier.0.weapon_index=1` references `weapon.1`.
 
@@ -44,7 +45,8 @@ The loader rejects:
 - unsafe asset paths
 - unknown enum values
 - invalid controller, faction, force, weapon, or soldier references
+- invalid hidden-contact fields, such as negative concealment
 - out-of-bounds map tiles, terrain, civilians, objectives, and units
 - scenarios that the portable C core refuses to load
 
-CTest covers the default 2003 data file, fixture parity, missing asset references, invalid force references, and impossible objective bounds.
+CTest covers the default 2003 data file, fixture parity, hidden-contact fields, missing asset references, invalid force references, and impossible objective bounds.

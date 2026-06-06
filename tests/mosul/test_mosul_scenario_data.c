@@ -68,6 +68,9 @@ static void test_default_scenario_data_matches_fixture_shape(void) {
     MK_TEST_ASSERT_CLOSE(loaded.units[0].position_m.y, fixture.units[0].position_m.y);
     MK_TEST_ASSERT(loaded.units[0].soldier_count == fixture.units[0].soldier_count);
     MK_TEST_ASSERT(loaded.units[1].soldiers[1].role == fixture.units[1].soldiers[1].role);
+    MK_TEST_ASSERT(loaded.units[1].hidden == fixture.units[1].hidden);
+    MK_TEST_ASSERT(loaded.units[1].revealed == fixture.units[1].revealed);
+    MK_TEST_ASSERT(loaded.units[1].concealment == fixture.units[1].concealment);
     MK_TEST_ASSERT(loaded.units[2].soldiers[0].ammo == 0);
 }
 

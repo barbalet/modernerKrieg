@@ -13,5 +13,6 @@ Useful options:
 - `--quiet`: suppress console transcript output.
 - `--transcript PATH`: write the run transcript to a file.
 - `--ai-only`: let tactical AI controllers issue orders for both non-civilian sides before each tick.
+- `--aar`: append a deterministic after-action summary after the result line.
 
-Future cycles should extend this into richer AI-vs-AI autoplay with controller assignment, replay output, and batch balance summaries.
+Future cycles should extend this into richer AI-vs-AI autoplay with controller assignment, replay/debug output, score-threshold checks, and batch balance summaries.

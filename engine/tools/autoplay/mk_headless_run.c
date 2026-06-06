@@ -37,6 +37,8 @@ static const char *mk_headless_order_name(mk_order_t order) {
             return "breach";
         case MK_ORDER_RALLY:
             return "rally";
+        case MK_ORDER_WITHDRAW:
+            return "withdraw";
         case MK_ORDER_NONE:
         default:
             return "none";
@@ -60,6 +62,8 @@ static const char *mk_headless_status_name(mk_unit_status_t status) {
 
 static void mk_headless_print_tick(FILE *stream, const mk_game_t *game) {
     size_t unit_index;
+    size_t civilian_index;
+    int civilian_risk = 0;
 
     fprintf(stream, "tick %u", game->tick);
 
@@ -78,6 +82,11 @@ static void mk_headless_print_tick(FILE *stream, const mk_game_t *game) {
         );
     }
 
+    for (civilian_index = 0; civilian_index < game->civilian_count; ++civilian_index) {
+        civilian_risk += game->civilians[civilian_index].risk;
+    }
+
+    fprintf(stream, " | contacts=%u civilian_risk=%d", (unsigned)game->contact_report_count, civilian_risk);
     fprintf(stream, "\n");
 }
 
@@ -138,7 +147,7 @@ static bool mk_headless_parse_u64(const char *text, uint64_t *out_value) {
 static void mk_headless_print_usage(const char *program_name) {
     fprintf(
         stderr,
-        "usage: %s [--scenario PATH] [--project-root PATH] [--steps N|--max-ticks N] [--seed N] [--quiet] [--transcript PATH] [--ai-only]\n"
+        "usage: %s [--scenario PATH] [--project-root PATH] [--steps N|--max-ticks N] [--seed N] [--quiet] [--transcript PATH] [--ai-only] [--aar]\n"
         "\n"
         "Runs a MOSUL scenario headlessly for deterministic smoke tests and AI-only runs.\n",
         program_name
@@ -211,6 +220,17 @@ static void mk_headless_print_result(FILE *stream, const mk_game_t *game) {
     fprintf(stream, "result: ok tick=%u units=%u\n", game->tick, (unsigned)game->unit_count);
 }
 
+static void mk_headless_print_after_action(FILE *stream, const mk_game_t *game) {
+    mk_after_action_report_t report;
+
+    if (mk_game_after_action_report(game, &report) != MK_OK) {
+        fprintf(stream, "after_action: unavailable\n");
+        return;
+    }
+
+    fprintf(stream, "after_action: %s\n", report.summary);
+}
+
 static mk_result_t mk_headless_run_steps(
     mk_game_t *game,
     uint32_t steps,
@@ -250,6 +270,7 @@ int main(int argc, char **argv) {
     uint64_t seed = 0;
     bool has_seed = false;
     bool ai_only = false;
+    bool print_aar = false;
     int arg_index;
     mk_result_t result;
 
@@ -271,6 +292,11 @@ int main(int argc, char **argv) {
 
         if (strcmp(argument, "--ai-only") == 0) {
             ai_only = true;
+            continue;
+        }
+
+        if (strcmp(argument, "--aar") == 0) {
+            print_aar = true;
             continue;
         }
 
@@ -381,10 +407,16 @@ int main(int argc, char **argv) {
 
     if (!observer.quiet) {
         mk_headless_print_result(stdout, &game);
+        if (print_aar) {
+            mk_headless_print_after_action(stdout, &game);
+        }
     }
 
     if (observer.transcript != NULL) {
         mk_headless_print_result(observer.transcript, &game);
+        if (print_aar) {
+            mk_headless_print_after_action(observer.transcript, &game);
+        }
         fclose(observer.transcript);
     }
 

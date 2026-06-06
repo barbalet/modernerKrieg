@@ -20,6 +20,8 @@ extern "C" {
 #define MK_MAX_CIVILIANS 128
 #define MK_MAX_SOLDIERS_PER_UNIT 16
 #define MK_MAX_UNITS 64
+#define MK_MAX_CONTACT_REPORTS 64
+#define MK_AFTER_ACTION_SUMMARY_CAPACITY 256
 #define MK_UNIT_PICK_RADIUS_M 8.0f
 #define MK_DEFAULT_MOVE_SPEED_M_PER_TICK 6.0f
 
@@ -69,7 +71,8 @@ typedef enum {
     MK_ORDER_SUPPRESS = 5,
     MK_ORDER_OVERWATCH = 6,
     MK_ORDER_BREACH = 7,
-    MK_ORDER_RALLY = 8
+    MK_ORDER_RALLY = 8,
+    MK_ORDER_WITHDRAW = 9
 } mk_order_t;
 
 typedef enum {
@@ -148,6 +151,19 @@ typedef enum {
     MK_CIVILIAN_FROZEN = 2,
     MK_CIVILIAN_FOLLOWING_INSTRUCTIONS = 3
 } mk_civilian_state_t;
+
+typedef enum {
+    MK_CONTACT_REPORT_FIRE = 0,
+    MK_CONTACT_REPORT_REVEAL = 1,
+    MK_CONTACT_REPORT_CIVILIAN_RISK = 2
+} mk_contact_report_kind_t;
+
+typedef enum {
+    MK_OUTCOME_IN_PROGRESS = 0,
+    MK_OUTCOME_PLAYER_SUCCESS = 1,
+    MK_OUTCOME_PLAYER_PARTIAL = 2,
+    MK_OUTCOME_PLAYER_FAILURE = 3
+} mk_outcome_t;
 
 typedef struct {
     float x;
@@ -264,6 +280,9 @@ typedef struct {
     bool communications_up;
     bool cover_posture;
     bool has_move_target;
+    bool hidden;
+    bool revealed;
+    int concealment;
     size_t soldier_count;
     mk_soldier_t soldiers[MK_MAX_SOLDIERS_PER_UNIT];
 } mk_unit_t;
@@ -334,6 +353,25 @@ typedef struct {
 } mk_line_of_sight_t;
 
 typedef struct {
+    uint32_t id;
+    uint32_t tick;
+    mk_contact_report_kind_t kind;
+    uint32_t attacker_unit_id;
+    uint32_t target_unit_id;
+    uint32_t civilian_id;
+    mk_side_t side;
+    mk_vec2_t position_m;
+    mk_vec2_t target_position_m;
+    int shots_fired;
+    int hits;
+    int suppression_added;
+    int casualties;
+    int civilian_risk_added;
+    bool visible;
+    bool resolved;
+} mk_contact_report_t;
+
+typedef struct {
     uint32_t attacker_unit_id;
     uint32_t target_unit_id;
     mk_line_of_sight_t line_of_sight;
@@ -344,11 +382,33 @@ typedef struct {
     int damage_applied;
     int casualties;
     int suppression_added;
+    int civilian_risk_added;
+    uint32_t contact_report_id;
     mk_unit_status_t attacker_status;
     mk_unit_status_t target_status_before;
     mk_unit_status_t target_status_after;
     bool resolved;
 } mk_fire_result_t;
+
+typedef struct {
+    int objective_points;
+    int civilian_risk_penalty;
+    int casualty_penalty;
+    int time_penalty;
+    int total_score;
+    int player_casualties;
+    int opfor_casualties;
+    int civilian_casualties;
+    int civilian_risk;
+    uint32_t controlled_objectives;
+    uint32_t contested_objectives;
+    mk_outcome_t outcome;
+} mk_score_t;
+
+typedef struct {
+    mk_score_t score;
+    char summary[MK_AFTER_ACTION_SUMMARY_CAPACITY];
+} mk_after_action_report_t;
 
 typedef struct {
     char name[MK_SCENARIO_NAME_CAPACITY];
@@ -386,6 +446,8 @@ typedef struct {
     mk_civilian_t civilians[MK_MAX_CIVILIANS];
     size_t unit_count;
     mk_unit_t units[MK_MAX_UNITS];
+    size_t contact_report_count;
+    mk_contact_report_t contact_reports[MK_MAX_CONTACT_REPORTS];
 } mk_game_t;
 
 typedef struct {
@@ -406,6 +468,8 @@ typedef struct {
     mk_civilian_t civilians[MK_MAX_CIVILIANS];
     size_t unit_count;
     mk_unit_t units[MK_MAX_UNITS];
+    size_t contact_report_count;
+    mk_contact_report_t contact_reports[MK_MAX_CONTACT_REPORTS];
 } mk_game_snapshot_t;
 
 typedef mk_result_t (*mk_step_observer_fn)(const mk_game_t *game, void *user_data);
@@ -454,6 +518,11 @@ mk_result_t mk_game_selected_unit_fire(
     uint32_t target_unit_id,
     mk_fire_result_t *out_fire_result
 );
+mk_result_t mk_game_update_hidden_contacts(mk_game_t *game);
+mk_result_t mk_game_update_civilian_risk(mk_game_t *game);
+mk_result_t mk_game_update_objective_control(mk_game_t *game);
+mk_result_t mk_game_score(const mk_game_t *game, mk_score_t *out_score);
+mk_result_t mk_game_after_action_report(const mk_game_t *game, mk_after_action_report_t *out_report);
 
 mk_vec2_t mk_vec2(float x, float y);
 mk_ivec2_t mk_ivec2(int x, int y);

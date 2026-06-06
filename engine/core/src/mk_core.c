@@ -1,6 +1,7 @@
 #include "mk_core.h"
 
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 static void mk_copy_text(char *destination, size_t capacity, const char *source) {
@@ -223,6 +224,29 @@ static float mk_distance(mk_vec2_t first, mk_vec2_t second) {
     return sqrtf(mk_distance_squared(first, second));
 }
 
+static float mk_distance_point_to_segment(mk_vec2_t point, mk_vec2_t segment_start, mk_vec2_t segment_end) {
+    float dx = segment_end.x - segment_start.x;
+    float dy = segment_end.y - segment_start.y;
+    float length_squared = dx * dx + dy * dy;
+    float t;
+    mk_vec2_t closest;
+
+    if (length_squared <= 0.0001f) {
+        return mk_distance(point, segment_start);
+    }
+
+    t = ((point.x - segment_start.x) * dx + (point.y - segment_start.y) * dy) / length_squared;
+    if (t < 0.0f) {
+        t = 0.0f;
+    } else if (t > 1.0f) {
+        t = 1.0f;
+    }
+    closest.x = segment_start.x + t * dx;
+    closest.y = segment_start.y + t * dy;
+
+    return mk_distance(point, closest);
+}
+
 static bool mk_point_in_rect(mk_vec2_t point, mk_rect_t rect) {
     return point.x >= rect.x
         && point.y >= rect.y
@@ -418,6 +442,221 @@ static int mk_apply_fire_damage(mk_unit_t *target, int damage, int cover, int *o
     return damage_applied;
 }
 
+static mk_contact_report_t *mk_game_add_contact_report(mk_game_t *game, mk_contact_report_kind_t kind) {
+    mk_contact_report_t *report;
+
+    if (game == NULL || game->contact_report_count >= MK_MAX_CONTACT_REPORTS) {
+        return NULL;
+    }
+
+    report = &game->contact_reports[game->contact_report_count];
+    memset(report, 0, sizeof(*report));
+    report->id = (uint32_t)(game->contact_report_count + 1);
+    report->tick = game->tick;
+    report->kind = kind;
+    game->contact_report_count += 1;
+
+    return report;
+}
+
+static void mk_game_record_reveal_contact(mk_game_t *game, const mk_unit_t *observer, const mk_unit_t *hidden_unit) {
+    mk_contact_report_t *report = mk_game_add_contact_report(game, MK_CONTACT_REPORT_REVEAL);
+
+    if (report == NULL || hidden_unit == NULL) {
+        return;
+    }
+
+    report->attacker_unit_id = observer != NULL ? observer->id : 0;
+    report->target_unit_id = hidden_unit->id;
+    report->side = hidden_unit->side;
+    report->position_m = hidden_unit->position_m;
+    report->target_position_m = hidden_unit->position_m;
+    report->visible = true;
+    report->resolved = true;
+}
+
+static void mk_game_reveal_unit(mk_game_t *game, mk_unit_t *unit, const mk_unit_t *observer) {
+    if (game == NULL || unit == NULL || !unit->hidden || unit->revealed) {
+        return;
+    }
+
+    unit->revealed = true;
+    mk_game_record_reveal_contact(game, observer, unit);
+}
+
+static int mk_game_apply_civilian_fire_risk(
+    mk_game_t *game,
+    const mk_unit_t *attacker,
+    const mk_unit_t *target,
+    const mk_fire_result_t *fire_result
+) {
+    int total_risk_added = 0;
+    size_t index;
+
+    if (game == NULL || attacker == NULL || target == NULL || fire_result == NULL || fire_result->shots_fired <= 0) {
+        return 0;
+    }
+
+    for (index = 0; index < game->civilian_count; ++index) {
+        mk_civilian_t *civilian = &game->civilians[index];
+        float distance_to_lane;
+        int risk_added = 0;
+
+        if (!civilian->protected_noncombatant) {
+            continue;
+        }
+
+        distance_to_lane = mk_distance_point_to_segment(civilian->position_m, attacker->position_m, target->position_m);
+        if (distance_to_lane <= 30.0f) {
+            risk_added += 3;
+        } else if (distance_to_lane <= 60.0f) {
+            risk_added += 1;
+        }
+
+        if (mk_distance(civilian->position_m, target->position_m) <= 70.0f) {
+            risk_added += 2;
+        }
+
+        if (risk_added > 0) {
+            mk_contact_report_t *report;
+
+            civilian->risk = mk_clamp_int(civilian->risk + risk_added, 0, 100);
+            civilian->stress = mk_clamp_int(civilian->stress + risk_added, 0, 100);
+            if (civilian->state == MK_CIVILIAN_SHELTERING && civilian->risk >= 6) {
+                civilian->state = MK_CIVILIAN_FROZEN;
+            }
+
+            total_risk_added += risk_added;
+            report = mk_game_add_contact_report(game, MK_CONTACT_REPORT_CIVILIAN_RISK);
+            if (report != NULL) {
+                report->attacker_unit_id = attacker->id;
+                report->target_unit_id = target->id;
+                report->civilian_id = civilian->id;
+                report->side = MK_SIDE_CIVILIAN;
+                report->position_m = civilian->position_m;
+                report->target_position_m = target->position_m;
+                report->civilian_risk_added = risk_added;
+                report->visible = true;
+                report->resolved = true;
+            }
+        }
+    }
+
+    return total_risk_added;
+}
+
+static int mk_unit_casualty_count(const mk_unit_t *unit) {
+    int casualty_count = 0;
+    size_t index;
+
+    if (unit == NULL) {
+        return 0;
+    }
+
+    for (index = 0; index < unit->soldier_count; ++index) {
+        if (unit->soldiers[index].casualty) {
+            casualty_count += 1;
+        }
+    }
+
+    return casualty_count;
+}
+
+static int mk_game_side_casualties(const mk_game_t *game, mk_side_t side) {
+    int casualty_count = 0;
+    size_t index;
+
+    if (game == NULL) {
+        return 0;
+    }
+
+    for (index = 0; index < game->unit_count; ++index) {
+        const mk_unit_t *unit = &game->units[index];
+
+        if (unit->side == side) {
+            casualty_count += mk_unit_casualty_count(unit);
+        }
+    }
+
+    return casualty_count;
+}
+
+static int mk_game_total_civilian_risk(const mk_game_t *game) {
+    int civilian_risk = 0;
+    size_t index;
+
+    if (game == NULL) {
+        return 0;
+    }
+
+    for (index = 0; index < game->civilian_count; ++index) {
+        civilian_risk += game->civilians[index].risk;
+    }
+
+    return civilian_risk;
+}
+
+static bool mk_objective_can_be_controlled(const mk_objective_t *objective) {
+    return objective != NULL && objective->kind != MK_OBJECTIVE_PROTECT_CIVILIANS;
+}
+
+static void mk_game_objective_presence(
+    const mk_game_t *game,
+    const mk_objective_t *objective,
+    bool *out_player_present,
+    bool *out_opfor_present
+) {
+    bool player_present = false;
+    bool opfor_present = false;
+    size_t index;
+
+    if (game != NULL && objective != NULL) {
+        for (index = 0; index < game->unit_count; ++index) {
+            const mk_unit_t *unit = &game->units[index];
+
+            if (unit->side != MK_SIDE_PLAYER && unit->side != MK_SIDE_OPFOR) {
+                continue;
+            }
+
+            if (unit->status == MK_UNIT_BROKEN || mk_unit_live_soldier_count(unit) == 0) {
+                continue;
+            }
+
+            if (mk_distance(unit->position_m, objective->position_m) > objective->radius_m) {
+                continue;
+            }
+
+            if (unit->side == MK_SIDE_PLAYER) {
+                player_present = true;
+            } else if (unit->side == MK_SIDE_OPFOR) {
+                opfor_present = true;
+            }
+        }
+    }
+
+    if (out_player_present != NULL) {
+        *out_player_present = player_present;
+    }
+
+    if (out_opfor_present != NULL) {
+        *out_opfor_present = opfor_present;
+    }
+}
+
+static const char *mk_outcome_summary_name(mk_outcome_t outcome) {
+    switch (outcome) {
+        case MK_OUTCOME_PLAYER_SUCCESS:
+            return "success";
+        case MK_OUTCOME_PLAYER_PARTIAL:
+            return "partial";
+        case MK_OUTCOME_PLAYER_FAILURE:
+            return "failure";
+        case MK_OUTCOME_IN_PROGRESS:
+        default:
+            return "in_progress";
+    }
+}
+
 static void mk_update_unit_movement(mk_unit_t *unit) {
     float dx;
     float dy;
@@ -438,7 +677,7 @@ static void mk_update_unit_movement(mk_unit_t *unit) {
         return;
     }
 
-    if (unit->order != MK_ORDER_MOVE && unit->order != MK_ORDER_ASSAULT_MOVE) {
+    if (unit->order != MK_ORDER_MOVE && unit->order != MK_ORDER_ASSAULT_MOVE && unit->order != MK_ORDER_WITHDRAW) {
         unit->has_move_target = false;
         return;
     }
@@ -453,7 +692,7 @@ static void mk_update_unit_movement(mk_unit_t *unit) {
     if (distance_squared <= step_squared || distance_squared <= 0.0001f) {
         unit->position_m = unit->target_position_m;
         unit->has_move_target = false;
-        unit->order = MK_ORDER_HOLD;
+        unit->order = unit->order == MK_ORDER_WITHDRAW ? MK_ORDER_RALLY : MK_ORDER_HOLD;
         return;
     }
 
@@ -781,6 +1020,228 @@ void mk_game_step(mk_game_t *game) {
 
         mk_update_unit_status(unit);
     }
+
+    (void)mk_game_update_hidden_contacts(game);
+    (void)mk_game_update_civilian_risk(game);
+    (void)mk_game_update_objective_control(game);
+}
+
+mk_result_t mk_game_update_hidden_contacts(mk_game_t *game) {
+    size_t hidden_index;
+
+    if (game == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    for (hidden_index = 0; hidden_index < game->unit_count; ++hidden_index) {
+        mk_unit_t *hidden_unit = &game->units[hidden_index];
+        size_t observer_index;
+
+        if (!hidden_unit->hidden || hidden_unit->revealed || hidden_unit->side == MK_SIDE_CIVILIAN) {
+            continue;
+        }
+
+        for (observer_index = 0; observer_index < game->unit_count; ++observer_index) {
+            const mk_unit_t *observer = &game->units[observer_index];
+            mk_line_of_sight_t line_of_sight;
+            float reveal_distance;
+
+            if (observer->id == hidden_unit->id
+                || observer->side == hidden_unit->side
+                || observer->side == MK_SIDE_CIVILIAN
+                || observer->status == MK_UNIT_BROKEN) {
+                continue;
+            }
+
+            reveal_distance = 120.0f - (float)hidden_unit->concealment;
+            if (reveal_distance < 40.0f) {
+                reveal_distance = 40.0f;
+            }
+
+            if (mk_distance(observer->position_m, hidden_unit->position_m) > reveal_distance) {
+                continue;
+            }
+
+            if (mk_game_unit_line_of_sight(game, observer->id, hidden_unit->id, &line_of_sight) == MK_OK
+                && line_of_sight.visible) {
+                mk_game_reveal_unit(game, hidden_unit, observer);
+                break;
+            }
+        }
+    }
+
+    return MK_OK;
+}
+
+mk_result_t mk_game_update_civilian_risk(mk_game_t *game) {
+    size_t civilian_index;
+
+    if (game == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    for (civilian_index = 0; civilian_index < game->civilian_count; ++civilian_index) {
+        mk_civilian_t *civilian = &game->civilians[civilian_index];
+        size_t unit_index;
+
+        if (!civilian->protected_noncombatant) {
+            continue;
+        }
+
+        for (unit_index = 0; unit_index < game->unit_count; ++unit_index) {
+            const mk_unit_t *unit = &game->units[unit_index];
+            float distance;
+
+            if (unit->side == MK_SIDE_CIVILIAN || unit->status == MK_UNIT_BROKEN) {
+                continue;
+            }
+
+            distance = mk_distance(civilian->position_m, unit->position_m);
+            if (distance <= 24.0f) {
+                mk_contact_report_t *report;
+
+                civilian->risk = mk_clamp_int(civilian->risk + 1, 0, 100);
+                civilian->stress = mk_clamp_int(civilian->stress + 1, 0, 100);
+                if (civilian->state == MK_CIVILIAN_SHELTERING) {
+                    civilian->state = MK_CIVILIAN_FROZEN;
+                }
+
+                report = mk_game_add_contact_report(game, MK_CONTACT_REPORT_CIVILIAN_RISK);
+                if (report != NULL) {
+                    report->attacker_unit_id = unit->id;
+                    report->civilian_id = civilian->id;
+                    report->side = MK_SIDE_CIVILIAN;
+                    report->position_m = civilian->position_m;
+                    report->target_position_m = unit->position_m;
+                    report->civilian_risk_added = 1;
+                    report->visible = true;
+                    report->resolved = true;
+                }
+                break;
+            }
+        }
+    }
+
+    return MK_OK;
+}
+
+mk_result_t mk_game_update_objective_control(mk_game_t *game) {
+    size_t objective_index;
+
+    if (game == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    for (objective_index = 0; objective_index < game->objective_count; ++objective_index) {
+        mk_objective_t *objective = &game->objectives[objective_index];
+        bool player_present = false;
+        bool opfor_present = false;
+
+        if (!mk_objective_can_be_controlled(objective)) {
+            continue;
+        }
+
+        mk_game_objective_presence(game, objective, &player_present, &opfor_present);
+
+        if (player_present && opfor_present) {
+            objective->controlling_side = MK_SIDE_NEUTRAL;
+        } else if (player_present) {
+            objective->controlling_side = MK_SIDE_PLAYER;
+        } else if (opfor_present) {
+            objective->controlling_side = MK_SIDE_OPFOR;
+        }
+    }
+
+    return MK_OK;
+}
+
+mk_result_t mk_game_score(const mk_game_t *game, mk_score_t *out_score) {
+    mk_score_t score;
+    size_t objective_index;
+
+    if (game == NULL || out_score == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    memset(&score, 0, sizeof(score));
+
+    for (objective_index = 0; objective_index < game->objective_count; ++objective_index) {
+        const mk_objective_t *objective = &game->objectives[objective_index];
+        bool player_present = false;
+        bool opfor_present = false;
+        int objective_value;
+
+        if (!mk_objective_can_be_controlled(objective)) {
+            continue;
+        }
+
+        mk_game_objective_presence(game, objective, &player_present, &opfor_present);
+        if (player_present && opfor_present) {
+            score.contested_objectives += 1;
+        }
+
+        objective_value = mk_max_int(0, objective->value);
+        if (objective->controlling_side == MK_SIDE_PLAYER && !(player_present && opfor_present)) {
+            score.controlled_objectives += 1;
+            score.objective_points += objective_value * 100;
+        }
+    }
+
+    score.civilian_risk = mk_game_total_civilian_risk(game);
+    score.player_casualties = mk_game_side_casualties(game, MK_SIDE_PLAYER);
+    score.opfor_casualties = mk_game_side_casualties(game, MK_SIDE_OPFOR);
+    score.civilian_casualties = mk_game_side_casualties(game, MK_SIDE_CIVILIAN);
+    score.civilian_risk_penalty = score.civilian_risk * 10;
+    score.casualty_penalty = score.player_casualties * 50 + score.civilian_casualties * 100;
+    score.time_penalty = (int)game->tick;
+    score.total_score = score.objective_points
+        - score.civilian_risk_penalty
+        - score.casualty_penalty
+        - score.time_penalty;
+
+    if (score.controlled_objectives == 0) {
+        score.outcome = MK_OUTCOME_PLAYER_FAILURE;
+    } else if (score.player_casualties > 0 || score.civilian_casualties > 0 || score.civilian_risk >= 25) {
+        score.outcome = MK_OUTCOME_PLAYER_PARTIAL;
+    } else {
+        score.outcome = MK_OUTCOME_PLAYER_SUCCESS;
+    }
+
+    *out_score = score;
+    return MK_OK;
+}
+
+mk_result_t mk_game_after_action_report(const mk_game_t *game, mk_after_action_report_t *out_report) {
+    mk_after_action_report_t report;
+    mk_result_t result;
+
+    if (game == NULL || out_report == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    memset(&report, 0, sizeof(report));
+    result = mk_game_score(game, &report.score);
+    if (result != MK_OK) {
+        return result;
+    }
+
+    (void)snprintf(
+        report.summary,
+        sizeof(report.summary),
+        "outcome=%s score=%d objectives=%u contested=%u civilian_risk=%d casualties(player=%d,opfor=%d,civilian=%d) ticks=%u",
+        mk_outcome_summary_name(report.score.outcome),
+        report.score.total_score,
+        (unsigned)report.score.controlled_objectives,
+        (unsigned)report.score.contested_objectives,
+        report.score.civilian_risk,
+        report.score.player_casualties,
+        report.score.opfor_casualties,
+        report.score.civilian_casualties,
+        game->tick
+    );
+
+    *out_report = report;
+    return MK_OK;
 }
 
 mk_result_t mk_game_run_fixed_steps(
@@ -836,6 +1297,8 @@ mk_result_t mk_game_snapshot(const mk_game_t *game, mk_game_snapshot_t *out_snap
     memcpy(out_snapshot->civilians, game->civilians, sizeof(game->civilians));
     out_snapshot->unit_count = game->unit_count;
     memcpy(out_snapshot->units, game->units, sizeof(game->units));
+    out_snapshot->contact_report_count = game->contact_report_count;
+    memcpy(out_snapshot->contact_reports, game->contact_reports, sizeof(game->contact_reports));
 
     return MK_OK;
 }
@@ -867,6 +1330,8 @@ mk_result_t mk_game_load_scenario(mk_game_t *game, const mk_scenario_definition_
     memcpy(game->civilians, scenario->civilians, sizeof(scenario->civilians));
     game->unit_count = scenario->unit_count;
     memcpy(game->units, scenario->units, sizeof(scenario->units));
+    game->contact_report_count = 0;
+    memset(game->contact_reports, 0, sizeof(game->contact_reports));
 
     for (index = 0; index < game->unit_count; ++index) {
         mk_update_unit_status(&game->units[index]);
@@ -1095,6 +1560,9 @@ mk_result_t mk_game_unit_fire(
         return MK_OK;
     }
 
+    mk_game_reveal_unit(game, attacker, target);
+    mk_game_reveal_unit(game, target, attacker);
+
     los_result = mk_game_unit_line_of_sight(game, attacker_unit_id, target_unit_id, &fire_result.line_of_sight);
     if (los_result != MK_OK) {
         *out_fire_result = fire_result;
@@ -1161,6 +1629,26 @@ mk_result_t mk_game_unit_fire(
     fire_result.attacker_status = attacker->status;
     fire_result.target_status_after = target->status;
     fire_result.resolved = fire_result.shots_fired > 0;
+    fire_result.civilian_risk_added = mk_game_apply_civilian_fire_risk(game, attacker, target, &fire_result);
+    if (fire_result.resolved) {
+        mk_contact_report_t *report = mk_game_add_contact_report(game, MK_CONTACT_REPORT_FIRE);
+
+        if (report != NULL) {
+            report->attacker_unit_id = attacker->id;
+            report->target_unit_id = target->id;
+            report->side = attacker->side;
+            report->position_m = attacker->position_m;
+            report->target_position_m = target->position_m;
+            report->shots_fired = fire_result.shots_fired;
+            report->hits = fire_result.hits;
+            report->suppression_added = fire_result.suppression_added;
+            report->casualties = fire_result.casualties;
+            report->civilian_risk_added = fire_result.civilian_risk_added;
+            report->visible = fire_result.line_of_sight.visible;
+            report->resolved = fire_result.resolved;
+            fire_result.contact_report_id = report->id;
+        }
+    }
     *out_fire_result = fire_result;
 
     return MK_OK;

@@ -250,6 +250,8 @@ static const char *mk_sdl_overlay_marker_id(mk_tactical_overlay_kind_t kind) {
             return "move_route";
         case MK_TACTICAL_OVERLAY_MOVE_TARGET:
             return "move_target";
+        case MK_TACTICAL_OVERLAY_FIRE:
+            return "fire_order";
         case MK_TACTICAL_OVERLAY_SUPPRESSION:
             return "suppression";
         case MK_TACTICAL_OVERLAY_CASUALTY:
@@ -423,7 +425,7 @@ static void mk_render_overlay(
         SDL_SetRenderDrawColor(renderer, 220, 216, 156, 220);
     }
 
-    if (overlay->kind == MK_TACTICAL_OVERLAY_MOVE_ROUTE) {
+    if (overlay->kind == MK_TACTICAL_OVERLAY_MOVE_ROUTE || overlay->kind == MK_TACTICAL_OVERLAY_FIRE) {
         SDL_RenderLine(
             renderer,
             overlay->screen_position_px.x,

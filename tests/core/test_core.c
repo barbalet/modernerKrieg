@@ -236,6 +236,9 @@ static void test_scenario_loading_populates_core_state(void) {
     assert(game.units[0].controller_id == 1);
     assert(strcmp(game.units[0].command.callsign, "PATROL-1A") == 0);
     assert(game.units[0].soldier_count == 3);
+    assert(game.units[1].hidden);
+    assert(!game.units[1].revealed);
+    assert(game.units[1].concealment == 18);
     assert(game.units[1].soldiers[1].role == MK_ROLE_RPG);
     assert(game.units[2].side == MK_SIDE_CIVILIAN);
 }
@@ -423,12 +426,18 @@ static void test_unit_fire_resolves_damage_and_suppression(void) {
     assert(fire_result.attacker_status == MK_UNIT_READY);
     assert(fire_result.target_status_before == MK_UNIT_READY);
     assert(fire_result.target_status_after == MK_UNIT_BROKEN);
+    assert(fire_result.contact_report_id == 1);
     assert(stored_target->suppression == 50);
     assert(stored_target->status == MK_UNIT_BROKEN);
     assert(stored_target->soldiers[0].casualty);
     assert(stored_target->soldiers[1].casualty);
     assert(game.units[0].soldiers[0].ammo == 118);
     assert(game.units[0].soldiers[1].ammo == 118);
+    assert(game.contact_report_count == 1);
+    assert(game.contact_reports[0].kind == MK_CONTACT_REPORT_FIRE);
+    assert(game.contact_reports[0].shots_fired == 4);
+    assert(game.contact_reports[0].hits == 3);
+    assert(game.contact_reports[0].casualties == 2);
 }
 
 static void test_unit_fire_blocked_by_line_of_sight(void) {
@@ -474,6 +483,44 @@ static void test_selected_unit_fire_uses_loaded_scenario(void) {
     assert(fire_result.eligible_shooters == 3);
     assert(fire_result.shots_fired == 6);
     assert(game.units[1].suppression > 0);
+    assert(game.contact_report_count >= 2);
+    assert(game.units[1].revealed);
+    assert(fire_result.civilian_risk_added > 0);
+    assert(game.civilians[0].risk == fire_result.civilian_risk_added);
+}
+
+static void test_hidden_contact_reveals_when_observed(void) {
+    mk_scenario_definition_t scenario = make_east_mosul_block_scenario_fixture();
+    mk_game_t game;
+
+    assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
+    assert(game.units[1].hidden);
+    assert(!game.units[1].revealed);
+    assert(mk_game_update_hidden_contacts(&game) == MK_OK);
+    assert(!game.units[1].revealed);
+    assert(game.contact_report_count == 0);
+
+    game.units[0].position_m = make_vec2(300.0f, 230.0f);
+    assert(mk_game_update_hidden_contacts(&game) == MK_OK);
+    assert(game.units[1].revealed);
+    assert(game.contact_report_count == 1);
+    assert(game.contact_reports[0].kind == MK_CONTACT_REPORT_REVEAL);
+    assert(game.contact_reports[0].target_unit_id == 2);
+}
+
+static void test_civilian_risk_tracks_close_armed_units(void) {
+    mk_scenario_definition_t scenario = make_east_mosul_block_scenario_fixture();
+    mk_game_t game;
+
+    assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
+    game.units[0].position_m = make_vec2(246.0f, 206.0f);
+    assert(mk_game_update_civilian_risk(&game) == MK_OK);
+    assert(game.civilians[0].risk == 1);
+    assert(game.civilians[0].stress == 1);
+    assert(game.civilians[0].state == MK_CIVILIAN_FROZEN);
+    assert(game.contact_report_count == 1);
+    assert(game.contact_reports[0].kind == MK_CONTACT_REPORT_CIVILIAN_RISK);
+    assert(game.contact_reports[0].civilian_id == 1);
 }
 
 static mk_unit_t make_status_test_unit(const char *name, mk_training_t training, int suppression) {
@@ -540,6 +587,56 @@ static void test_broken_unit_halts_movement(void) {
     assert(stored_unit->status == MK_UNIT_BROKEN);
 }
 
+static void test_objective_control_and_scoring(void) {
+    mk_scenario_definition_t scenario = make_east_mosul_block_scenario_fixture();
+    mk_game_t game;
+    mk_score_t score;
+
+    assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
+    game.units[0].position_m = game.objectives[0].position_m;
+    assert(mk_game_update_objective_control(&game) == MK_OK);
+    assert(game.objectives[0].controlling_side == MK_SIDE_NEUTRAL);
+
+    game.units[1].position_m = make_vec2(420.0f, 230.0f);
+    game.civilians[0].risk = 3;
+    game.units[0].soldiers[0].casualty = true;
+    game.tick = 7;
+    assert(mk_game_update_objective_control(&game) == MK_OK);
+    assert(game.objectives[0].controlling_side == MK_SIDE_PLAYER);
+
+    assert(mk_game_score(&game, &score) == MK_OK);
+    assert(score.objective_points == 500);
+    assert(score.civilian_risk == 3);
+    assert(score.civilian_risk_penalty == 30);
+    assert(score.player_casualties == 1);
+    assert(score.casualty_penalty == 50);
+    assert(score.time_penalty == 7);
+    assert(score.total_score == 413);
+    assert(score.controlled_objectives == 1);
+    assert(score.contested_objectives == 0);
+    assert(score.outcome == MK_OUTCOME_PLAYER_PARTIAL);
+}
+
+static void test_after_action_report_is_stable(void) {
+    mk_scenario_definition_t scenario = make_east_mosul_block_scenario_fixture();
+    mk_game_t game;
+    mk_after_action_report_t report;
+
+    assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
+    game.units[0].position_m = game.objectives[0].position_m;
+    game.units[1].position_m = make_vec2(420.0f, 230.0f);
+    game.tick = 5;
+    assert(mk_game_update_objective_control(&game) == MK_OK);
+
+    assert(mk_game_after_action_report(&game, &report) == MK_OK);
+    assert(report.score.total_score == 495);
+    assert(report.score.outcome == MK_OUTCOME_PLAYER_SUCCESS);
+    assert(strstr(report.summary, "outcome=success") != NULL);
+    assert(strstr(report.summary, "score=495") != NULL);
+    assert(strstr(report.summary, "objectives=1") != NULL);
+    assert(strstr(report.summary, "ticks=5") != NULL);
+}
+
 static void test_invalid_scenario_is_rejected(void) {
     mk_scenario_definition_t scenario = make_east_mosul_block_scenario_fixture();
     mk_game_t game;
@@ -591,8 +688,12 @@ int main(void) {
     test_unit_fire_resolves_damage_and_suppression();
     test_unit_fire_blocked_by_line_of_sight();
     test_selected_unit_fire_uses_loaded_scenario();
+    test_hidden_contact_reveals_when_observed();
+    test_civilian_risk_tracks_close_armed_units();
     test_suppression_status_slows_movement_and_recovers();
     test_broken_unit_halts_movement();
+    test_objective_control_and_scoring();
+    test_after_action_report_is_stable();
     test_invalid_scenario_is_rejected();
 
     puts("mk_core_tests: ok");

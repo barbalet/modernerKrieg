@@ -132,15 +132,26 @@ mk_result_t mk_board_view_collect_tactical_overlays(
     size_t objective_index;
     size_t unit_index;
     size_t civilian_index;
+    size_t contact_index;
 
     if (!mk_render_view_is_valid(view) || snapshot == NULL || out_overlay_count == NULL) {
         return MK_ERROR_INVALID_ARGUMENT;
     }
 
     needed += snapshot->objective_count;
+    for (contact_index = 0; contact_index < snapshot->contact_report_count; ++contact_index) {
+        if (snapshot->contact_reports[contact_index].kind == MK_CONTACT_REPORT_FIRE) {
+            needed += 1;
+        }
+    }
+
     for (unit_index = 0; unit_index < snapshot->unit_count; ++unit_index) {
         const mk_unit_t *unit = &snapshot->units[unit_index];
         size_t soldier_index;
+
+        if (unit->hidden && !unit->revealed) {
+            needed += 1;
+        }
 
         if (unit->id == snapshot->selected_unit_id) {
             needed += 1;
@@ -177,6 +188,30 @@ mk_result_t mk_board_view_collect_tactical_overlays(
         return MK_ERROR_CAPACITY;
     }
 
+    for (contact_index = 0; contact_index < snapshot->contact_report_count; ++contact_index) {
+        const mk_contact_report_t *report = &snapshot->contact_reports[contact_index];
+
+        if (report->kind == MK_CONTACT_REPORT_FIRE) {
+            mk_tactical_overlay_t overlay = mk_board_view_make_overlay(
+                view,
+                MK_TACTICAL_OVERLAY_FIRE,
+                report->position_m,
+                0.0f
+            );
+            mk_result_t result;
+
+            overlay.unit_id = report->attacker_unit_id;
+            overlay.side = report->side;
+            overlay.target_position_m = report->target_position_m;
+            overlay.target_screen_position_px = mk_board_view_map_to_screen(view, report->target_position_m);
+            overlay.intensity = report->suppression_added;
+            result = mk_board_view_push_overlay(out_overlays, overlay_capacity, &overlay_index, &overlay);
+            if (result != MK_OK) {
+                return result;
+            }
+        }
+    }
+
     for (objective_index = 0; objective_index < snapshot->objective_count; ++objective_index) {
         const mk_objective_t *objective = &snapshot->objectives[objective_index];
         mk_tactical_overlay_t overlay = mk_board_view_make_overlay(
@@ -199,6 +234,24 @@ mk_result_t mk_board_view_collect_tactical_overlays(
     for (unit_index = 0; unit_index < snapshot->unit_count; ++unit_index) {
         const mk_unit_t *unit = &snapshot->units[unit_index];
         size_t soldier_index;
+
+        if (unit->hidden && !unit->revealed) {
+            mk_tactical_overlay_t overlay = mk_board_view_make_overlay(
+                view,
+                MK_TACTICAL_OVERLAY_HIDDEN_CONTACT,
+                unit->position_m,
+                6.0f
+            );
+            mk_result_t result;
+
+            overlay.unit_id = unit->id;
+            overlay.side = unit->side;
+            overlay.intensity = unit->concealment;
+            result = mk_board_view_push_overlay(out_overlays, overlay_capacity, &overlay_index, &overlay);
+            if (result != MK_OK) {
+                return result;
+            }
+        }
 
         if (unit->id == snapshot->selected_unit_id) {
             mk_tactical_overlay_t overlay = mk_board_view_make_overlay(
@@ -444,7 +497,13 @@ mk_result_t mk_board_view_collect_soldier_markers(
     }
 
     for (unit_index = 0; unit_index < snapshot->unit_count; ++unit_index) {
-        needed += snapshot->units[unit_index].soldier_count;
+        const mk_unit_t *unit = &snapshot->units[unit_index];
+
+        if (unit->hidden && !unit->revealed) {
+            continue;
+        }
+
+        needed += unit->soldier_count;
     }
 
     *out_marker_count = needed;
@@ -460,6 +519,10 @@ mk_result_t mk_board_view_collect_soldier_markers(
     for (unit_index = 0; unit_index < snapshot->unit_count; ++unit_index) {
         const mk_unit_t *unit = &snapshot->units[unit_index];
         size_t soldier_index;
+
+        if (unit->hidden && !unit->revealed) {
+            continue;
+        }
 
         for (soldier_index = 0; soldier_index < unit->soldier_count; ++soldier_index) {
             const mk_soldier_t *soldier = &unit->soldiers[soldier_index];

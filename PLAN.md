@@ -7,14 +7,14 @@ The first public target is the 2003 Market / Commercial Streets demo. `derZweite
 ## Current Baseline
 
 - CMake project, portable C core, Mosul game module, renderer-independent board-view code, and headless tests exist.
-- The core already supports deterministic game state, unit selection, orders, movement ticks, line of sight, cover checks, unit fire, ammo spend, wounds, casualties, suppression, and morale state changes.
-- The core state model now includes controller slots, force records, command identities, map tiles with elevation/cover/movement costs, richer weapon/ammunition metadata, richer soldier state, standalone civilian records, and snapshot/load support for those containers.
-- The render layer already projects map, terrain, objectives, units, soldier offsets, selection, movement targets, suppression, casualties, and civilian-risk overlays into screen space.
+- The core already supports deterministic game state, unit selection, orders, movement ticks, line of sight, cover checks, unit fire, ammo spend, wounds, casualties, suppression, morale state changes, hidden-contact reveals, contact reports, civilian-risk updates, objective control, scoring, and after-action summaries.
+- The core state model now includes controller slots, force records, command identities, map tiles with elevation/cover/movement costs, richer weapon/ammunition metadata, richer soldier state, standalone civilian records, contact reports, hidden unit fields, and snapshot/load support for those containers.
+- The render layer already projects map, terrain, objectives, units, soldier offsets, selection, movement targets, fire lanes, suppression, hidden contacts, casualties, and civilian-risk overlays into screen space.
 - A deterministic headless runner exists for smoke tests and AI-vs-AI/autoplay work.
 - CMake presets exist for default, headless, and strict warning-as-error builds.
 - Asset pipeline documentation, the first Market / Commercial Streets map manifest, the first 2003 sprite manifest, the first marker manifest, and C manifest validation tests exist.
 - The 2003 Market / Commercial Streets scenario now loads from a validated `.mkscenario` data file, with a C fixture retained for parity tests.
-- `mk_headless_run` can load an explicit scenario path, override the seed, run for a fixed tick budget, suppress console output, write a transcript, and run both non-civilian tactical sides under basic AI.
+- `mk_headless_run` can load an explicit scenario path, override the seed, run for a fixed tick budget, suppress console output, write a transcript with contact/risk counters and after-action output, and run both non-civilian tactical sides under basic AI.
 - The SDL app can read the map, sprite, and marker manifests and, when SDL3_image is available, load the manifest PNG assets; otherwise it keeps fallback map/unit/overlay rendering.
 - The first runtime map overview exists at `assets/mosul/runtime/maps/market_commercial_streets_2003/overview.png`.
 - The SDL3 app shell is optional and experimental. If SDL3 is available, it provides the current launchable app path; if not, the core and tests still build.
@@ -184,10 +184,10 @@ Cycle accounting starts from the current checked-in PNG-backed Mosul demo plan s
 - Ledger baseline date: 2026-06-06.
 - Planned cycle budget: 100 cycles.
 - Planned cycle shape: 5 milestones x 20 cycles each.
-- Completed cycles in this ledger: 20.
-- Current cycle: 20.
-- Remaining planned cycles: 80.
-- Next cycle batch: cycles 21-30.
+- Completed cycles in this ledger: 40.
+- Current cycle: 40.
+- Remaining planned cycles: 60.
+- Next cycle batch: cycles 41-50.
 
 When a development batch is completed, increment `Completed cycles in this ledger`, advance `Current cycle`, reduce `Remaining planned cycles`, and update `Next cycle batch`. Add one log row describing the cycle range, milestone focus, completed work, and verification.
 
@@ -196,6 +196,8 @@ When a development batch is completed, increment `Completed cycles in this ledge
 | 2026-06-06 | 0 | 0 | 100 | Baseline | Ledger added after the completed foundation pass; next work starts at cycles 1-10. |
 | 2026-06-06 | 10 | 10 | 90 | Milestone C / Autoplay | Added the 2003 `.mkscenario` file, scenario parser, fixture parity and invalid-reference tests, default data-backed Mosul loader, and headless scenario/seed/tick/quiet/transcript controls. Verified default CTest and direct transcript run. |
 | 2026-06-06 | 20 | 20 | 80 | Milestone B / Autoplay | Added marker metadata and validation, renderer-independent tactical overlays, SDL sprite/marker fallback rendering, copied the first runtime map overview, introduced basic AI order emission, and added AI-only headless smoke coverage. Verified default CTest and direct AI transcript run. |
+| 2026-06-06 | 30 | 30 | 70 | Milestone D / Contact | Added contact reports for fire/reveal/civilian risk, hidden-contact scenario fields and reveal checks, civilian-risk updates from fire and proximity, fire/hidden overlays, smarter AI suppress/withdraw choices, and deterministic AI transcript assertions. Verified default CTest and direct AI transcript run. |
+| 2026-06-06 | 40 | 40 | 60 | Milestone D/E / Outcome | Added persistent objective-control state, deterministic score math for objectives/civilian risk/casualties/time, after-action summary data, `mk_headless_run --aar`, player AI civilian-risk restraint, revealed-opfor withdrawal behavior, and deterministic tests for scoring/AAR/AI caution. Verified default CTest and direct AI-only AAR transcript run. |
 
 ## Milestones
 
@@ -224,26 +226,29 @@ When a development batch is completed, increment `Completed cycles in this ledge
 
 ### Milestone D: Playable Contact
 
-- Add visible fire/suppression/casualty feedback.
-- Add hidden-contact reveal logic.
-- Add civilian-risk scoring and at least one non-combatant constraint.
-- Add a basic opposing AI response.
+- Complete: add visible fire/suppression/casualty feedback records and overlays.
+- Complete: add hidden-contact state, reveal checks, and suspected-contact overlays.
+- Complete: add first civilian-risk scoring and a non-combatant proximity/fire constraint.
+- Complete: add a basic opposing AI response.
+- Complete: turn the first contact systems into scenario outcome scoring and after-action text.
+- Continue: deepen uncertainty with suspected and false contact records.
 
 ### Milestone E: Demo Polish
 
-- Add briefing and after-action summary.
+- Complete: add deterministic after-action summary data and headless transcript output.
+- Continue: add player-facing briefing and after-action UI presentation.
 - Add deterministic replay/debug logging.
 - Package one macOS-first smoke-tested build.
 - Document how to build, run, test, and regenerate runtime assets.
 
 ## Immediate Next Steps
 
-1. Add visible fire and suppression feedback records from resolved combat, not just current suppression state.
-2. Add hidden-contact state, suspected-contact overlays, reveal checks, and false-certainty hooks.
-3. Add civilian-risk scoring and at least one non-combatant constraint tied to movement/fire.
-4. Extend basic AI to choose between move, suppress, hold, and withdraw based on distance, suppression, and objective pressure.
-5. Add deterministic AI-vs-AI transcript assertions, not only smoke runs.
-6. Add marker-driven fire, overwatch, hidden-contact, breach/search, and rooftop/stair overlays as soon as the related state exists.
+1. Expand hidden-contact behavior with suspected-danger and false-contact records.
+2. Add deterministic replay/debug logging beyond the current tick transcript.
+3. Teach board-view overlays to project objective-control and after-action-relevant state cleanly.
+4. Add headless balance assertions for AI-only runs that reach or contest an objective.
+5. Add scenario data fields for score thresholds, objective labels, briefing copy, and after-action copy.
+6. Start SDL/player-facing presentation for briefing, objective control, score, and after-action summaries.
 7. Keep all manifest/scenario/render/AI changes covered by CTest, including missing asset and invalid-reference failures.
 
 ## Quality Bar

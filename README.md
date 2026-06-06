@@ -76,6 +76,17 @@ Run both tactical sides under deterministic AI:
 ./build/bin/mk_headless_run --ai-only --max-ticks 10
 ```
 
+Write an after-action summary into a deterministic AI-only transcript:
+
+```sh
+./build/bin/mk_headless_run \
+  --ai-only \
+  --max-ticks 10 \
+  --aar \
+  --quiet \
+  --transcript build/mosul_ai_aar.txt
+```
+
 The SDL3 app target is provisional. If SDL3 proves workable for the game feel and deployment path, it will be used. If not, the contingency is a new SwiftUI GUI over the same tactical model. The SDL3 target is enabled automatically when CMake can find SDL3. If SDL3 is installed in a custom prefix, pass its CMake package location:
 
 ```sh
@@ -114,26 +125,32 @@ The core now supports deterministic board interaction without depending on SDL:
 - pick a unit at a map coordinate
 - select or clear a selected unit
 - issue hold/rally/other orders
+- issue withdraw orders through AI when units are pinned or heavily suppressed
 - issue a move order and advance toward the target on each simulation tick
 - run the same fixed-step loop from the SDL app or a headless command-line runner
 - load scenario state with controllers, forces, civilians, map tiles, terrain zones, objectives, and units
 - trace line of sight between map positions or units
 - report blocking terrain and target cover
 - resolve deterministic unit fire, ammo spend, hits, wounds, casualties, and suppression
+- retain contact reports for fire, reveal, and civilian-risk events
+- reveal hidden contacts through proximity and line-of-sight checks
+- track civilian risk and stress from dangerous fire lanes and close armed movement
+- update objective-control state and score outcomes from objective control, civilian risk, casualties, and time
+- produce deterministic after-action summaries for headless runs and future UI presentation
 - track ready, suppressed, pinned, and broken unit states from live strength, training, and suppression
 - slow or halt movement under suppression and apply fire penalties from combat stress
 - represent richer soldier state, including stance, wound state, ammo capacity, stress, exposure, equipment flags, sensor flags, and reload/cooldown timers
 - fit the tactical map to a screen rectangle
 - pan and zoom a board view
 - project terrain, objectives, units, and soldier offsets into screen space
-- project tactical overlays for selection, movement, suppression, casualties, objectives, and civilian risk
+- project tactical overlays for selection, movement, fire, suppression, hidden contacts, casualties, objectives, and civilian risk
 - validate map, sprite, and marker manifests without SDL
 - load the 2003 scenario from data with parser-side and core-side validation
 - run a selected scenario through the headless tool with seed, tick-count, quiet, and transcript controls
-- run player and opposing tactical controllers as deterministic AI-only headless runs
+- run player and opposing tactical controllers as deterministic AI-only headless runs with move, suppress, hold, civilian-risk restraint, and withdraw choices
 - hand map, sprite, and marker manifests to the SDL app, which can load PNGs when SDL3_image is available and fall back otherwise
 
-The next implementation push is contact-facing: visible fire feedback, hidden-contact reveal logic, civilian-risk scoring, and stronger AI-vs-AI transcript checks.
+The next implementation push is uncertainty and presentation facing: suspected/false contact records, replay/debug logging, score thresholds in scenario data, and player-facing briefing/after-action presentation.
 
 When the SDL3 app target is available, left-click selects a unit, right-click gives the selected unit a move order, arrow keys pan the board, and plus/minus zoom the board.
 

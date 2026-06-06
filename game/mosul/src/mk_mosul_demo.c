@@ -298,6 +298,9 @@ static mk_result_t mk_mosul_add_defender_unit(
     unit.force_id = force_id;
     unit.controller_id = controller_id;
     unit.command = mk_make_command_identity("Armed Threat Cell", "CELL-1A", MK_SIDE_OPFOR);
+    unit.hidden = true;
+    unit.revealed = false;
+    unit.concealment = 18;
 
     soldier = mk_make_soldier("Armed Rifleman", MK_ROLE_RIFLEMAN, akm);
     soldier.offset_m = mk_mosul_vec2(-3.0f, 0.0f);

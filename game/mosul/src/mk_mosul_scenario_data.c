@@ -251,6 +251,22 @@ static bool mk_mosul_required_bool(const mk_mosul_scenario_entry_list_t *entries
     return false;
 }
 
+static bool mk_mosul_optional_bool(
+    const mk_mosul_scenario_entry_list_t *entries,
+    const char *key,
+    bool default_value,
+    bool *out_value
+) {
+    const char *value = mk_mosul_entry_value(entries, key);
+
+    if (value == NULL) {
+        *out_value = default_value;
+        return true;
+    }
+
+    return mk_mosul_required_bool(entries, key, out_value);
+}
+
 static bool mk_mosul_required_count(
     const mk_mosul_scenario_entry_list_t *entries,
     const char *key,
@@ -1290,6 +1306,9 @@ static mk_result_t mk_mosul_load_units(
         size_t controller_index = 0;
         size_t soldier_count = 0;
         size_t soldier_index;
+        bool hidden = false;
+        bool revealed = false;
+        int concealment = 0;
         mk_unit_t unit;
         mk_result_t result;
 
@@ -1348,6 +1367,29 @@ static mk_result_t mk_mosul_load_units(
         unit.force_id = force_ids[force_index];
         unit.controller_id = controller_ids[controller_index];
         unit.command = mk_make_command_identity(command_name, callsign, side);
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "unit", unit_index, "hidden");
+        if (!mk_mosul_optional_bool(entries, key, false, &hidden)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "unit", unit_index, "revealed");
+        if (!mk_mosul_optional_bool(entries, key, false, &revealed)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "unit", unit_index, "concealment");
+        if (!mk_mosul_optional_int(entries, key, 0, &concealment)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        if (concealment < 0) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        unit.hidden = hidden;
+        unit.revealed = revealed;
+        unit.concealment = concealment;
 
         for (soldier_index = 0; soldier_index < soldier_count; ++soldier_index) {
             char soldier_name[MK_NAME_CAPACITY];
