@@ -182,6 +182,17 @@ if(MK_BUILD_TESTS)
   add_test(NAME mk_headless_run_smoke COMMAND mk_headless_run --steps 3 --quiet)
   add_test(NAME mk_headless_run_ai_smoke COMMAND mk_headless_run --steps 3 --quiet --ai-only)
   add_test(
+    NAME mk_headless_run_debug_balance
+    COMMAND mk_headless_run
+      --steps 3
+      --quiet
+      --ai-only
+      --aar
+      --debug-log
+      --expect-objective opfor
+      --expect-min-score -10
+  )
+  add_test(
     NAME mk_core_no_sdl_headers
     COMMAND ${CMAKE_COMMAND}
       -DMK_PROJECT_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}

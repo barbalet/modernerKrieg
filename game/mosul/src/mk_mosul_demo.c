@@ -373,7 +373,33 @@ mk_result_t mk_mosul_make_market_2003_fixture_scenario(mk_scenario_definition_t 
 
     memset(out_scenario, 0, sizeof(*out_scenario));
     snprintf(out_scenario->name, sizeof(out_scenario->name), "%s", "Market Commercial Streets 2003");
+    snprintf(
+        out_scenario->briefing,
+        sizeof(out_scenario->briefing),
+        "%s",
+        "Secure the market junction, identify armed threats, and keep protected civilians out of the line of fire."
+    );
+    snprintf(
+        out_scenario->after_action_success,
+        sizeof(out_scenario->after_action_success),
+        "%s",
+        "The patrol secured the junction while preserving civilian safety and force cohesion."
+    );
+    snprintf(
+        out_scenario->after_action_partial,
+        sizeof(out_scenario->after_action_partial),
+        "%s",
+        "The patrol made progress, but civilian risk, casualties, or delay kept the result limited."
+    );
+    snprintf(
+        out_scenario->after_action_failure,
+        sizeof(out_scenario->after_action_failure),
+        "%s",
+        "The patrol did not secure the market junction within acceptable risk."
+    );
     out_scenario->seed = UINT64_C(0x4D4B32303033);
+    out_scenario->score_success_threshold = MK_DEFAULT_SCORE_SUCCESS_THRESHOLD;
+    out_scenario->score_partial_threshold = MK_DEFAULT_SCORE_PARTIAL_THRESHOLD;
     out_scenario->map = mk_make_map("Market / Commercial Streets", 500.0f, 500.0f);
 
     result = mk_mosul_configure_tiles(out_scenario);

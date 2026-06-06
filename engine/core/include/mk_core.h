@@ -21,9 +21,12 @@ extern "C" {
 #define MK_MAX_SOLDIERS_PER_UNIT 16
 #define MK_MAX_UNITS 64
 #define MK_MAX_CONTACT_REPORTS 64
+#define MK_SCENARIO_TEXT_CAPACITY 256
 #define MK_AFTER_ACTION_SUMMARY_CAPACITY 256
 #define MK_UNIT_PICK_RADIUS_M 8.0f
 #define MK_DEFAULT_MOVE_SPEED_M_PER_TICK 6.0f
+#define MK_DEFAULT_SCORE_SUCCESS_THRESHOLD 450
+#define MK_DEFAULT_SCORE_PARTIAL_THRESHOLD 150
 
 typedef enum {
     MK_OK = 0,
@@ -155,7 +158,9 @@ typedef enum {
 typedef enum {
     MK_CONTACT_REPORT_FIRE = 0,
     MK_CONTACT_REPORT_REVEAL = 1,
-    MK_CONTACT_REPORT_CIVILIAN_RISK = 2
+    MK_CONTACT_REPORT_CIVILIAN_RISK = 2,
+    MK_CONTACT_REPORT_SUSPECTED_DANGER = 3,
+    MK_CONTACT_REPORT_FALSE_CONTACT = 4
 } mk_contact_report_kind_t;
 
 typedef enum {
@@ -359,6 +364,7 @@ typedef struct {
     uint32_t attacker_unit_id;
     uint32_t target_unit_id;
     uint32_t civilian_id;
+    uint32_t terrain_id;
     mk_side_t side;
     mk_vec2_t position_m;
     mk_vec2_t target_position_m;
@@ -367,6 +373,7 @@ typedef struct {
     int suppression_added;
     int casualties;
     int civilian_risk_added;
+    int confidence;
     bool visible;
     bool resolved;
 } mk_contact_report_t;
@@ -408,11 +415,18 @@ typedef struct {
 typedef struct {
     mk_score_t score;
     char summary[MK_AFTER_ACTION_SUMMARY_CAPACITY];
+    char narrative[MK_SCENARIO_TEXT_CAPACITY];
 } mk_after_action_report_t;
 
 typedef struct {
     char name[MK_SCENARIO_NAME_CAPACITY];
+    char briefing[MK_SCENARIO_TEXT_CAPACITY];
+    char after_action_success[MK_SCENARIO_TEXT_CAPACITY];
+    char after_action_partial[MK_SCENARIO_TEXT_CAPACITY];
+    char after_action_failure[MK_SCENARIO_TEXT_CAPACITY];
     uint64_t seed;
+    int score_success_threshold;
+    int score_partial_threshold;
     mk_map_t map;
     size_t controller_count;
     mk_controller_slot_t controllers[MK_MAX_CONTROLLERS];
@@ -430,8 +444,14 @@ typedef struct {
 
 typedef struct {
     char scenario_name[MK_SCENARIO_NAME_CAPACITY];
+    char briefing[MK_SCENARIO_TEXT_CAPACITY];
+    char after_action_success[MK_SCENARIO_TEXT_CAPACITY];
+    char after_action_partial[MK_SCENARIO_TEXT_CAPACITY];
+    char after_action_failure[MK_SCENARIO_TEXT_CAPACITY];
     uint32_t tick;
     uint64_t rng_state;
+    int score_success_threshold;
+    int score_partial_threshold;
     uint32_t selected_unit_id;
     mk_map_t map;
     size_t controller_count;
@@ -452,8 +472,14 @@ typedef struct {
 
 typedef struct {
     char scenario_name[MK_SCENARIO_NAME_CAPACITY];
+    char briefing[MK_SCENARIO_TEXT_CAPACITY];
+    char after_action_success[MK_SCENARIO_TEXT_CAPACITY];
+    char after_action_partial[MK_SCENARIO_TEXT_CAPACITY];
+    char after_action_failure[MK_SCENARIO_TEXT_CAPACITY];
     uint32_t tick;
     uint64_t rng_state;
+    int score_success_threshold;
+    int score_partial_threshold;
     uint32_t selected_unit_id;
     mk_map_t map;
     size_t controller_count;

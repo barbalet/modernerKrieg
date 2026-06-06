@@ -155,6 +155,23 @@ static bool mk_mosul_required_text(
     return true;
 }
 
+static bool mk_mosul_optional_text(
+    const mk_mosul_scenario_entry_list_t *entries,
+    const char *key,
+    const char *default_value,
+    char *out_text,
+    size_t capacity
+) {
+    const char *value = mk_mosul_entry_value(entries, key);
+
+    if (out_text == NULL || capacity == 0) {
+        return false;
+    }
+
+    mk_mosul_copy_text(out_text, capacity, value != NULL ? value : default_value);
+    return true;
+}
+
 static bool mk_mosul_parse_int_text(const char *text, int *out_value) {
     char *end = NULL;
     long parsed;
@@ -765,6 +782,57 @@ static mk_result_t mk_mosul_load_map(
 
     scenario->map = mk_make_map(map_name, width_m, height_m);
     return mk_map_configure_tiles(&scenario->map, columns, rows, tile_width_m, tile_height_m, default_kind);
+}
+
+static mk_result_t mk_mosul_load_briefing_and_scoring(
+    const mk_mosul_scenario_entry_list_t *entries,
+    mk_scenario_definition_t *scenario
+) {
+    int success_threshold = MK_DEFAULT_SCORE_SUCCESS_THRESHOLD;
+    int partial_threshold = MK_DEFAULT_SCORE_PARTIAL_THRESHOLD;
+
+    if (entries == NULL || scenario == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (!mk_mosul_optional_text(
+            entries,
+            "briefing",
+            "",
+            scenario->briefing,
+            sizeof(scenario->briefing)
+        )
+        || !mk_mosul_optional_text(
+            entries,
+            "after_action.success",
+            "",
+            scenario->after_action_success,
+            sizeof(scenario->after_action_success)
+        )
+        || !mk_mosul_optional_text(
+            entries,
+            "after_action.partial",
+            "",
+            scenario->after_action_partial,
+            sizeof(scenario->after_action_partial)
+        )
+        || !mk_mosul_optional_text(
+            entries,
+            "after_action.failure",
+            "",
+            scenario->after_action_failure,
+            sizeof(scenario->after_action_failure)
+        )
+        || !mk_mosul_optional_int(entries, "score.success_threshold", success_threshold, &success_threshold)
+        || !mk_mosul_optional_int(entries, "score.partial_threshold", partial_threshold, &partial_threshold)
+        || success_threshold < partial_threshold
+        || partial_threshold < 0) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    scenario->score_success_threshold = success_threshold;
+    scenario->score_partial_threshold = partial_threshold;
+    return MK_OK;
 }
 
 static mk_result_t mk_mosul_load_tile_ranges(
@@ -1483,6 +1551,11 @@ mk_result_t mk_mosul_load_scenario_file(
     if (!mk_mosul_required_text(&entries, "name", scenario.name, sizeof(scenario.name))
         || !mk_mosul_required_u64(&entries, "seed", &scenario.seed)) {
         return MK_ERROR_INVALID_DATA;
+    }
+
+    result = mk_mosul_load_briefing_and_scoring(&entries, &scenario);
+    if (result != MK_OK) {
+        return result;
     }
 
     result = mk_mosul_load_map(&entries, &scenario);

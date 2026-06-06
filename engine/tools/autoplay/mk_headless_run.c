@@ -16,8 +16,51 @@
 
 typedef struct {
     bool quiet;
+    bool debug_log;
     FILE *transcript;
 } mk_headless_run_observer_t;
+
+static const char *mk_headless_side_name(mk_side_t side) {
+    switch (side) {
+        case MK_SIDE_PLAYER:
+            return "player";
+        case MK_SIDE_OPFOR:
+            return "opfor";
+        case MK_SIDE_CIVILIAN:
+            return "civilian";
+        case MK_SIDE_NEUTRAL:
+        default:
+            return "neutral";
+    }
+}
+
+static bool mk_headless_parse_side(const char *text, mk_side_t *out_side) {
+    if (text == NULL || out_side == NULL) {
+        return false;
+    }
+
+    if (strcmp(text, "player") == 0) {
+        *out_side = MK_SIDE_PLAYER;
+        return true;
+    }
+
+    if (strcmp(text, "opfor") == 0) {
+        *out_side = MK_SIDE_OPFOR;
+        return true;
+    }
+
+    if (strcmp(text, "civilian") == 0) {
+        *out_side = MK_SIDE_CIVILIAN;
+        return true;
+    }
+
+    if (strcmp(text, "neutral") == 0) {
+        *out_side = MK_SIDE_NEUTRAL;
+        return true;
+    }
+
+    return false;
+}
 
 static const char *mk_headless_order_name(mk_order_t order) {
     switch (order) {
@@ -42,6 +85,23 @@ static const char *mk_headless_order_name(mk_order_t order) {
         case MK_ORDER_NONE:
         default:
             return "none";
+    }
+}
+
+static const char *mk_headless_contact_kind_name(mk_contact_report_kind_t kind) {
+    switch (kind) {
+        case MK_CONTACT_REPORT_FIRE:
+            return "fire";
+        case MK_CONTACT_REPORT_REVEAL:
+            return "reveal";
+        case MK_CONTACT_REPORT_CIVILIAN_RISK:
+            return "civilian_risk";
+        case MK_CONTACT_REPORT_SUSPECTED_DANGER:
+            return "suspected_danger";
+        case MK_CONTACT_REPORT_FALSE_CONTACT:
+            return "false_contact";
+        default:
+            return "unknown";
     }
 }
 
@@ -90,6 +150,55 @@ static void mk_headless_print_tick(FILE *stream, const mk_game_t *game) {
     fprintf(stream, "\n");
 }
 
+static void mk_headless_print_debug_tick(FILE *stream, const mk_game_t *game) {
+    mk_score_t score;
+    size_t objective_index;
+
+    if (mk_game_score(game, &score) != MK_OK) {
+        memset(&score, 0, sizeof(score));
+    }
+
+    fprintf(
+        stream,
+        "debug tick=%u rng=%llu score=%d controlled=%u contested=%u",
+        game->tick,
+        (unsigned long long)game->rng_state,
+        score.total_score,
+        (unsigned)score.controlled_objectives,
+        (unsigned)score.contested_objectives
+    );
+
+    for (objective_index = 0; objective_index < game->objective_count; ++objective_index) {
+        const mk_objective_t *objective = &game->objectives[objective_index];
+
+        fprintf(
+            stream,
+            " objective.%u=%s",
+            objective->id,
+            mk_headless_side_name(objective->controlling_side)
+        );
+    }
+
+    if (game->contact_report_count > 0) {
+        const mk_contact_report_t *report = &game->contact_reports[game->contact_report_count - 1];
+
+        fprintf(
+            stream,
+            " last_contact=(id=%u kind=%s target=%u terrain=%u confidence=%d resolved=%d)",
+            report->id,
+            mk_headless_contact_kind_name(report->kind),
+            report->target_unit_id,
+            report->terrain_id,
+            report->confidence,
+            report->resolved ? 1 : 0
+        );
+    } else {
+        fprintf(stream, " last_contact=none");
+    }
+
+    fprintf(stream, "\n");
+}
+
 static mk_result_t mk_headless_observe_tick(const mk_game_t *game, void *user_data) {
     mk_headless_run_observer_t *observer = (mk_headless_run_observer_t *)user_data;
 
@@ -99,10 +208,16 @@ static mk_result_t mk_headless_observe_tick(const mk_game_t *game, void *user_da
 
     if (!observer->quiet) {
         mk_headless_print_tick(stdout, game);
+        if (observer->debug_log) {
+            mk_headless_print_debug_tick(stdout, game);
+        }
     }
 
     if (observer->transcript != NULL) {
         mk_headless_print_tick(observer->transcript, game);
+        if (observer->debug_log) {
+            mk_headless_print_debug_tick(observer->transcript, game);
+        }
     }
 
     return MK_OK;
@@ -144,10 +259,28 @@ static bool mk_headless_parse_u64(const char *text, uint64_t *out_value) {
     return true;
 }
 
+static bool mk_headless_parse_i32(const char *text, int *out_value) {
+    char *end = NULL;
+    long parsed;
+
+    if (text == NULL || out_value == NULL || text[0] == '\0') {
+        return false;
+    }
+
+    errno = 0;
+    parsed = strtol(text, &end, 10);
+    if (errno != 0 || end == text || *end != '\0' || parsed < INT32_MIN || parsed > INT32_MAX) {
+        return false;
+    }
+
+    *out_value = (int)parsed;
+    return true;
+}
+
 static void mk_headless_print_usage(const char *program_name) {
     fprintf(
         stderr,
-        "usage: %s [--scenario PATH] [--project-root PATH] [--steps N|--max-ticks N] [--seed N] [--quiet] [--transcript PATH] [--ai-only] [--aar]\n"
+        "usage: %s [--scenario PATH] [--project-root PATH] [--steps N|--max-ticks N] [--seed N] [--quiet] [--transcript PATH] [--ai-only] [--aar] [--briefing] [--debug-log] [--expect-objective SIDE] [--expect-min-score N]\n"
         "\n"
         "Runs a MOSUL scenario headlessly for deterministic smoke tests and AI-only runs.\n",
         program_name
@@ -216,6 +349,10 @@ static void mk_headless_print_header(FILE *stream, const mk_game_t *game, uint32
     );
 }
 
+static void mk_headless_print_briefing(FILE *stream, const mk_game_t *game) {
+    fprintf(stream, "briefing: %s\n", game->briefing[0] != '\0' ? game->briefing : "(none)");
+}
+
 static void mk_headless_print_result(FILE *stream, const mk_game_t *game) {
     fprintf(stream, "result: ok tick=%u units=%u\n", game->tick, (unsigned)game->unit_count);
 }
@@ -229,6 +366,25 @@ static void mk_headless_print_after_action(FILE *stream, const mk_game_t *game) 
     }
 
     fprintf(stream, "after_action: %s\n", report.summary);
+    if (report.narrative[0] != '\0') {
+        fprintf(stream, "after_action_text: %s\n", report.narrative);
+    }
+}
+
+static bool mk_headless_objective_side_present(const mk_game_t *game, mk_side_t side) {
+    size_t index;
+
+    if (game == NULL) {
+        return false;
+    }
+
+    for (index = 0; index < game->objective_count; ++index) {
+        if (game->objectives[index].controlling_side == side) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 static mk_result_t mk_headless_run_steps(
@@ -271,10 +427,16 @@ int main(int argc, char **argv) {
     bool has_seed = false;
     bool ai_only = false;
     bool print_aar = false;
+    bool print_briefing = false;
+    bool expect_objective = false;
+    bool expect_min_score = false;
+    mk_side_t expected_objective_side = MK_SIDE_NEUTRAL;
+    int expected_min_score = 0;
     int arg_index;
     mk_result_t result;
 
     observer.quiet = false;
+    observer.debug_log = false;
     observer.transcript = NULL;
 
     for (arg_index = 1; arg_index < argc; ++arg_index) {
@@ -297,6 +459,16 @@ int main(int argc, char **argv) {
 
         if (strcmp(argument, "--aar") == 0) {
             print_aar = true;
+            continue;
+        }
+
+        if (strcmp(argument, "--briefing") == 0) {
+            print_briefing = true;
+            continue;
+        }
+
+        if (strcmp(argument, "--debug-log") == 0) {
+            observer.debug_log = true;
             continue;
         }
 
@@ -354,6 +526,28 @@ int main(int argc, char **argv) {
             continue;
         }
 
+        if (strcmp(argument, "--expect-objective") == 0) {
+            if (arg_index + 1 >= argc || !mk_headless_parse_side(argv[arg_index + 1], &expected_objective_side)) {
+                mk_headless_print_usage(argv[0]);
+                return 2;
+            }
+
+            expect_objective = true;
+            arg_index += 1;
+            continue;
+        }
+
+        if (strcmp(argument, "--expect-min-score") == 0) {
+            if (arg_index + 1 >= argc || !mk_headless_parse_i32(argv[arg_index + 1], &expected_min_score)) {
+                mk_headless_print_usage(argv[0]);
+                return 2;
+            }
+
+            expect_min_score = true;
+            arg_index += 1;
+            continue;
+        }
+
         mk_headless_print_usage(argv[0]);
         return 2;
     }
@@ -390,10 +584,16 @@ int main(int argc, char **argv) {
 
     if (!observer.quiet) {
         mk_headless_print_header(stdout, &game, steps);
+        if (print_briefing) {
+            mk_headless_print_briefing(stdout, &game);
+        }
     }
 
     if (observer.transcript != NULL) {
         mk_headless_print_header(observer.transcript, &game, steps);
+        if (print_briefing) {
+            mk_headless_print_briefing(observer.transcript, &game);
+        }
     }
 
     result = mk_headless_run_steps(&game, steps, ai_only, &observer);
@@ -403,6 +603,27 @@ int main(int argc, char **argv) {
             fclose(observer.transcript);
         }
         return 1;
+    }
+
+    if (expect_objective && !mk_headless_objective_side_present(&game, expected_objective_side)) {
+        fprintf(stderr, "expected objective controlled by %s\n", mk_headless_side_name(expected_objective_side));
+        if (observer.transcript != NULL) {
+            fclose(observer.transcript);
+        }
+        return 1;
+    }
+
+    if (expect_min_score) {
+        mk_score_t score;
+
+        result = mk_game_score(&game, &score);
+        if (result != MK_OK || score.total_score < expected_min_score) {
+            fprintf(stderr, "expected score >= %d\n", expected_min_score);
+            if (observer.transcript != NULL) {
+                fclose(observer.transcript);
+            }
+            return 1;
+        }
     }
 
     if (!observer.quiet) {

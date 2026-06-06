@@ -49,7 +49,13 @@ static void test_default_scenario_data_matches_fixture_shape(void) {
     MK_TEST_ASSERT(mk_mosul_make_market_2003_fixture_scenario(&fixture) == MK_OK);
 
     MK_TEST_ASSERT(strcmp(loaded.name, fixture.name) == 0);
+    MK_TEST_ASSERT(strcmp(loaded.briefing, fixture.briefing) == 0);
+    MK_TEST_ASSERT(strcmp(loaded.after_action_success, fixture.after_action_success) == 0);
+    MK_TEST_ASSERT(strcmp(loaded.after_action_partial, fixture.after_action_partial) == 0);
+    MK_TEST_ASSERT(strcmp(loaded.after_action_failure, fixture.after_action_failure) == 0);
     MK_TEST_ASSERT(loaded.seed == fixture.seed);
+    MK_TEST_ASSERT(loaded.score_success_threshold == fixture.score_success_threshold);
+    MK_TEST_ASSERT(loaded.score_partial_threshold == fixture.score_partial_threshold);
     MK_TEST_ASSERT(strcmp(loaded.map.name, fixture.map.name) == 0);
     MK_TEST_ASSERT_CLOSE(loaded.map.width_m, fixture.map.width_m);
     MK_TEST_ASSERT_CLOSE(loaded.map.height_m, fixture.map.height_m);
@@ -202,12 +208,30 @@ static void test_impossible_objective_bounds_are_rejected(void) {
     MK_TEST_ASSERT(mk_mosul_load_scenario_file(path, MK_TEST_PROJECT_ROOT, &scenario) == MK_ERROR_INVALID_DATA);
 }
 
+static void test_invalid_score_thresholds_are_rejected(void) {
+    char path[512];
+    mk_scenario_definition_t scenario;
+
+    make_binary_path(path, sizeof(path), "bad_score_thresholds.mkscenario");
+    write_text_file(
+        path,
+        "format=modernerKrieg.scenario.v1\n"
+        "name=Bad Score Thresholds\n"
+        "seed=1\n"
+        "score.success_threshold=50\n"
+        "score.partial_threshold=100\n"
+    );
+
+    MK_TEST_ASSERT(mk_mosul_load_scenario_file(path, MK_TEST_PROJECT_ROOT, &scenario) == MK_ERROR_INVALID_DATA);
+}
+
 int main(void) {
     test_default_scenario_data_matches_fixture_shape();
     test_public_default_scenario_uses_data_file();
     test_missing_asset_manifest_is_rejected();
     test_invalid_force_reference_is_rejected();
     test_impossible_objective_bounds_are_rejected();
+    test_invalid_score_thresholds_are_rejected();
 
     puts("mk_mosul_scenario_data_tests: ok");
     return 0;

@@ -14,5 +14,9 @@ Useful options:
 - `--transcript PATH`: write the run transcript to a file.
 - `--ai-only`: let tactical AI controllers issue orders for both non-civilian sides before each tick.
 - `--aar`: append a deterministic after-action summary after the result line.
+- `--briefing`: print or record the scenario briefing before the first tick.
+- `--debug-log`: print or record replay-oriented debug lines after each tick.
+- `--expect-objective SIDE`: fail the run unless at least one objective is controlled by `player`, `opfor`, `civilian`, or `neutral`.
+- `--expect-min-score N`: fail the run unless the final deterministic score is at least `N`.
 
-Future cycles should extend this into richer AI-vs-AI autoplay with controller assignment, replay/debug output, score-threshold checks, and batch balance summaries.
+Future cycles should extend this into richer AI-vs-AI autoplay with controller assignment, versioned replay/event output, score-threshold checks, and batch balance summaries.

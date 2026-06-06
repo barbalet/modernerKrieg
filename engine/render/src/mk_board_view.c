@@ -139,8 +139,18 @@ mk_result_t mk_board_view_collect_tactical_overlays(
     }
 
     needed += snapshot->objective_count;
+    for (objective_index = 0; objective_index < snapshot->objective_count; ++objective_index) {
+        if (snapshot->objectives[objective_index].controlling_side != MK_SIDE_NEUTRAL) {
+            needed += 1;
+        }
+    }
+
     for (contact_index = 0; contact_index < snapshot->contact_report_count; ++contact_index) {
-        if (snapshot->contact_reports[contact_index].kind == MK_CONTACT_REPORT_FIRE) {
+        mk_contact_report_kind_t kind = snapshot->contact_reports[contact_index].kind;
+
+        if (kind == MK_CONTACT_REPORT_FIRE
+            || kind == MK_CONTACT_REPORT_SUSPECTED_DANGER
+            || kind == MK_CONTACT_REPORT_FALSE_CONTACT) {
             needed += 1;
         }
     }
@@ -209,6 +219,27 @@ mk_result_t mk_board_view_collect_tactical_overlays(
             if (result != MK_OK) {
                 return result;
             }
+        } else if (report->kind == MK_CONTACT_REPORT_SUSPECTED_DANGER
+            || report->kind == MK_CONTACT_REPORT_FALSE_CONTACT) {
+            mk_tactical_overlay_kind_t kind = report->kind == MK_CONTACT_REPORT_SUSPECTED_DANGER
+                ? MK_TACTICAL_OVERLAY_SUSPECTED_CONTACT
+                : MK_TACTICAL_OVERLAY_FALSE_CONTACT;
+            mk_tactical_overlay_t overlay = mk_board_view_make_overlay(
+                view,
+                kind,
+                report->position_m,
+                report->kind == MK_CONTACT_REPORT_SUSPECTED_DANGER ? 10.0f : 8.0f
+            );
+            mk_result_t result;
+
+            overlay.unit_id = report->target_unit_id;
+            overlay.terrain_id = report->terrain_id;
+            overlay.side = report->side;
+            overlay.intensity = report->confidence;
+            result = mk_board_view_push_overlay(out_overlays, overlay_capacity, &overlay_index, &overlay);
+            if (result != MK_OK) {
+                return result;
+            }
         }
     }
 
@@ -228,6 +259,23 @@ mk_result_t mk_board_view_collect_tactical_overlays(
         result = mk_board_view_push_overlay(out_overlays, overlay_capacity, &overlay_index, &overlay);
         if (result != MK_OK) {
             return result;
+        }
+
+        if (objective->controlling_side != MK_SIDE_NEUTRAL) {
+            mk_tactical_overlay_t control_overlay = mk_board_view_make_overlay(
+                view,
+                MK_TACTICAL_OVERLAY_OBJECTIVE_CONTROL,
+                objective->position_m,
+                objective->radius_m * 0.5f
+            );
+
+            control_overlay.objective_id = objective->id;
+            control_overlay.side = objective->controlling_side;
+            control_overlay.intensity = objective->value;
+            result = mk_board_view_push_overlay(out_overlays, overlay_capacity, &overlay_index, &control_overlay);
+            if (result != MK_OK) {
+                return result;
+            }
         }
     }
 

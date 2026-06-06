@@ -27,6 +27,10 @@ static void mk_copy_scenario_name(char destination[MK_SCENARIO_NAME_CAPACITY], c
     mk_copy_text(destination, MK_SCENARIO_NAME_CAPACITY, source);
 }
 
+static void mk_copy_scenario_text(char destination[MK_SCENARIO_TEXT_CAPACITY], const char *source) {
+    mk_copy_text(destination, MK_SCENARIO_TEXT_CAPACITY, source);
+}
+
 static int mk_training_recovery(mk_training_t training) {
     switch (training) {
         case MK_TRAINING_ELITE:
@@ -222,6 +226,14 @@ static float mk_distance_squared(mk_vec2_t first, mk_vec2_t second) {
 
 static float mk_distance(mk_vec2_t first, mk_vec2_t second) {
     return sqrtf(mk_distance_squared(first, second));
+}
+
+static mk_vec2_t mk_rect_center(mk_rect_t rect) {
+    mk_vec2_t center;
+
+    center.x = rect.x + rect.width * 0.5f;
+    center.y = rect.y + rect.height * 0.5f;
+    return center;
 }
 
 static float mk_distance_point_to_segment(mk_vec2_t point, mk_vec2_t segment_start, mk_vec2_t segment_end) {
@@ -459,6 +471,33 @@ static mk_contact_report_t *mk_game_add_contact_report(mk_game_t *game, mk_conta
     return report;
 }
 
+static bool mk_game_contact_report_exists(
+    const mk_game_t *game,
+    mk_contact_report_kind_t kind,
+    uint32_t observer_unit_id,
+    uint32_t target_unit_id,
+    uint32_t terrain_id
+) {
+    size_t index;
+
+    if (game == NULL) {
+        return false;
+    }
+
+    for (index = 0; index < game->contact_report_count; ++index) {
+        const mk_contact_report_t *report = &game->contact_reports[index];
+
+        if (report->kind == kind
+            && report->attacker_unit_id == observer_unit_id
+            && report->target_unit_id == target_unit_id
+            && report->terrain_id == terrain_id) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static void mk_game_record_reveal_contact(mk_game_t *game, const mk_unit_t *observer, const mk_unit_t *hidden_unit) {
     mk_contact_report_t *report = mk_game_add_contact_report(game, MK_CONTACT_REPORT_REVEAL);
 
@@ -471,8 +510,54 @@ static void mk_game_record_reveal_contact(mk_game_t *game, const mk_unit_t *obse
     report->side = hidden_unit->side;
     report->position_m = hidden_unit->position_m;
     report->target_position_m = hidden_unit->position_m;
+    report->confidence = 100;
     report->visible = true;
     report->resolved = true;
+}
+
+static void mk_game_record_suspected_contact(
+    mk_game_t *game,
+    const mk_unit_t *observer,
+    const mk_unit_t *hidden_unit,
+    float distance_m,
+    float suspect_distance_m
+) {
+    mk_contact_report_t *report;
+    int confidence;
+
+    if (game == NULL || observer == NULL || hidden_unit == NULL) {
+        return;
+    }
+
+    if (mk_game_contact_report_exists(
+            game,
+            MK_CONTACT_REPORT_SUSPECTED_DANGER,
+            observer->id,
+            hidden_unit->id,
+            0
+        )) {
+        return;
+    }
+
+    report = mk_game_add_contact_report(game, MK_CONTACT_REPORT_SUSPECTED_DANGER);
+    if (report == NULL) {
+        return;
+    }
+
+    confidence = 25;
+    if (suspect_distance_m > 0.0f && distance_m < suspect_distance_m) {
+        confidence += (int)((suspect_distance_m - distance_m) / suspect_distance_m * 50.0f);
+    }
+    confidence = mk_clamp_int(confidence - hidden_unit->concealment / 2, 10, 80);
+
+    report->attacker_unit_id = observer->id;
+    report->target_unit_id = hidden_unit->id;
+    report->side = hidden_unit->side;
+    report->position_m = hidden_unit->position_m;
+    report->target_position_m = hidden_unit->position_m;
+    report->confidence = confidence;
+    report->visible = true;
+    report->resolved = false;
 }
 
 static void mk_game_reveal_unit(mk_game_t *game, mk_unit_t *unit, const mk_unit_t *observer) {
@@ -482,6 +567,112 @@ static void mk_game_reveal_unit(mk_game_t *game, mk_unit_t *unit, const mk_unit_
 
     unit->revealed = true;
     mk_game_record_reveal_contact(game, observer, unit);
+}
+
+static bool mk_game_hidden_enemy_near_position(
+    const mk_game_t *game,
+    const mk_unit_t *observer,
+    mk_vec2_t position_m,
+    float radius_m
+) {
+    size_t index;
+
+    if (game == NULL || observer == NULL) {
+        return false;
+    }
+
+    for (index = 0; index < game->unit_count; ++index) {
+        const mk_unit_t *unit = &game->units[index];
+
+        if (!unit->hidden
+            || unit->revealed
+            || unit->side == MK_SIDE_CIVILIAN
+            || unit->side == observer->side
+            || unit->status == MK_UNIT_BROKEN) {
+            continue;
+        }
+
+        if (mk_distance(unit->position_m, position_m) <= radius_m) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static void mk_game_record_false_contact(
+    mk_game_t *game,
+    const mk_unit_t *observer,
+    const mk_terrain_zone_t *terrain
+) {
+    mk_contact_report_t *report;
+    mk_vec2_t position;
+
+    if (game == NULL || observer == NULL || terrain == NULL || terrain->id == 0) {
+        return;
+    }
+
+    if (mk_game_contact_report_exists(
+            game,
+            MK_CONTACT_REPORT_FALSE_CONTACT,
+            observer->id,
+            0,
+            terrain->id
+        )) {
+        return;
+    }
+
+    position = mk_rect_center(terrain->bounds_m);
+    report = mk_game_add_contact_report(game, MK_CONTACT_REPORT_FALSE_CONTACT);
+    if (report == NULL) {
+        return;
+    }
+
+    report->attacker_unit_id = observer->id;
+    report->terrain_id = terrain->id;
+    report->side = MK_SIDE_NEUTRAL;
+    report->position_m = position;
+    report->target_position_m = position;
+    report->confidence = 20 + mk_min_int(20, terrain->cover * 5);
+    report->visible = true;
+    report->resolved = false;
+}
+
+static void mk_game_update_false_terrain_contacts(mk_game_t *game) {
+    size_t unit_index;
+
+    if (game == NULL) {
+        return;
+    }
+
+    for (unit_index = 0; unit_index < game->unit_count; ++unit_index) {
+        const mk_unit_t *observer = &game->units[unit_index];
+        size_t terrain_index;
+
+        if (observer->side == MK_SIDE_CIVILIAN || observer->status == MK_UNIT_BROKEN) {
+            continue;
+        }
+
+        for (terrain_index = 0; terrain_index < game->map.terrain_count; ++terrain_index) {
+            const mk_terrain_zone_t *terrain = &game->map.terrain[terrain_index];
+            mk_vec2_t terrain_center;
+
+            if (terrain->kind != MK_TERRAIN_RUBBLE && terrain->kind != MK_TERRAIN_SUSPECTED_IED) {
+                continue;
+            }
+
+            terrain_center = mk_rect_center(terrain->bounds_m);
+            if (mk_distance(observer->position_m, terrain_center) > 60.0f) {
+                continue;
+            }
+
+            if (mk_game_hidden_enemy_near_position(game, observer, terrain_center, 90.0f)) {
+                continue;
+            }
+
+            mk_game_record_false_contact(game, observer, terrain);
+        }
+    }
 }
 
 static int mk_game_apply_civilian_fire_risk(
@@ -655,6 +846,22 @@ static const char *mk_outcome_summary_name(mk_outcome_t outcome) {
         default:
             return "in_progress";
     }
+}
+
+static int mk_game_score_success_threshold(const mk_game_t *game) {
+    if (game != NULL && game->score_success_threshold > 0) {
+        return game->score_success_threshold;
+    }
+
+    return MK_DEFAULT_SCORE_SUCCESS_THRESHOLD;
+}
+
+static int mk_game_score_partial_threshold(const mk_game_t *game) {
+    if (game != NULL && game->score_partial_threshold > 0) {
+        return game->score_partial_threshold;
+    }
+
+    return MK_DEFAULT_SCORE_PARTIAL_THRESHOLD;
 }
 
 static void mk_update_unit_movement(mk_unit_t *unit) {
@@ -858,6 +1065,14 @@ static bool mk_scenario_is_valid(const mk_scenario_definition_t *scenario) {
         }
     }
 
+    if (scenario->score_success_threshold < 0
+        || scenario->score_partial_threshold < 0
+        || (scenario->score_success_threshold > 0
+            && scenario->score_partial_threshold > 0
+            && scenario->score_success_threshold < scenario->score_partial_threshold)) {
+        return false;
+    }
+
     for (index = 0; index < scenario->civilian_count; ++index) {
         if (scenario->civilians[index].id == 0
             || !mk_faction_id_exists(scenario, scenario->civilians[index].faction_id)
@@ -1045,6 +1260,8 @@ mk_result_t mk_game_update_hidden_contacts(mk_game_t *game) {
             const mk_unit_t *observer = &game->units[observer_index];
             mk_line_of_sight_t line_of_sight;
             float reveal_distance;
+            float suspect_distance;
+            float observer_distance;
 
             if (observer->id == hidden_unit->id
                 || observer->side == hidden_unit->side
@@ -1057,18 +1274,25 @@ mk_result_t mk_game_update_hidden_contacts(mk_game_t *game) {
             if (reveal_distance < 40.0f) {
                 reveal_distance = 40.0f;
             }
+            suspect_distance = reveal_distance + 55.0f;
+            observer_distance = mk_distance(observer->position_m, hidden_unit->position_m);
 
-            if (mk_distance(observer->position_m, hidden_unit->position_m) > reveal_distance) {
+            if (observer_distance > suspect_distance) {
                 continue;
             }
 
             if (mk_game_unit_line_of_sight(game, observer->id, hidden_unit->id, &line_of_sight) == MK_OK
-                && line_of_sight.visible) {
+                && line_of_sight.visible
+                && observer_distance <= reveal_distance) {
                 mk_game_reveal_unit(game, hidden_unit, observer);
                 break;
             }
+
+            mk_game_record_suspected_contact(game, observer, hidden_unit, observer_distance, suspect_distance);
         }
     }
+
+    mk_game_update_false_terrain_contacts(game);
 
     return MK_OK;
 }
@@ -1199,12 +1423,15 @@ mk_result_t mk_game_score(const mk_game_t *game, mk_score_t *out_score) {
         - score.casualty_penalty
         - score.time_penalty;
 
-    if (score.controlled_objectives == 0) {
+    if (score.controlled_objectives == 0 || score.total_score < mk_game_score_partial_threshold(game)) {
         score.outcome = MK_OUTCOME_PLAYER_FAILURE;
-    } else if (score.player_casualties > 0 || score.civilian_casualties > 0 || score.civilian_risk >= 25) {
-        score.outcome = MK_OUTCOME_PLAYER_PARTIAL;
-    } else {
+    } else if (score.total_score >= mk_game_score_success_threshold(game)
+        && score.player_casualties == 0
+        && score.civilian_casualties == 0
+        && score.civilian_risk < 25) {
         score.outcome = MK_OUTCOME_PLAYER_SUCCESS;
+    } else {
+        score.outcome = MK_OUTCOME_PLAYER_PARTIAL;
     }
 
     *out_score = score;
@@ -1228,9 +1455,11 @@ mk_result_t mk_game_after_action_report(const mk_game_t *game, mk_after_action_r
     (void)snprintf(
         report.summary,
         sizeof(report.summary),
-        "outcome=%s score=%d objectives=%u contested=%u civilian_risk=%d casualties(player=%d,opfor=%d,civilian=%d) ticks=%u",
+        "outcome=%s score=%d thresholds(success=%d,partial=%d) objectives=%u contested=%u civilian_risk=%d casualties(player=%d,opfor=%d,civilian=%d) ticks=%u",
         mk_outcome_summary_name(report.score.outcome),
         report.score.total_score,
+        mk_game_score_success_threshold(game),
+        mk_game_score_partial_threshold(game),
         (unsigned)report.score.controlled_objectives,
         (unsigned)report.score.contested_objectives,
         report.score.civilian_risk,
@@ -1239,6 +1468,14 @@ mk_result_t mk_game_after_action_report(const mk_game_t *game, mk_after_action_r
         report.score.civilian_casualties,
         game->tick
     );
+
+    if (report.score.outcome == MK_OUTCOME_PLAYER_SUCCESS) {
+        mk_copy_scenario_text(report.narrative, game->after_action_success);
+    } else if (report.score.outcome == MK_OUTCOME_PLAYER_PARTIAL) {
+        mk_copy_scenario_text(report.narrative, game->after_action_partial);
+    } else {
+        mk_copy_scenario_text(report.narrative, game->after_action_failure);
+    }
 
     *out_report = report;
     return MK_OK;
@@ -1281,8 +1518,14 @@ mk_result_t mk_game_snapshot(const mk_game_t *game, mk_game_snapshot_t *out_snap
 
     memset(out_snapshot, 0, sizeof(*out_snapshot));
     mk_copy_scenario_name(out_snapshot->scenario_name, game->scenario_name);
+    mk_copy_scenario_text(out_snapshot->briefing, game->briefing);
+    mk_copy_scenario_text(out_snapshot->after_action_success, game->after_action_success);
+    mk_copy_scenario_text(out_snapshot->after_action_partial, game->after_action_partial);
+    mk_copy_scenario_text(out_snapshot->after_action_failure, game->after_action_failure);
     out_snapshot->tick = game->tick;
     out_snapshot->rng_state = game->rng_state;
+    out_snapshot->score_success_threshold = game->score_success_threshold;
+    out_snapshot->score_partial_threshold = game->score_partial_threshold;
     out_snapshot->selected_unit_id = game->selected_unit_id;
     out_snapshot->map = game->map;
     out_snapshot->controller_count = game->controller_count;
@@ -1316,7 +1559,13 @@ mk_result_t mk_game_load_scenario(mk_game_t *game, const mk_scenario_definition_
 
     mk_game_init(game, scenario->seed);
     mk_copy_scenario_name(game->scenario_name, scenario->name);
+    mk_copy_scenario_text(game->briefing, scenario->briefing);
+    mk_copy_scenario_text(game->after_action_success, scenario->after_action_success);
+    mk_copy_scenario_text(game->after_action_partial, scenario->after_action_partial);
+    mk_copy_scenario_text(game->after_action_failure, scenario->after_action_failure);
     game->selected_unit_id = 0;
+    game->score_success_threshold = scenario->score_success_threshold;
+    game->score_partial_threshold = scenario->score_partial_threshold;
     game->map = scenario->map;
     game->controller_count = scenario->controller_count;
     memcpy(game->controllers, scenario->controllers, sizeof(scenario->controllers));

@@ -39,7 +39,10 @@ typedef enum {
     MK_TACTICAL_OVERLAY_CASUALTY = 5,
     MK_TACTICAL_OVERLAY_OBJECTIVE = 6,
     MK_TACTICAL_OVERLAY_HIDDEN_CONTACT = 7,
-    MK_TACTICAL_OVERLAY_CIVILIAN_RISK = 8
+    MK_TACTICAL_OVERLAY_CIVILIAN_RISK = 8,
+    MK_TACTICAL_OVERLAY_SUSPECTED_CONTACT = 9,
+    MK_TACTICAL_OVERLAY_FALSE_CONTACT = 10,
+    MK_TACTICAL_OVERLAY_OBJECTIVE_CONTROL = 11
 } mk_tactical_overlay_kind_t;
 
 typedef struct {
@@ -48,6 +51,7 @@ typedef struct {
     uint32_t soldier_id;
     uint32_t objective_id;
     uint32_t civilian_id;
+    uint32_t terrain_id;
     mk_side_t side;
     mk_vec2_t position_m;
     mk_vec2_t target_position_m;

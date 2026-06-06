@@ -9,6 +9,7 @@
 #include <SDL3_image/SDL_image.h>
 #endif
 #include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 
 #define MK_SDL_MAP_MANIFEST_PATH "assets/mosul/manifests/market_commercial_streets_2003.mapmanifest"
@@ -262,6 +263,12 @@ static const char *mk_sdl_overlay_marker_id(mk_tactical_overlay_kind_t kind) {
             return "hidden_contact";
         case MK_TACTICAL_OVERLAY_CIVILIAN_RISK:
             return "civilian_risk";
+        case MK_TACTICAL_OVERLAY_SUSPECTED_CONTACT:
+            return "hidden_contact";
+        case MK_TACTICAL_OVERLAY_FALSE_CONTACT:
+            return "civilian_risk";
+        case MK_TACTICAL_OVERLAY_OBJECTIVE_CONTROL:
+            return "objective";
         default:
             return "selection_ring";
     }
@@ -287,6 +294,33 @@ static void mk_sdl_set_side_color(SDL_Renderer *renderer, mk_side_t side, bool c
 
 static float mk_sdl_max_float(float first, float second) {
     return first > second ? first : second;
+}
+
+static void mk_sdl_update_window_title(SDL_Window *window, const mk_game_t *game) {
+    mk_score_t score;
+    const char *objective_side = "none";
+    char title[160];
+
+    if (window == NULL || game == NULL) {
+        return;
+    }
+
+    if (game->objective_count > 0) {
+        objective_side = mk_sdl_side_name(game->objectives[0].controlling_side);
+    }
+
+    if (mk_game_score(game, &score) != MK_OK) {
+        memset(&score, 0, sizeof(score));
+    }
+
+    (void)snprintf(
+        title,
+        sizeof(title),
+        "modernerKrieg Mosul Demo | score %d | objective %s",
+        score.total_score,
+        objective_side
+    );
+    SDL_SetWindowTitle(window, title);
 }
 
 static void mk_render_map_background(
@@ -680,6 +714,9 @@ int main(int argc, char **argv) {
         SDL_Quit();
         return 1;
     }
+    (void)mk_game_update_objective_control(&game);
+    SDL_Log("Briefing: %s", game.briefing[0] != '\0' ? game.briefing : "(none)");
+    mk_sdl_update_window_title(window, &game);
 
     result = mk_board_view_fit_map(&view, &game.map, 960.0f, 640.0f, MK_BOARD_VIEW_DEFAULT_MARGIN_PX);
     if (result != MK_OK) {
@@ -710,6 +747,7 @@ int main(int argc, char **argv) {
 
         mk_sdl_apply_input(&game, &view, &input);
         (void)mk_game_run_fixed_steps(&game, 1, NULL, NULL);
+        mk_sdl_update_window_title(window, &game);
         mk_render(renderer, &game, &view, map_texture, &sprite_assets, &marker_assets);
         SDL_Delay(16);
     }
