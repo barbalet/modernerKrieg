@@ -1,6 +1,6 @@
 # modernerKrieg Plan
 
-`modernerKrieg` is the new portable tactical wargame engine for a Mosul demo. It should start fresh as an SDL3 + CMake project, using `derZweiteWeltkrieg` as a proven design reference rather than as a submodule or runtime dependency.
+`modernerKrieg` is the new portable tactical wargame engine for the MOSUL public demo. It should start fresh as a CMake project with a portable C core. SDL3 is the current experimental app shell; if it proves workable, it will be used, and if not, the contingency is a new SwiftUI GUI over the same tactical model. `derZweiteWeltkrieg` remains a proven design reference rather than a submodule or runtime dependency.
 
 The guiding idea is simple: keep the game playable at unit scale, but simulate enough detail inside each unit that soldiers, weapons, casualties, suppression, civilians, and urban terrain all matter.
 
@@ -28,7 +28,7 @@ If code is copied rather than rewritten, copy it intentionally, preserve license
 
 - Run on macOS, Windows, and Linux.
 - Put the simulation, rules, AI, replay, and scenario logic in portable C.
-- Use SDL3 for windowing, input, audio, and cross-platform runtime services.
+- Test SDL3 for windowing, input, audio, and cross-platform runtime services; keep the core portable enough for a SwiftUI GUI contingency.
 - Use CMake as the primary build system.
 - Keep platform, renderer, tools, and content above the core simulation.
 - Support deterministic headless tests without opening a window.
@@ -102,13 +102,13 @@ This supports unit-based play while allowing soldier-level outcomes:
 
 The first playable demo should be a small urban block, not the whole city.
 
-Suggested initial scenario:
+Current initial scenario:
 
-- East Mosul, late 2016, a CTS-led push into a defended district edge
-- one Iraqi assault element with optional support
-- one ISIS defensive cell with rifles, RPG, machine gun, hidden positions, and one simple IED threat
+- 2003 Market / Commercial Streets, after Mosul's fall during Operation Iraqi Freedom
+- U.S. Army conventional infantry associated with the 101st Airborne Division period in Mosul
+- regime remnants, irregular fighters, weapons looters, early insurgent cells, and disorder around civic/commercial spaces
 - civilians present as protected non-combatants and movement/fire constraints
-- buildings, alleys, road lanes, rubble, rooftops, and one objective compound
+- shops, market lanes, streets, courtyards, rooftops, upper floors, rubble, checkpoints, and weapons-cache/search objectives
 
 Core demo loop:
 
@@ -169,7 +169,7 @@ The demo is successful when it proves that modern urban combat feels meaningfull
 
 ## Art Asset Direction
 
-The Mosul private brief already has a strong art start: line art maps, combatant plates, weapon plates, vehicle plates, and 64/128 px top-down sprite sheets. Treat those as source art and organize them into an engine-ready asset pipeline.
+The Mosul private brief already has a strong art start: line art maps, combatant plates, weapon plates, vehicle plates, 128 px top-down sprite sheets, and 2003 Market / Commercial Streets map layers. Treat those as source art and organize them into an engine-ready asset pipeline.
 
 Initial asset folders:
 
@@ -189,22 +189,23 @@ Do this first:
 - copy the Mosul README art index into `docs/asset_pipeline.md`
 - bring source PNGs across without destructive edits
 - keep 128 px sheets as high-detail tactical sprites
-- keep 64 px sheets as zoomed-out or UI-scale sprites
+- do not reintroduce 64 px combatant renderings for the current demo
 - define atlas metadata before slicing sheets
 - define a consistent pivot point, facing convention, scale, and faction/role naming scheme
 
 Suggested sprite naming:
 
 ```text
-cts_rifleman_128_n.png
-cts_machinegunner_128_n.png
-iraqi_army_rifleman_128_n.png
-peshmerga_rifleman_128_n.png
-isis_rifleman_128_n.png
-isis_rpg_128_n.png
+us_army_rifleman_128_n.png
+us_army_squad_leader_128_n.png
+us_army_automatic_rifleman_128_n.png
+us_army_grenadier_128_n.png
+us_army_medic_128_n.png
+opposing_regime_rifleman_128_n.png
+opposing_rpg_gunner_128_n.png
+opposing_weapons_looter_128_n.png
 civilian_adult_128_n.png
 humvee_128_n.png
-technical_dshk_128_n.png
 ```
 
 Suggested atlas metadata:
@@ -219,8 +220,8 @@ Suggested atlas metadata:
   "facing": "north_up",
   "frames": [
     {
-      "id": "cts_rifleman",
-      "faction": "iraqi_cts",
+      "id": "us_army_rifleman",
+      "faction": "us_army_2003",
       "role": "rifleman",
       "x": 0,
       "y": 0
@@ -231,10 +232,10 @@ Suggested atlas metadata:
 
 Art should serve readability first. The player must be able to distinguish:
 
-- Iraqi CTS, Iraqi Army, Federal Police, Peshmerga, ISIS, and civilians
-- rifleman, machine gunner, RPG/AT, marksman, engineer/EOD, medic, commander, and drone operator
-- infantry, technicals, Humvees, MRAPs, tanks, bulldozers, drones, and static weapons
-- open street, rubble, interior, rooftop, alley, river/bridge, obstacle, breach point, and suspected IED zone
+- U.S. Army patrol soldiers, local security, regime remnants, irregular fighters, weapons looters, and civilians
+- rifleman, squad leader, automatic rifleman, grenadier, marksman, engineer/breacher, medic, vehicle crew, RPG gunner, machine gunner, and looter/criminal threat
+- infantry, Humvees, trucks, technicals, engineering vehicles, and static weapons
+- open street, market lane, shopfront, rubble, interior, rooftop, courtyard, obstacle, breach point, checkpoint, and suspected weapons-cache or IED zone
 
 ## Data Direction
 
@@ -268,7 +269,6 @@ The C core should load validated data into stable runtime structs. Tests should 
 2. Add `engine/core` with deterministic game-state and unit/soldier structs.
 3. Add the first headless tests.
 4. Import Mosul source art into `assets/mosul/source`.
-5. Write the first atlas metadata file for 64 px and 128 px combatant sheets.
+5. Write the first atlas metadata file for 128 px combatant sheets.
 6. Render a board with placeholder terrain and real Mosul unit sprites.
-7. Build the first East Mosul block scenario.
-
+7. Build the first 2003 Market / Commercial Streets scenario.

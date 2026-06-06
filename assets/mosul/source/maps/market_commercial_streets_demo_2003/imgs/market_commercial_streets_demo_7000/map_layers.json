@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "id": "market_commercial_streets_demo_2003",
+  "display_name": "2003 Market / Commercial Streets Demo",
+  "era": "2003",
+  "real_world_size_m": [
+    500,
+    500
+  ],
+  "overview_pixel_size": [
+    7000,
+    7000
+  ],
+  "overview_pixels_per_meter": 14,
+  "full_combat_pixels_per_meter": 70,
+  "full_combat_pixel_size": [
+    35000,
+    35000
+  ],
+  "art_style": "approved MOSUL black-and-white contemporary graphite line art; dense realistic top-down urban detail; no stick art, no schematic placeholder art",
+  "composite": {
+    "id": "minimap_composite",
+    "path": "00_minimap_composite.png",
+    "mode": "opaque_grayscale"
+  },
+  "layers": [
+    {
+      "id": "ground",
+      "path": "assets/map_data/market_commercial_streets_demo_7000/01_ground_level.png",
+      "mode": "opaque_grayscale",
+      "z_index": 0
+    },
+    {
+      "id": "level_2",
+      "path": "assets/map_data/market_commercial_streets_demo_7000/02_level_2_alpha.png",
+      "mode": "rgba_alpha_overlay",
+      "z_index": 1
+    },
+    {
+      "id": "level_3",
+      "path": "assets/map_data/market_commercial_streets_demo_7000/03_level_3_alpha.png",
+      "mode": "rgba_alpha_overlay",
+      "z_index": 2
+    },
+    {
+      "id": "roof_access",
+      "path": "assets/map_data/market_commercial_streets_demo_7000/04_roof_access_alpha.png",
+      "mode": "rgba_alpha_overlay",
+      "z_index": 3
+    }
+  ],
+  "multistorey_mask": {
+    "path": "assets/map_data/market_commercial_streets_demo_7000/05_multistorey_mask.png",
+    "preview_path": "assets/map_data/market_commercial_streets_demo_7000/preview_multistorey_mask_1400.png",
+    "lineart_overview_path": "06_multistorey_lineart_overview.png",
+    "mode": "opaque_grayscale",
+    "black": "single-layer terrain, road, courtyard, stall, open lot, or building without authored upper floor",
+    "white": "building footprint requiring one or more transparent upper-level PNG overlays",
+    "note": "This binary mask is renderer data, not presentation art. The presentation overview uses subtle graphite hatching and existing roof linework instead of mask-like fills."
+  },
+  "display_overviews": [
+    {
+      "id": "minimap_preview",
+      "path": "preview_1400.png",
+      "mode": "opaque_grayscale"
+    },
+    {
+      "id": "multistorey_lineart_overview",
+      "path": "06_multistorey_lineart_overview.png",
+      "mode": "opaque_grayscale"
+    },
+    {
+      "id": "multistorey_lineart_preview",
+      "path": "preview_multistorey_lineart_1400.png",
+      "mode": "opaque_grayscale"
+    }
+  ],
+  "source_lineart_reference": "/Users/barbalet/.codex/generated_images/019e950b-525e-7881-939d-af918f4040ab/ig_043be3cb4a71a86d016a242fbe0e808198b53578531d69372b.png"
+}

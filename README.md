@@ -1,6 +1,6 @@
 # modernerKrieg
 
-`modernerKrieg` is a portable tactical wargame engine for a Mosul demo.
+`modernerKrieg` is a portable tactical wargame engine for the MOSUL public demo.
 
 The project starts fresh as an SDL3 + CMake codebase. `derZweiteWeltkrieg` remains a design reference for deterministic tactical rules and engine layering, but this repository is not a submodule consumer or direct dependency.
 
@@ -11,7 +11,7 @@ The project starts fresh as an SDL3 + CMake codebase. `derZweiteWeltkrieg` remai
 - `engine/platform/sdl3/` contains the optional SDL3 app shell.
 - `game/mosul/` contains Mosul-specific scenario/content code built above the reusable core.
 - `tests/core/` contains headless C tests.
-- `assets/mosul/source/` is reserved for raw Mosul source art and references.
+- `assets/mosul/source/` contains raw Mosul source art and references for the 2003 Market / Commercial Streets demo.
 - `PLAN.md` describes the full engine and Mosul demo direction.
 
 ## Build
@@ -24,7 +24,7 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-The SDL3 app target is enabled automatically when CMake can find SDL3. If SDL3 is installed in a custom prefix, pass its CMake package location:
+The SDL3 app target is provisional. If SDL3 proves workable for the game feel and deployment path, it will be used. If not, the contingency is a new SwiftUI GUI over the same tactical model. The SDL3 target is enabled automatically when CMake can find SDL3. If SDL3 is installed in a custom prefix, pass its CMake package location:
 
 ```sh
 cmake -S . -B build -DSDL3_DIR=/path/to/sdl3/lib/cmake/SDL3
@@ -33,15 +33,16 @@ cmake --build build
 
 If SDL3 is not available, CMake still builds the portable core and tests.
 
-## Current Demo Data
+## Current Demo Direction
 
-The Mosul module currently exposes one small East Mosul block scenario with:
+The public MOSUL demo target is the 2003 Market / Commercial Streets scenario: a 500 m x 500 m central-city security fight after Mosul's fall during Operation Iraqi Freedom. The imported source assets currently include:
 
-- a CTS assault element
-- an ISIS defensive cell
-- sheltered civilians
-- road, building, and rubble terrain
-- one control objective
+- line-art map previews and multi-storey source layers
+- 128 px top-down combatant, stance, vehicle, and weapon sheets
+- source-angle weapon sprites
+- reference plates for combatants, weapons, vehicles, and urban tactics
+
+The current code scenario remains a small placeholder while the data and scenario layer is redirected to the 2003 demo.
 
 ## Interaction
 
