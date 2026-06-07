@@ -20,10 +20,12 @@ typedef struct {
 typedef struct {
     uint32_t expected_steps;
     uint32_t expected_units;
+    uint32_t expected_civilians;
     uint32_t expected_objectives;
     uint32_t initial_contacts;
     uint32_t current_tick;
     uint32_t current_units;
+    uint32_t current_civilians;
     uint32_t current_objectives;
     uint32_t current_scores;
     uint32_t current_contacts;
@@ -264,6 +266,10 @@ static bool mk_replay_finalize_tick(
         return mk_replay_fail(config, line_number, "tick does not contain the expected unit records");
     }
 
+    if (state->expected_civilians > 0U && state->current_civilians != state->expected_civilians) {
+        return mk_replay_fail(config, line_number, "tick does not contain the expected civilian records");
+    }
+
     if (state->current_objectives != state->expected_objectives) {
         return mk_replay_fail(config, line_number, "tick does not contain the expected objective records");
     }
@@ -323,6 +329,7 @@ static bool mk_replay_begin_tick(
 
     state->current_tick = tick;
     state->current_units = 0;
+    state->current_civilians = 0;
     state->current_objectives = 0;
     state->current_scores = 0;
     state->current_contacts = 0;
@@ -377,6 +384,7 @@ static bool mk_replay_validate_start_event(
     }
 
     if (!mk_replay_read_field_u32(line, "units", &state->expected_units)
+        || !mk_replay_read_field_u32(line, "civilians", &state->expected_civilians)
         || !mk_replay_read_field_u32(line, "objectives", &state->expected_objectives)
         || !mk_replay_read_field_u32(line, "contacts", &state->initial_contacts)) {
         return mk_replay_fail(config, line_number, "start event is missing required counts");
@@ -434,6 +442,67 @@ static bool mk_replay_validate_unit_event(
     }
 
     state->current_units += 1;
+    return true;
+}
+
+static bool mk_replay_validate_population_event(
+    const mk_replay_validate_config_t *config,
+    const mk_replay_state_t *state,
+    const char *line,
+    uint32_t tick,
+    uint32_t line_number
+) {
+    uint32_t scratch_count;
+
+    if (state == NULL || !state->have_start) {
+        return mk_replay_fail(config, line_number, "population event appeared before start");
+    }
+
+    if (tick != 0U) {
+        return mk_replay_fail(config, line_number, "population event must be at tick 0");
+    }
+
+    if (!mk_replay_read_field_u32(line, "spawn_zones", &scratch_count)
+        || !mk_replay_read_field_u32(line, "unit_templates", &scratch_count)
+        || !mk_replay_read_field_u32(line, "civilian_archetypes", &scratch_count)
+        || !mk_replay_read_field_u32(line, "civilian_groups", &scratch_count)) {
+        return mk_replay_fail(config, line_number, "population event is missing required counts");
+    }
+
+    return true;
+}
+
+static bool mk_replay_validate_civilian_event(
+    const mk_replay_validate_config_t *config,
+    mk_replay_state_t *state,
+    const char *line,
+    uint32_t line_number
+) {
+    uint32_t id;
+    int scratch_int;
+
+    if (state == NULL || !state->have_start) {
+        return mk_replay_fail(config, line_number, "civilian event appeared before start");
+    }
+
+    if (!mk_replay_read_field_u32(line, "id", &id)
+        || id == 0U
+        || !mk_replay_has_quoted_field(line, "archetype")
+        || !mk_replay_has_quoted_field(line, "group")
+        || !mk_replay_has_quoted_field(line, "spawn")
+        || !mk_replay_has_quoted_field(line, "node")
+        || !mk_replay_has_quoted_field(line, "level")
+        || !mk_replay_read_field_number(line, "x")
+        || !mk_replay_read_field_number(line, "y")
+        || !mk_replay_read_field_i32(line, "stress", &scratch_int)
+        || !mk_replay_read_field_i32(line, "risk", &scratch_int)
+        || !mk_replay_read_field_i32(line, "compliance", &scratch_int)
+        || !mk_replay_validate_bool_field(line, "protected")
+        || !mk_replay_has_quoted_field(line, "sprite")) {
+        return mk_replay_fail(config, line_number, "civilian event is missing required fields");
+    }
+
+    state->current_civilians += 1U;
     return true;
 }
 
@@ -672,6 +741,14 @@ static bool mk_replay_validate_event(
 
     if (strcmp(kind, "unit") == 0) {
         return mk_replay_validate_unit_event(config, state, line, line_number);
+    }
+
+    if (strcmp(kind, "population") == 0) {
+        return mk_replay_validate_population_event(config, state, line, tick, line_number);
+    }
+
+    if (strcmp(kind, "civilian") == 0) {
+        return mk_replay_validate_civilian_event(config, state, line, line_number);
     }
 
     if (strcmp(kind, "gameplay_area") == 0) {

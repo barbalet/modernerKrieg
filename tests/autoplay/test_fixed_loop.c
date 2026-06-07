@@ -53,8 +53,8 @@ static void test_fixed_loop_runs_requested_steps(void) {
     MK_TEST_ASSERT(mk_game_run_fixed_steps(&game, 3, record_tick_observer, &observer) == MK_OK);
     MK_TEST_ASSERT(game.tick == 3);
     MK_TEST_ASSERT(observer.calls == 3);
-    MK_TEST_ASSERT(mk_test_transcript_contains(&observer.transcript, "tick=1 units=3 selected=0"));
-    MK_TEST_ASSERT(mk_test_transcript_contains(&observer.transcript, "tick=3 units=3 selected=0"));
+    MK_TEST_ASSERT(mk_test_transcript_contains(&observer.transcript, "tick=1 units=6 selected=0"));
+    MK_TEST_ASSERT(mk_test_transcript_contains(&observer.transcript, "tick=3 units=6 selected=0"));
 }
 
 static void test_fixed_loop_can_stop_on_observer_failure(void) {
@@ -70,7 +70,7 @@ static void test_fixed_loop_can_stop_on_observer_failure(void) {
     );
     MK_TEST_ASSERT(game.tick == 2);
     MK_TEST_ASSERT(observer.calls == 2);
-    MK_TEST_ASSERT(mk_test_transcript_contains(&observer.transcript, "tick=2 units=3 selected=0"));
+    MK_TEST_ASSERT(mk_test_transcript_contains(&observer.transcript, "tick=2 units=6 selected=0"));
 }
 
 static void test_fixed_loop_rejects_invalid_game(void) {

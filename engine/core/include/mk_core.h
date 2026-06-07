@@ -23,6 +23,10 @@ extern "C" {
 #define MK_MAX_SOLDIERS_PER_UNIT 16
 #define MK_MAX_UNITS 64
 #define MK_MAX_CONTACT_REPORTS 64
+#define MK_MAX_SCENARIO_SPAWN_ZONES 16
+#define MK_MAX_SCENARIO_UNIT_TEMPLATES 16
+#define MK_MAX_SCENARIO_CIVILIAN_ARCHETYPES 16
+#define MK_MAX_SCENARIO_CIVILIAN_GROUPS 16
 #define MK_MAX_GAMEPLAY_ROUTE_STEPS 16
 #define MK_MAX_GAMEPLAY_AREA_LEVELS 8
 #define MK_MAX_GAMEPLAY_AREA_FEATURES 128
@@ -258,6 +262,55 @@ typedef struct {
 
 typedef struct {
     uint32_t id;
+    char scenario_id[MK_NAME_CAPACITY];
+    char name[MK_NAME_CAPACITY];
+    char kind[MK_KIND_CAPACITY];
+    mk_side_t side;
+    char level_id[MK_NAME_CAPACITY];
+    char topology_node_id[MK_NAME_CAPACITY];
+    mk_rect_t bounds_m;
+    int capacity;
+    bool active;
+} mk_spawn_zone_t;
+
+typedef struct {
+    uint32_t id;
+    char scenario_id[MK_NAME_CAPACITY];
+    char name[MK_NAME_CAPACITY];
+    char role[MK_KIND_CAPACITY];
+    mk_side_t side;
+    mk_training_t training;
+    char default_spawn_zone_id[MK_NAME_CAPACITY];
+    int expected_soldiers;
+} mk_unit_template_t;
+
+typedef struct {
+    uint32_t id;
+    char scenario_id[MK_NAME_CAPACITY];
+    char name[MK_NAME_CAPACITY];
+    char sprite_id[MK_NAME_CAPACITY];
+    int baseline_stress;
+    int baseline_risk;
+    int compliance;
+    bool protected_noncombatant;
+} mk_civilian_archetype_t;
+
+typedef struct {
+    uint32_t id;
+    char scenario_id[MK_NAME_CAPACITY];
+    char name[MK_NAME_CAPACITY];
+    char archetype_id[MK_NAME_CAPACITY];
+    char spawn_zone_id[MK_NAME_CAPACITY];
+    char level_id[MK_NAME_CAPACITY];
+    char topology_node_id[MK_NAME_CAPACITY];
+    int expected_count;
+    int baseline_stress;
+    int compliance;
+    bool protected_noncombatants;
+} mk_civilian_group_t;
+
+typedef struct {
+    uint32_t id;
     char name[MK_NAME_CAPACITY];
     mk_side_t side;
     uint32_t faction_id;
@@ -313,6 +366,10 @@ typedef struct {
     mk_training_t training;
     mk_order_t order;
     mk_order_source_t order_source;
+    char template_id[MK_NAME_CAPACITY];
+    char group_id[MK_NAME_CAPACITY];
+    char spawn_zone_id[MK_NAME_CAPACITY];
+    char topology_node_id[MK_NAME_CAPACITY];
     char level_id[MK_NAME_CAPACITY];
     mk_vec2_t position_m;
     mk_vec2_t target_position_m;
@@ -552,10 +609,17 @@ typedef struct {
     uint32_t id;
     char name[MK_NAME_CAPACITY];
     uint32_t faction_id;
+    char archetype_id[MK_NAME_CAPACITY];
+    char group_id[MK_NAME_CAPACITY];
+    char spawn_zone_id[MK_NAME_CAPACITY];
+    char level_id[MK_NAME_CAPACITY];
+    char topology_node_id[MK_NAME_CAPACITY];
+    char sprite_id[MK_NAME_CAPACITY];
     mk_vec2_t position_m;
     mk_civilian_state_t state;
     int stress;
     int risk;
+    int compliance;
     bool protected_noncombatant;
 } mk_civilian_t;
 
@@ -658,6 +722,14 @@ typedef struct {
     mk_faction_t factions[MK_MAX_FACTIONS];
     size_t force_count;
     mk_force_t forces[MK_MAX_FORCES];
+    size_t spawn_zone_count;
+    mk_spawn_zone_t spawn_zones[MK_MAX_SCENARIO_SPAWN_ZONES];
+    size_t unit_template_count;
+    mk_unit_template_t unit_templates[MK_MAX_SCENARIO_UNIT_TEMPLATES];
+    size_t civilian_archetype_count;
+    mk_civilian_archetype_t civilian_archetypes[MK_MAX_SCENARIO_CIVILIAN_ARCHETYPES];
+    size_t civilian_group_count;
+    mk_civilian_group_t civilian_groups[MK_MAX_SCENARIO_CIVILIAN_GROUPS];
     size_t objective_count;
     mk_objective_t objectives[MK_MAX_OBJECTIVES];
     size_t civilian_count;
@@ -690,6 +762,14 @@ typedef struct {
     mk_faction_t factions[MK_MAX_FACTIONS];
     size_t force_count;
     mk_force_t forces[MK_MAX_FORCES];
+    size_t spawn_zone_count;
+    mk_spawn_zone_t spawn_zones[MK_MAX_SCENARIO_SPAWN_ZONES];
+    size_t unit_template_count;
+    mk_unit_template_t unit_templates[MK_MAX_SCENARIO_UNIT_TEMPLATES];
+    size_t civilian_archetype_count;
+    mk_civilian_archetype_t civilian_archetypes[MK_MAX_SCENARIO_CIVILIAN_ARCHETYPES];
+    size_t civilian_group_count;
+    mk_civilian_group_t civilian_groups[MK_MAX_SCENARIO_CIVILIAN_GROUPS];
     size_t objective_count;
     mk_objective_t objectives[MK_MAX_OBJECTIVES];
     size_t civilian_count;
@@ -724,6 +804,14 @@ typedef struct {
     mk_faction_t factions[MK_MAX_FACTIONS];
     size_t force_count;
     mk_force_t forces[MK_MAX_FORCES];
+    size_t spawn_zone_count;
+    mk_spawn_zone_t spawn_zones[MK_MAX_SCENARIO_SPAWN_ZONES];
+    size_t unit_template_count;
+    mk_unit_template_t unit_templates[MK_MAX_SCENARIO_UNIT_TEMPLATES];
+    size_t civilian_archetype_count;
+    mk_civilian_archetype_t civilian_archetypes[MK_MAX_SCENARIO_CIVILIAN_ARCHETYPES];
+    size_t civilian_group_count;
+    mk_civilian_group_t civilian_groups[MK_MAX_SCENARIO_CIVILIAN_GROUPS];
     size_t objective_count;
     mk_objective_t objectives[MK_MAX_OBJECTIVES];
     size_t civilian_count;

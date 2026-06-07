@@ -114,6 +114,20 @@ The current runtime sprite set contains 1,064 PNGs, and tests assert that every 
 - 64 weapon sprites: 8 weapon types x 8 facings.
 - 192 vehicle sprites: 8 vehicle types x 3 damage states x 8 facings.
 
+## Population Asset References
+
+Scenario population records use sprite runtime IDs from the compact sprite
+manifest. Civilian archetypes should reference the first-frame runtime id for
+their current placeholder state, such as `civilian_adult_128_n`; the full
+render manifest remains available to a renderer that needs every facing and
+state. The Mosul scenario loader validates civilian archetype sprite ids against
+the sprite manifest before the C core accepts the scenario.
+
+Spawn zones, civilian groups, and unit templates reference gameplay-area
+topology ids rather than image paths. This keeps art provenance in the manifest
+layer and keeps scenario files focused on gameplay placement, side ownership,
+and AI population intent.
+
 ## Marker Manifests
 
 Marker manifests describe tactical overlay presentation without requiring final marker artwork. They record:

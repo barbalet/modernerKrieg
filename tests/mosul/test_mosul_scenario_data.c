@@ -95,8 +95,12 @@ static void test_default_scenario_data_matches_fixture_shape(void) {
     MK_TEST_ASSERT(loaded.force_count == fixture.force_count);
     MK_TEST_ASSERT(loaded.objective_count == fixture.objective_count);
     MK_TEST_ASSERT(strcmp(loaded.objectives[0].label, fixture.objectives[0].label) == 0);
-    MK_TEST_ASSERT(loaded.civilian_count == fixture.civilian_count);
-    MK_TEST_ASSERT(loaded.unit_count == fixture.unit_count);
+    MK_TEST_ASSERT(loaded.spawn_zone_count == 7);
+    MK_TEST_ASSERT(loaded.unit_template_count == 5);
+    MK_TEST_ASSERT(loaded.civilian_archetype_count == 4);
+    MK_TEST_ASSERT(loaded.civilian_group_count == 4);
+    MK_TEST_ASSERT(loaded.civilian_count == 7);
+    MK_TEST_ASSERT(loaded.unit_count == 6);
     MK_TEST_ASSERT(strcmp(loaded.forces[0].command.callsign, fixture.forces[0].command.callsign) == 0);
     MK_TEST_ASSERT(strcmp(loaded.units[0].name, fixture.units[0].name) == 0);
     MK_TEST_ASSERT(strcmp(loaded.units[0].command.callsign, fixture.units[0].command.callsign) == 0);
@@ -108,6 +112,17 @@ static void test_default_scenario_data_matches_fixture_shape(void) {
     MK_TEST_ASSERT(loaded.units[1].revealed == fixture.units[1].revealed);
     MK_TEST_ASSERT(loaded.units[1].concealment == fixture.units[1].concealment);
     MK_TEST_ASSERT(loaded.units[2].soldiers[0].ammo == 0);
+    MK_TEST_ASSERT(strcmp(loaded.spawn_zones[1].scenario_id, "market_stalls_crowd") == 0);
+    MK_TEST_ASSERT(strcmp(loaded.spawn_zones[1].topology_node_id, "market_stalls_ground") == 0);
+    MK_TEST_ASSERT(strcmp(loaded.unit_templates[3].scenario_id, "rooftop_watcher") == 0);
+    MK_TEST_ASSERT(strcmp(loaded.civilian_archetypes[0].sprite_id, "civilian_adult_128_n") == 0);
+    MK_TEST_ASSERT(strcmp(loaded.civilian_groups[2].spawn_zone_id, "apartment_shelter_civilians") == 0);
+    MK_TEST_ASSERT(strcmp(loaded.civilians[6].archetype_id, "wounded_bystander") == 0);
+    MK_TEST_ASSERT(strcmp(loaded.civilians[6].topology_node_id, "market_stalls_ground") == 0);
+    MK_TEST_ASSERT(loaded.civilians[6].risk == 1);
+    MK_TEST_ASSERT(strcmp(loaded.units[3].template_id, "rooftop_watcher") == 0);
+    MK_TEST_ASSERT(strcmp(loaded.units[3].level_id, "level_04_roof_access") == 0);
+    MK_TEST_ASSERT(strcmp(loaded.units[3].topology_node_id, "hotel_roof_access") == 0);
 
     MK_TEST_ASSERT(mk_gameplay_area_is_loaded(&loaded.gameplay_area));
     MK_TEST_ASSERT(strcmp(loaded.gameplay_area.id, "market_commercial_streets_2003_building_levels") == 0);
@@ -247,7 +262,12 @@ static void test_public_default_scenario_uses_data_file(void) {
     MK_TEST_ASSERT(mk_mosul_make_market_2003_scenario(&scenario) == MK_OK);
     MK_TEST_ASSERT(mk_game_load_scenario(&game, &scenario) == MK_OK);
     MK_TEST_ASSERT(strcmp(game.scenario_name, "Market Commercial Streets 2003") == 0);
-    MK_TEST_ASSERT(game.unit_count == 3);
+    MK_TEST_ASSERT(game.spawn_zone_count == 7);
+    MK_TEST_ASSERT(game.unit_template_count == 5);
+    MK_TEST_ASSERT(game.civilian_archetype_count == 4);
+    MK_TEST_ASSERT(game.civilian_group_count == 4);
+    MK_TEST_ASSERT(game.civilian_count == 7);
+    MK_TEST_ASSERT(game.unit_count == 6);
     MK_TEST_ASSERT(mk_gameplay_area_is_loaded(&game.gameplay_area));
     MK_TEST_ASSERT(game.gameplay_area.level_count == 4);
     MK_TEST_ASSERT(mk_gameplay_area_topology_is_loaded(&game.gameplay_area));
@@ -261,6 +281,10 @@ static void test_control_smoke_scenario_loads(void) {
     make_project_path(path, sizeof(path), "game/mosul/scenarios/market_control_smoke_2003.mkscenario");
     MK_TEST_ASSERT(mk_mosul_load_scenario_file(path, MK_TEST_PROJECT_ROOT, &scenario) == MK_OK);
     MK_TEST_ASSERT(strcmp(scenario.objectives[0].label, "Market Junction") == 0);
+    MK_TEST_ASSERT(scenario.spawn_zone_count == 0);
+    MK_TEST_ASSERT(scenario.unit_template_count == 0);
+    MK_TEST_ASSERT(scenario.civilian_archetype_count == 0);
+    MK_TEST_ASSERT(scenario.civilian_group_count == 0);
     MK_TEST_ASSERT(scenario.civilian_count == 0);
     MK_TEST_ASSERT(scenario.unit_count == 2);
     MK_TEST_ASSERT(mk_game_load_scenario(&game, &scenario) == MK_OK);
@@ -275,6 +299,10 @@ static void test_contested_risk_smoke_scenario_loads(void) {
     MK_TEST_ASSERT(mk_mosul_load_scenario_file(path, MK_TEST_PROJECT_ROOT, &scenario) == MK_OK);
     MK_TEST_ASSERT(strcmp(scenario.name, "Market Contested Risk Smoke 2003") == 0);
     MK_TEST_ASSERT(scenario.objective_count == 1);
+    MK_TEST_ASSERT(scenario.spawn_zone_count == 0);
+    MK_TEST_ASSERT(scenario.unit_template_count == 0);
+    MK_TEST_ASSERT(scenario.civilian_archetype_count == 0);
+    MK_TEST_ASSERT(scenario.civilian_group_count == 0);
     MK_TEST_ASSERT(scenario.civilian_count == 1);
     MK_TEST_ASSERT(scenario.unit_count == 2);
     MK_TEST_ASSERT(mk_game_load_scenario(&game, &scenario) == MK_OK);
@@ -449,6 +477,164 @@ static void test_impossible_objective_bounds_are_rejected(void) {
     MK_TEST_ASSERT(mk_mosul_load_scenario_file(path, MK_TEST_PROJECT_ROOT, &scenario) == MK_ERROR_INVALID_DATA);
 }
 
+static void test_invalid_civilian_archetype_sprite_is_rejected(void) {
+    char path[512];
+    mk_scenario_definition_t scenario;
+
+    make_binary_path(path, sizeof(path), "bad_civilian_archetype_sprite.mkscenario");
+    write_text_file(
+        path,
+        "format=modernerKrieg.scenario.v1\n"
+        "name=Bad Civilian Archetype Sprite\n"
+        "seed=1\n"
+        "asset.map_manifest=assets/mosul/manifests/market_commercial_streets_2003.mapmanifest\n"
+        "asset.sprite_manifest=assets/mosul/manifests/mosul_2003_sprites.spritemanifest\n"
+        "asset.building_level_manifest=assets/mosul/manifests/market_commercial_streets_2003_building_levels.json\n"
+        "asset.topology_manifest=assets/mosul/manifests/market_commercial_streets_2003_topology.json\n"
+        "map.name=Market / Commercial Streets\n"
+        "map.width_m=500\n"
+        "map.height_m=500\n"
+        "map.tile_columns=10\n"
+        "map.tile_rows=10\n"
+        "map.tile_width_m=50\n"
+        "map.tile_height_m=50\n"
+        "map.default_terrain=open\n"
+        "civilian_archetype.count=1\n"
+        "civilian_archetype.0.sprite_id=missing_civilian_sprite\n"
+    );
+
+    MK_TEST_ASSERT(mk_mosul_load_scenario_file(path, MK_TEST_PROJECT_ROOT, &scenario) == MK_ERROR_INVALID_DATA);
+}
+
+static void test_invalid_population_topology_reference_is_rejected(void) {
+    char path[512];
+    mk_scenario_definition_t scenario;
+
+    make_binary_path(path, sizeof(path), "bad_population_topology.mkscenario");
+    write_text_file(
+        path,
+        "format=modernerKrieg.scenario.v1\n"
+        "name=Bad Population Topology\n"
+        "seed=1\n"
+        "asset.map_manifest=assets/mosul/manifests/market_commercial_streets_2003.mapmanifest\n"
+        "asset.sprite_manifest=assets/mosul/manifests/mosul_2003_sprites.spritemanifest\n"
+        "asset.building_level_manifest=assets/mosul/manifests/market_commercial_streets_2003_building_levels.json\n"
+        "asset.topology_manifest=assets/mosul/manifests/market_commercial_streets_2003_topology.json\n"
+        "map.name=Market / Commercial Streets\n"
+        "map.width_m=500\n"
+        "map.height_m=500\n"
+        "map.tile_columns=10\n"
+        "map.tile_rows=10\n"
+        "map.tile_width_m=50\n"
+        "map.tile_height_m=50\n"
+        "map.default_terrain=open\n"
+        "tile_range.count=0\n"
+        "terrain.count=0\n"
+        "controller.count=1\n"
+        "controller.0.name=AI\n"
+        "controller.0.side=player\n"
+        "controller.0.kind=tactical_ai\n"
+        "faction.count=1\n"
+        "faction.0.name=Faction\n"
+        "faction.0.side=player\n"
+        "faction.0.color=255,255,255,255\n"
+        "force.count=1\n"
+        "force.0.name=Force\n"
+        "force.0.side=player\n"
+        "force.0.faction_index=0\n"
+        "force.0.controller_index=0\n"
+        "force.0.command_name=Command\n"
+        "force.0.callsign=OK\n"
+        "spawn_zone.count=1\n"
+        "spawn_zone.0.id=bad_spawn\n"
+        "spawn_zone.0.name=Bad Spawn\n"
+        "spawn_zone.0.kind=crowd\n"
+        "spawn_zone.0.side=civilian\n"
+        "spawn_zone.0.level_id=level_01_ground\n"
+        "spawn_zone.0.topology_node_id=missing_topology_node\n"
+        "spawn_zone.0.bounds=180,160,20,20\n"
+        "spawn_zone.0.capacity=2\n"
+        "spawn_zone.0.active=true\n"
+        "unit_template.count=0\n"
+        "civilian_archetype.count=0\n"
+        "civilian_group.count=0\n"
+        "objective.count=0\n"
+        "weapon.count=0\n"
+        "civilian.count=0\n"
+        "unit.count=0\n"
+    );
+
+    MK_TEST_ASSERT(mk_mosul_load_scenario_file(path, MK_TEST_PROJECT_ROOT, &scenario) == MK_ERROR_INVALID_DATA);
+}
+
+static void test_invalid_unit_template_spawn_side_is_rejected(void) {
+    char path[512];
+    mk_scenario_definition_t scenario;
+
+    make_binary_path(path, sizeof(path), "bad_unit_template_spawn_side.mkscenario");
+    write_text_file(
+        path,
+        "format=modernerKrieg.scenario.v1\n"
+        "name=Bad Unit Template Spawn Side\n"
+        "seed=1\n"
+        "asset.map_manifest=assets/mosul/manifests/market_commercial_streets_2003.mapmanifest\n"
+        "asset.sprite_manifest=assets/mosul/manifests/mosul_2003_sprites.spritemanifest\n"
+        "asset.building_level_manifest=assets/mosul/manifests/market_commercial_streets_2003_building_levels.json\n"
+        "asset.topology_manifest=assets/mosul/manifests/market_commercial_streets_2003_topology.json\n"
+        "map.name=Market / Commercial Streets\n"
+        "map.width_m=500\n"
+        "map.height_m=500\n"
+        "map.tile_columns=10\n"
+        "map.tile_rows=10\n"
+        "map.tile_width_m=50\n"
+        "map.tile_height_m=50\n"
+        "map.default_terrain=open\n"
+        "tile_range.count=0\n"
+        "terrain.count=0\n"
+        "controller.count=1\n"
+        "controller.0.name=AI\n"
+        "controller.0.side=player\n"
+        "controller.0.kind=tactical_ai\n"
+        "faction.count=1\n"
+        "faction.0.name=Faction\n"
+        "faction.0.side=player\n"
+        "faction.0.color=255,255,255,255\n"
+        "force.count=1\n"
+        "force.0.name=Force\n"
+        "force.0.side=player\n"
+        "force.0.faction_index=0\n"
+        "force.0.controller_index=0\n"
+        "force.0.command_name=Command\n"
+        "force.0.callsign=OK\n"
+        "spawn_zone.count=1\n"
+        "spawn_zone.0.id=civilian_spawn\n"
+        "spawn_zone.0.name=Civilian Spawn\n"
+        "spawn_zone.0.kind=crowd\n"
+        "spawn_zone.0.side=civilian\n"
+        "spawn_zone.0.level_id=level_01_ground\n"
+        "spawn_zone.0.topology_node_id=market_stalls_ground\n"
+        "spawn_zone.0.bounds=176,164,86,48\n"
+        "spawn_zone.0.capacity=4\n"
+        "spawn_zone.0.active=true\n"
+        "unit_template.count=1\n"
+        "unit_template.0.id=bad_player_template\n"
+        "unit_template.0.name=Bad Player Template\n"
+        "unit_template.0.role=patrol\n"
+        "unit_template.0.side=player\n"
+        "unit_template.0.training=regular\n"
+        "unit_template.0.default_spawn_zone_id=civilian_spawn\n"
+        "unit_template.0.expected_soldiers=3\n"
+        "civilian_archetype.count=0\n"
+        "civilian_group.count=0\n"
+        "objective.count=0\n"
+        "weapon.count=0\n"
+        "civilian.count=0\n"
+        "unit.count=0\n"
+    );
+
+    MK_TEST_ASSERT(mk_mosul_load_scenario_file(path, MK_TEST_PROJECT_ROOT, &scenario) == MK_ERROR_INVALID_DATA);
+}
+
 static void test_invalid_score_thresholds_are_rejected(void) {
     char path[512];
     mk_scenario_definition_t scenario;
@@ -492,6 +678,9 @@ int main(void) {
     test_market_scenario_requires_topology_manifest();
     test_invalid_force_reference_is_rejected();
     test_impossible_objective_bounds_are_rejected();
+    test_invalid_civilian_archetype_sprite_is_rejected();
+    test_invalid_population_topology_reference_is_rejected();
+    test_invalid_unit_template_spawn_side_is_rejected();
     test_invalid_score_thresholds_are_rejected();
     test_invalid_score_weight_is_rejected();
 

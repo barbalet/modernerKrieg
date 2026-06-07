@@ -1940,6 +1940,139 @@ static bool mk_force_id_exists(const mk_scenario_definition_t *scenario, uint32_
     return false;
 }
 
+static const mk_spawn_zone_t *mk_scenario_find_spawn_zone(
+    const mk_scenario_definition_t *scenario,
+    const char *spawn_zone_id
+) {
+    size_t index;
+
+    if (scenario == NULL || !mk_text_is_present(spawn_zone_id)) {
+        return NULL;
+    }
+
+    for (index = 0; index < scenario->spawn_zone_count; ++index) {
+        if (strcmp(scenario->spawn_zones[index].scenario_id, spawn_zone_id) == 0) {
+            return &scenario->spawn_zones[index];
+        }
+    }
+
+    return NULL;
+}
+
+static const mk_unit_template_t *mk_scenario_find_unit_template(
+    const mk_scenario_definition_t *scenario,
+    const char *template_id
+) {
+    size_t index;
+
+    if (scenario == NULL || !mk_text_is_present(template_id)) {
+        return NULL;
+    }
+
+    for (index = 0; index < scenario->unit_template_count; ++index) {
+        if (strcmp(scenario->unit_templates[index].scenario_id, template_id) == 0) {
+            return &scenario->unit_templates[index];
+        }
+    }
+
+    return NULL;
+}
+
+static const mk_civilian_archetype_t *mk_scenario_find_civilian_archetype(
+    const mk_scenario_definition_t *scenario,
+    const char *archetype_id
+) {
+    size_t index;
+
+    if (scenario == NULL || !mk_text_is_present(archetype_id)) {
+        return NULL;
+    }
+
+    for (index = 0; index < scenario->civilian_archetype_count; ++index) {
+        if (strcmp(scenario->civilian_archetypes[index].scenario_id, archetype_id) == 0) {
+            return &scenario->civilian_archetypes[index];
+        }
+    }
+
+    return NULL;
+}
+
+static const mk_civilian_group_t *mk_scenario_find_civilian_group(
+    const mk_scenario_definition_t *scenario,
+    const char *group_id
+) {
+    size_t index;
+
+    if (scenario == NULL || !mk_text_is_present(group_id)) {
+        return NULL;
+    }
+
+    for (index = 0; index < scenario->civilian_group_count; ++index) {
+        if (strcmp(scenario->civilian_groups[index].scenario_id, group_id) == 0) {
+            return &scenario->civilian_groups[index];
+        }
+    }
+
+    return NULL;
+}
+
+static bool mk_scenario_topology_reference_is_valid(
+    const mk_scenario_definition_t *scenario,
+    const char *level_id,
+    const char *topology_node_id,
+    mk_vec2_t position_m,
+    bool require_position_in_node
+) {
+    const mk_gameplay_topology_node_t *node;
+
+    if (!mk_text_is_present(topology_node_id)) {
+        return true;
+    }
+
+    if (scenario == NULL || !mk_gameplay_area_topology_is_loaded(&scenario->gameplay_area)) {
+        return false;
+    }
+
+    node = mk_gameplay_area_find_topology_node(&scenario->gameplay_area, topology_node_id);
+    if (node == NULL || !node->enterable) {
+        return false;
+    }
+
+    if (mk_text_is_present(level_id) && strcmp(node->level_id, level_id) != 0) {
+        return false;
+    }
+
+    if (require_position_in_node && !mk_rect_contains_point(node->bounds_m, position_m)) {
+        return false;
+    }
+
+    return true;
+}
+
+static bool mk_scenario_spawn_zone_reference_is_valid(
+    const mk_scenario_definition_t *scenario,
+    const char *spawn_zone_id,
+    mk_side_t side,
+    mk_vec2_t position_m
+) {
+    const mk_spawn_zone_t *spawn_zone;
+
+    if (!mk_text_is_present(spawn_zone_id)) {
+        return true;
+    }
+
+    spawn_zone = mk_scenario_find_spawn_zone(scenario, spawn_zone_id);
+    if (spawn_zone == NULL || !spawn_zone->active) {
+        return false;
+    }
+
+    if (spawn_zone->side != MK_SIDE_NEUTRAL && spawn_zone->side != side) {
+        return false;
+    }
+
+    return mk_rect_contains_point(spawn_zone->bounds_m, position_m);
+}
+
 static bool mk_scenario_is_valid(const mk_scenario_definition_t *scenario) {
     size_t index;
 
@@ -1964,6 +2097,10 @@ static bool mk_scenario_is_valid(const mk_scenario_definition_t *scenario) {
     if (scenario->controller_count > MK_MAX_CONTROLLERS
         || scenario->faction_count > MK_MAX_FACTIONS
         || scenario->force_count > MK_MAX_FORCES
+        || scenario->spawn_zone_count > MK_MAX_SCENARIO_SPAWN_ZONES
+        || scenario->unit_template_count > MK_MAX_SCENARIO_UNIT_TEMPLATES
+        || scenario->civilian_archetype_count > MK_MAX_SCENARIO_CIVILIAN_ARCHETYPES
+        || scenario->civilian_group_count > MK_MAX_SCENARIO_CIVILIAN_GROUPS
         || scenario->map.terrain_count > MK_MAX_TERRAIN_ZONES
         || scenario->map.tile_count > MK_MAX_MAP_TILES
         || scenario->objective_count > MK_MAX_OBJECTIVES
@@ -2032,6 +2169,119 @@ static bool mk_scenario_is_valid(const mk_scenario_definition_t *scenario) {
         }
     }
 
+    for (index = 0; index < scenario->spawn_zone_count; ++index) {
+        const mk_spawn_zone_t *spawn_zone = &scenario->spawn_zones[index];
+        size_t other_index;
+
+        if (spawn_zone->id == 0
+            || !mk_text_is_present(spawn_zone->scenario_id)
+            || !mk_text_is_present(spawn_zone->name)
+            || !mk_text_is_present(spawn_zone->kind)
+            || spawn_zone->capacity < 0
+            || !mk_rect_fits_map(spawn_zone->bounds_m, &scenario->map)
+            || (mk_text_is_present(spawn_zone->level_id)
+                && mk_gameplay_area_is_loaded(&scenario->gameplay_area)
+                && mk_gameplay_area_find_level(&scenario->gameplay_area, spawn_zone->level_id) == NULL)
+            || !mk_scenario_topology_reference_is_valid(
+                scenario,
+                spawn_zone->level_id,
+                spawn_zone->topology_node_id,
+                mk_rect_center(spawn_zone->bounds_m),
+                false
+            )) {
+            return false;
+        }
+
+        for (other_index = index + 1; other_index < scenario->spawn_zone_count; ++other_index) {
+            if (strcmp(spawn_zone->scenario_id, scenario->spawn_zones[other_index].scenario_id) == 0) {
+                return false;
+            }
+        }
+    }
+
+    for (index = 0; index < scenario->unit_template_count; ++index) {
+        const mk_unit_template_t *unit_template = &scenario->unit_templates[index];
+        const mk_spawn_zone_t *default_spawn_zone =
+            mk_scenario_find_spawn_zone(scenario, unit_template->default_spawn_zone_id);
+        mk_rect_t default_spawn_bounds = default_spawn_zone != NULL
+            ? default_spawn_zone->bounds_m
+            : mk_rect(0.0f, 0.0f, scenario->map.width_m, scenario->map.height_m);
+        size_t other_index;
+
+        if (unit_template->id == 0
+            || !mk_text_is_present(unit_template->scenario_id)
+            || !mk_text_is_present(unit_template->name)
+            || !mk_text_is_present(unit_template->role)
+            || unit_template->side == MK_SIDE_NEUTRAL
+            || unit_template->expected_soldiers < 0
+            || !mk_scenario_spawn_zone_reference_is_valid(
+                scenario,
+                unit_template->default_spawn_zone_id,
+                unit_template->side,
+                mk_rect_center(default_spawn_bounds)
+            )) {
+            return false;
+        }
+
+        for (other_index = index + 1; other_index < scenario->unit_template_count; ++other_index) {
+            if (strcmp(unit_template->scenario_id, scenario->unit_templates[other_index].scenario_id) == 0) {
+                return false;
+            }
+        }
+    }
+
+    for (index = 0; index < scenario->civilian_archetype_count; ++index) {
+        const mk_civilian_archetype_t *archetype = &scenario->civilian_archetypes[index];
+        size_t other_index;
+
+        if (archetype->id == 0
+            || !mk_text_is_present(archetype->scenario_id)
+            || !mk_text_is_present(archetype->name)
+            || !mk_text_is_present(archetype->sprite_id)
+            || archetype->baseline_stress < 0
+            || archetype->baseline_risk < 0
+            || archetype->compliance < 0) {
+            return false;
+        }
+
+        for (other_index = index + 1; other_index < scenario->civilian_archetype_count; ++other_index) {
+            if (strcmp(archetype->scenario_id, scenario->civilian_archetypes[other_index].scenario_id) == 0) {
+                return false;
+            }
+        }
+    }
+
+    for (index = 0; index < scenario->civilian_group_count; ++index) {
+        const mk_civilian_group_t *group = &scenario->civilian_groups[index];
+        const mk_spawn_zone_t *spawn_zone = mk_scenario_find_spawn_zone(scenario, group->spawn_zone_id);
+        size_t other_index;
+
+        if (group->id == 0
+            || !mk_text_is_present(group->scenario_id)
+            || !mk_text_is_present(group->name)
+            || mk_scenario_find_civilian_archetype(scenario, group->archetype_id) == NULL
+            || spawn_zone == NULL
+            || (spawn_zone->side != MK_SIDE_NEUTRAL && spawn_zone->side != MK_SIDE_CIVILIAN)
+            || group->expected_count < 0
+            || group->baseline_stress < 0
+            || group->compliance < 0
+            || !mk_scenario_topology_reference_is_valid(
+                scenario,
+                group->level_id,
+                group->topology_node_id,
+                mk_rect_center(spawn_zone->bounds_m),
+                false
+            )) {
+            return false;
+        }
+
+        for (other_index = index + 1; other_index < scenario->civilian_group_count; ++other_index) {
+            if (strcmp(group->scenario_id, scenario->civilian_groups[other_index].scenario_id) == 0) {
+                return false;
+            }
+        }
+    }
+
     for (index = 0; index < scenario->map.tile_count; ++index) {
         const mk_map_tile_t *tile = &scenario->map.tiles[index];
 
@@ -2073,9 +2323,34 @@ static bool mk_scenario_is_valid(const mk_scenario_definition_t *scenario) {
     }
 
     for (index = 0; index < scenario->civilian_count; ++index) {
-        if (scenario->civilians[index].id == 0
-            || !mk_faction_id_exists(scenario, scenario->civilians[index].faction_id)
-            || !mk_position_fits_map(scenario->civilians[index].position_m, &scenario->map)) {
+        const mk_civilian_t *civilian = &scenario->civilians[index];
+
+        if (civilian->id == 0
+            || !mk_faction_id_exists(scenario, civilian->faction_id)
+            || !mk_position_fits_map(civilian->position_m, &scenario->map)
+            || civilian->stress < 0
+            || civilian->risk < 0
+            || civilian->compliance < 0
+            || (mk_text_is_present(civilian->level_id)
+                && mk_gameplay_area_is_loaded(&scenario->gameplay_area)
+                && mk_gameplay_area_find_level(&scenario->gameplay_area, civilian->level_id) == NULL)
+            || (mk_text_is_present(civilian->archetype_id)
+                && mk_scenario_find_civilian_archetype(scenario, civilian->archetype_id) == NULL)
+            || (mk_text_is_present(civilian->group_id)
+                && mk_scenario_find_civilian_group(scenario, civilian->group_id) == NULL)
+            || !mk_scenario_spawn_zone_reference_is_valid(
+                scenario,
+                civilian->spawn_zone_id,
+                MK_SIDE_CIVILIAN,
+                civilian->position_m
+            )
+            || !mk_scenario_topology_reference_is_valid(
+                scenario,
+                civilian->level_id,
+                civilian->topology_node_id,
+                civilian->position_m,
+                true
+            )) {
             return false;
         }
     }
@@ -2090,6 +2365,21 @@ static bool mk_scenario_is_valid(const mk_scenario_definition_t *scenario) {
             || (unit->level_id[0] != '\0'
                 && mk_gameplay_area_is_loaded(&scenario->gameplay_area)
                 && mk_gameplay_area_find_level(&scenario->gameplay_area, unit->level_id) == NULL)
+            || (mk_text_is_present(unit->template_id)
+                && mk_scenario_find_unit_template(scenario, unit->template_id) == NULL)
+            || !mk_scenario_spawn_zone_reference_is_valid(
+                scenario,
+                unit->spawn_zone_id,
+                unit->side,
+                unit->position_m
+            )
+            || !mk_scenario_topology_reference_is_valid(
+                scenario,
+                unit->level_id,
+                unit->topology_node_id,
+                unit->position_m,
+                true
+            )
             || !mk_faction_id_exists(scenario, unit->faction_id)
             || !mk_force_id_exists(scenario, unit->force_id)
             || !mk_controller_id_exists(scenario, unit->controller_id)) {
@@ -3544,6 +3834,14 @@ mk_result_t mk_game_snapshot(const mk_game_t *game, mk_game_snapshot_t *out_snap
     memcpy(out_snapshot->factions, game->factions, sizeof(game->factions));
     out_snapshot->force_count = game->force_count;
     memcpy(out_snapshot->forces, game->forces, sizeof(game->forces));
+    out_snapshot->spawn_zone_count = game->spawn_zone_count;
+    memcpy(out_snapshot->spawn_zones, game->spawn_zones, sizeof(game->spawn_zones));
+    out_snapshot->unit_template_count = game->unit_template_count;
+    memcpy(out_snapshot->unit_templates, game->unit_templates, sizeof(game->unit_templates));
+    out_snapshot->civilian_archetype_count = game->civilian_archetype_count;
+    memcpy(out_snapshot->civilian_archetypes, game->civilian_archetypes, sizeof(game->civilian_archetypes));
+    out_snapshot->civilian_group_count = game->civilian_group_count;
+    memcpy(out_snapshot->civilian_groups, game->civilian_groups, sizeof(game->civilian_groups));
     out_snapshot->objective_count = game->objective_count;
     memcpy(out_snapshot->objectives, game->objectives, sizeof(game->objectives));
     out_snapshot->civilian_count = game->civilian_count;
@@ -3589,6 +3887,14 @@ mk_result_t mk_game_load_scenario(mk_game_t *game, const mk_scenario_definition_
     memcpy(game->factions, scenario->factions, sizeof(scenario->factions));
     game->force_count = scenario->force_count;
     memcpy(game->forces, scenario->forces, sizeof(scenario->forces));
+    game->spawn_zone_count = scenario->spawn_zone_count;
+    memcpy(game->spawn_zones, scenario->spawn_zones, sizeof(scenario->spawn_zones));
+    game->unit_template_count = scenario->unit_template_count;
+    memcpy(game->unit_templates, scenario->unit_templates, sizeof(scenario->unit_templates));
+    game->civilian_archetype_count = scenario->civilian_archetype_count;
+    memcpy(game->civilian_archetypes, scenario->civilian_archetypes, sizeof(scenario->civilian_archetypes));
+    game->civilian_group_count = scenario->civilian_group_count;
+    memcpy(game->civilian_groups, scenario->civilian_groups, sizeof(scenario->civilian_groups));
     game->objective_count = scenario->objective_count;
     memcpy(game->objectives, scenario->objectives, sizeof(scenario->objectives));
     game->civilian_count = scenario->civilian_count;
@@ -3597,6 +3903,12 @@ mk_result_t mk_game_load_scenario(mk_game_t *game, const mk_scenario_definition_
     memcpy(game->units, scenario->units, sizeof(scenario->units));
     game->contact_report_count = 0;
     memset(game->contact_reports, 0, sizeof(game->contact_reports));
+
+    for (index = 0; index < game->civilian_count; ++index) {
+        if (game->civilians[index].level_id[0] == '\0') {
+            mk_copy_name(game->civilians[index].level_id, mk_game_default_level_id(game));
+        }
+    }
 
     for (index = 0; index < game->unit_count; ++index) {
         if (game->units[index].level_id[0] == '\0') {
@@ -4347,6 +4659,7 @@ mk_civilian_t mk_make_civilian(const char *name, uint32_t faction_id, mk_vec2_t 
     civilian.faction_id = faction_id;
     civilian.position_m = position_m;
     civilian.state = MK_CIVILIAN_SHELTERING;
+    civilian.compliance = 50;
     civilian.protected_noncombatant = true;
 
     return civilian;

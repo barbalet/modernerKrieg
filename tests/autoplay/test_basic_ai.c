@@ -57,7 +57,7 @@ static void test_basic_ai_run_is_deterministic(void) {
     MK_TEST_ASSERT_CLOSE(first.units[0].position_m.y, second.units[0].position_m.y);
     MK_TEST_ASSERT_CLOSE(first.units[1].position_m.x, second.units[1].position_m.x);
     MK_TEST_ASSERT_CLOSE(first.units[1].position_m.y, second.units[1].position_m.y);
-    MK_TEST_ASSERT(first.units[0].order == MK_ORDER_MOVE);
+    MK_TEST_ASSERT(first.units[0].order == MK_ORDER_INVESTIGATE);
     MK_TEST_ASSERT(first.units[1].order == MK_ORDER_MOVE);
     MK_TEST_ASSERT(first.units[2].order == MK_ORDER_HOLD);
 }
@@ -253,7 +253,7 @@ static void test_basic_ai_transcript_is_deterministic(void) {
 
     MK_TEST_ASSERT(strcmp(first_transcript.text, second_transcript.text) == 0);
     MK_TEST_ASSERT(mk_test_transcript_contains(&first_transcript, "tick=3"));
-    MK_TEST_ASSERT(mk_test_transcript_contains(&first_transcript, "player_order=move"));
+    MK_TEST_ASSERT(mk_test_transcript_contains(&first_transcript, "player_order=investigate"));
     MK_TEST_ASSERT(mk_test_transcript_contains(&first_transcript, "opfor_order=move"));
 }
 

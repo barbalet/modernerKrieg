@@ -300,6 +300,22 @@ static bool mk_mosul_required_count(
     return true;
 }
 
+static bool mk_mosul_optional_count(
+    const mk_mosul_scenario_entry_list_t *entries,
+    const char *key,
+    size_t maximum,
+    size_t *out_count
+) {
+    const char *value = mk_mosul_entry_value(entries, key);
+
+    if (value == NULL) {
+        *out_count = 0;
+        return true;
+    }
+
+    return mk_mosul_required_count(entries, key, maximum, out_count);
+}
+
 static bool mk_mosul_required_index(
     const mk_mosul_scenario_entry_list_t *entries,
     const char *key,
@@ -919,6 +935,36 @@ static mk_result_t mk_mosul_apply_topology_manifest(
     return mk_scenario_set_gameplay_area(scenario, &area);
 }
 
+static mk_result_t mk_mosul_validate_population_asset_references(
+    const mk_mosul_scenario_entry_list_t *entries,
+    const mk_asset_sprite_manifest_t *sprite_manifest
+) {
+    size_t archetype_count = 0;
+    size_t archetype_index;
+
+    if (!mk_mosul_optional_count(
+            entries,
+            "civilian_archetype.count",
+            MK_MAX_SCENARIO_CIVILIAN_ARCHETYPES,
+            &archetype_count
+        )) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    for (archetype_index = 0; archetype_index < archetype_count; ++archetype_index) {
+        char key[128];
+        char sprite_id[MK_NAME_CAPACITY];
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian_archetype", archetype_index, "sprite_id");
+        if (!mk_mosul_required_text(entries, key, sprite_id, sizeof(sprite_id))
+            || mk_asset_find_sprite_frame(sprite_manifest, sprite_id) == NULL) {
+            return MK_ERROR_INVALID_DATA;
+        }
+    }
+
+    return MK_OK;
+}
+
 static mk_result_t mk_mosul_validate_asset_references(
     const mk_mosul_scenario_entry_list_t *entries,
     const char *project_root,
@@ -952,6 +998,10 @@ static mk_result_t mk_mosul_validate_asset_references(
     }
 
     if (mk_asset_load_sprite_manifest(sprite_manifest_path, project_root, &sprite_manifest) != MK_OK) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    if (mk_mosul_validate_population_asset_references(entries, &sprite_manifest) != MK_OK) {
         return MK_ERROR_INVALID_DATA;
     }
 
@@ -1451,6 +1501,282 @@ static mk_result_t mk_mosul_load_forces(
     return MK_OK;
 }
 
+static mk_result_t mk_mosul_load_spawn_zones(
+    const mk_mosul_scenario_entry_list_t *entries,
+    mk_scenario_definition_t *scenario
+) {
+    size_t spawn_zone_count = 0;
+    size_t spawn_zone_index;
+
+    if (!mk_mosul_optional_count(entries, "spawn_zone.count", MK_MAX_SCENARIO_SPAWN_ZONES, &spawn_zone_count)) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    scenario->spawn_zone_count = spawn_zone_count;
+    for (spawn_zone_index = 0; spawn_zone_index < spawn_zone_count; ++spawn_zone_index) {
+        char key[128];
+        mk_spawn_zone_t *spawn_zone = &scenario->spawn_zones[spawn_zone_index];
+
+        memset(spawn_zone, 0, sizeof(*spawn_zone));
+        spawn_zone->id = (uint32_t)(spawn_zone_index + 1);
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "spawn_zone", spawn_zone_index, "id");
+        if (!mk_mosul_required_text(entries, key, spawn_zone->scenario_id, sizeof(spawn_zone->scenario_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "spawn_zone", spawn_zone_index, "name");
+        if (!mk_mosul_required_text(entries, key, spawn_zone->name, sizeof(spawn_zone->name))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "spawn_zone", spawn_zone_index, "kind");
+        if (!mk_mosul_required_text(entries, key, spawn_zone->kind, sizeof(spawn_zone->kind))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "spawn_zone", spawn_zone_index, "side");
+        if (!mk_mosul_required_side(entries, key, &spawn_zone->side)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "spawn_zone", spawn_zone_index, "level_id");
+        if (!mk_mosul_optional_text(entries, key, "", spawn_zone->level_id, sizeof(spawn_zone->level_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "spawn_zone", spawn_zone_index, "topology_node_id");
+        if (!mk_mosul_optional_text(entries, key, "", spawn_zone->topology_node_id, sizeof(spawn_zone->topology_node_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "spawn_zone", spawn_zone_index, "bounds");
+        if (!mk_mosul_required_rect(entries, key, &spawn_zone->bounds_m)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "spawn_zone", spawn_zone_index, "capacity");
+        if (!mk_mosul_required_int(entries, key, &spawn_zone->capacity) || spawn_zone->capacity < 0) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "spawn_zone", spawn_zone_index, "active");
+        if (!mk_mosul_optional_bool(entries, key, true, &spawn_zone->active)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+    }
+
+    return MK_OK;
+}
+
+static mk_result_t mk_mosul_load_unit_templates(
+    const mk_mosul_scenario_entry_list_t *entries,
+    mk_scenario_definition_t *scenario
+) {
+    size_t template_count = 0;
+    size_t template_index;
+
+    if (!mk_mosul_optional_count(entries, "unit_template.count", MK_MAX_SCENARIO_UNIT_TEMPLATES, &template_count)) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    scenario->unit_template_count = template_count;
+    for (template_index = 0; template_index < template_count; ++template_index) {
+        char key[128];
+        mk_unit_template_t *unit_template = &scenario->unit_templates[template_index];
+
+        memset(unit_template, 0, sizeof(*unit_template));
+        unit_template->id = (uint32_t)(template_index + 1);
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "unit_template", template_index, "id");
+        if (!mk_mosul_required_text(entries, key, unit_template->scenario_id, sizeof(unit_template->scenario_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "unit_template", template_index, "name");
+        if (!mk_mosul_required_text(entries, key, unit_template->name, sizeof(unit_template->name))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "unit_template", template_index, "role");
+        if (!mk_mosul_required_text(entries, key, unit_template->role, sizeof(unit_template->role))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "unit_template", template_index, "side");
+        if (!mk_mosul_required_side(entries, key, &unit_template->side)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "unit_template", template_index, "training");
+        if (!mk_mosul_required_training(entries, key, &unit_template->training)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "unit_template", template_index, "default_spawn_zone_id");
+        if (!mk_mosul_optional_text(
+                entries,
+                key,
+                "",
+                unit_template->default_spawn_zone_id,
+                sizeof(unit_template->default_spawn_zone_id)
+            )) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "unit_template", template_index, "expected_soldiers");
+        if (!mk_mosul_required_int(entries, key, &unit_template->expected_soldiers)
+            || unit_template->expected_soldiers < 0
+            || unit_template->expected_soldiers > MK_MAX_SOLDIERS_PER_UNIT) {
+            return MK_ERROR_INVALID_DATA;
+        }
+    }
+
+    return MK_OK;
+}
+
+static mk_result_t mk_mosul_load_civilian_archetypes(
+    const mk_mosul_scenario_entry_list_t *entries,
+    mk_scenario_definition_t *scenario
+) {
+    size_t archetype_count = 0;
+    size_t archetype_index;
+
+    if (!mk_mosul_optional_count(
+            entries,
+            "civilian_archetype.count",
+            MK_MAX_SCENARIO_CIVILIAN_ARCHETYPES,
+            &archetype_count
+        )) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    scenario->civilian_archetype_count = archetype_count;
+    for (archetype_index = 0; archetype_index < archetype_count; ++archetype_index) {
+        char key[128];
+        mk_civilian_archetype_t *archetype = &scenario->civilian_archetypes[archetype_index];
+
+        memset(archetype, 0, sizeof(*archetype));
+        archetype->id = (uint32_t)(archetype_index + 1);
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian_archetype", archetype_index, "id");
+        if (!mk_mosul_required_text(entries, key, archetype->scenario_id, sizeof(archetype->scenario_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian_archetype", archetype_index, "name");
+        if (!mk_mosul_required_text(entries, key, archetype->name, sizeof(archetype->name))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian_archetype", archetype_index, "sprite_id");
+        if (!mk_mosul_required_text(entries, key, archetype->sprite_id, sizeof(archetype->sprite_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian_archetype", archetype_index, "baseline_stress");
+        if (!mk_mosul_required_int(entries, key, &archetype->baseline_stress) || archetype->baseline_stress < 0) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian_archetype", archetype_index, "baseline_risk");
+        if (!mk_mosul_required_int(entries, key, &archetype->baseline_risk) || archetype->baseline_risk < 0) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian_archetype", archetype_index, "compliance");
+        if (!mk_mosul_required_int(entries, key, &archetype->compliance)
+            || archetype->compliance < 0
+            || archetype->compliance > 100) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian_archetype", archetype_index, "protected_noncombatant");
+        if (!mk_mosul_required_bool(entries, key, &archetype->protected_noncombatant)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+    }
+
+    return MK_OK;
+}
+
+static mk_result_t mk_mosul_load_civilian_groups(
+    const mk_mosul_scenario_entry_list_t *entries,
+    mk_scenario_definition_t *scenario
+) {
+    size_t group_count = 0;
+    size_t group_index;
+
+    if (!mk_mosul_optional_count(entries, "civilian_group.count", MK_MAX_SCENARIO_CIVILIAN_GROUPS, &group_count)) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    scenario->civilian_group_count = group_count;
+    for (group_index = 0; group_index < group_count; ++group_index) {
+        char key[128];
+        mk_civilian_group_t *group = &scenario->civilian_groups[group_index];
+
+        memset(group, 0, sizeof(*group));
+        group->id = (uint32_t)(group_index + 1);
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian_group", group_index, "id");
+        if (!mk_mosul_required_text(entries, key, group->scenario_id, sizeof(group->scenario_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian_group", group_index, "name");
+        if (!mk_mosul_required_text(entries, key, group->name, sizeof(group->name))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian_group", group_index, "archetype_id");
+        if (!mk_mosul_required_text(entries, key, group->archetype_id, sizeof(group->archetype_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian_group", group_index, "spawn_zone_id");
+        if (!mk_mosul_required_text(entries, key, group->spawn_zone_id, sizeof(group->spawn_zone_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian_group", group_index, "level_id");
+        if (!mk_mosul_optional_text(entries, key, "", group->level_id, sizeof(group->level_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian_group", group_index, "topology_node_id");
+        if (!mk_mosul_optional_text(entries, key, "", group->topology_node_id, sizeof(group->topology_node_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian_group", group_index, "expected_count");
+        if (!mk_mosul_required_int(entries, key, &group->expected_count)
+            || group->expected_count < 0
+            || group->expected_count > MK_MAX_CIVILIANS) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian_group", group_index, "baseline_stress");
+        if (!mk_mosul_required_int(entries, key, &group->baseline_stress) || group->baseline_stress < 0) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian_group", group_index, "compliance");
+        if (!mk_mosul_required_int(entries, key, &group->compliance)
+            || group->compliance < 0
+            || group->compliance > 100) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian_group", group_index, "protected_noncombatants");
+        if (!mk_mosul_required_bool(entries, key, &group->protected_noncombatants)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+    }
+
+    return MK_OK;
+}
+
 static mk_result_t mk_mosul_load_objectives(
     const mk_mosul_scenario_entry_list_t *entries,
     mk_scenario_definition_t *scenario
@@ -1565,6 +1891,25 @@ static mk_result_t mk_mosul_load_weapons(
     return MK_OK;
 }
 
+static const mk_civilian_archetype_t *mk_mosul_find_loaded_civilian_archetype(
+    const mk_scenario_definition_t *scenario,
+    const char *archetype_id
+) {
+    size_t index;
+
+    if (scenario == NULL || archetype_id == NULL || archetype_id[0] == '\0') {
+        return NULL;
+    }
+
+    for (index = 0; index < scenario->civilian_archetype_count; ++index) {
+        if (strcmp(scenario->civilian_archetypes[index].scenario_id, archetype_id) == 0) {
+            return &scenario->civilian_archetypes[index];
+        }
+    }
+
+    return NULL;
+}
+
 static mk_result_t mk_mosul_load_civilians(
     const mk_mosul_scenario_entry_list_t *entries,
     mk_scenario_definition_t *scenario,
@@ -1581,17 +1926,62 @@ static mk_result_t mk_mosul_load_civilians(
     for (civilian_index = 0; civilian_index < civilian_count; ++civilian_index) {
         char key[128];
         char name[MK_NAME_CAPACITY];
+        char archetype_id[MK_NAME_CAPACITY];
+        char group_id[MK_NAME_CAPACITY];
+        char spawn_zone_id[MK_NAME_CAPACITY];
+        char level_id[MK_NAME_CAPACITY];
+        char topology_node_id[MK_NAME_CAPACITY];
+        char sprite_id[MK_NAME_CAPACITY];
         size_t faction_index = 0;
         mk_vec2_t position;
         mk_civilian_state_t state;
         int stress = 0;
         int risk = 0;
+        int compliance = 50;
         bool protected_noncombatant = true;
+        const mk_civilian_archetype_t *archetype = NULL;
         mk_civilian_t civilian;
         mk_result_t result;
 
         mk_mosul_make_indexed_key(key, sizeof(key), "civilian", civilian_index, "name");
         if (!mk_mosul_required_text(entries, key, name, sizeof(name))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian", civilian_index, "archetype_id");
+        if (!mk_mosul_optional_text(entries, key, "", archetype_id, sizeof(archetype_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian", civilian_index, "group_id");
+        if (!mk_mosul_optional_text(entries, key, "", group_id, sizeof(group_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian", civilian_index, "spawn_zone_id");
+        if (!mk_mosul_optional_text(entries, key, "", spawn_zone_id, sizeof(spawn_zone_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian", civilian_index, "level_id");
+        if (!mk_mosul_optional_text(entries, key, "", level_id, sizeof(level_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian", civilian_index, "topology_node_id");
+        if (!mk_mosul_optional_text(entries, key, "", topology_node_id, sizeof(topology_node_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        archetype = mk_mosul_find_loaded_civilian_archetype(scenario, archetype_id);
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian", civilian_index, "sprite_id");
+        if (!mk_mosul_optional_text(
+                entries,
+                key,
+                archetype != NULL ? archetype->sprite_id : "",
+                sprite_id,
+                sizeof(sprite_id)
+            )) {
             return MK_ERROR_INVALID_DATA;
         }
 
@@ -1625,10 +2015,24 @@ static mk_result_t mk_mosul_load_civilians(
             return MK_ERROR_INVALID_DATA;
         }
 
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian", civilian_index, "compliance");
+        if (!mk_mosul_optional_int(entries, key, archetype != NULL ? archetype->compliance : 50, &compliance)
+            || compliance < 0
+            || compliance > 100) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
         civilian = mk_make_civilian(name, faction_ids[faction_index], position);
+        mk_mosul_copy_text(civilian.archetype_id, sizeof(civilian.archetype_id), archetype_id);
+        mk_mosul_copy_text(civilian.group_id, sizeof(civilian.group_id), group_id);
+        mk_mosul_copy_text(civilian.spawn_zone_id, sizeof(civilian.spawn_zone_id), spawn_zone_id);
+        mk_mosul_copy_text(civilian.level_id, sizeof(civilian.level_id), level_id);
+        mk_mosul_copy_text(civilian.topology_node_id, sizeof(civilian.topology_node_id), topology_node_id);
+        mk_mosul_copy_text(civilian.sprite_id, sizeof(civilian.sprite_id), sprite_id);
         civilian.state = state;
         civilian.stress = stress;
         civilian.risk = risk;
+        civilian.compliance = compliance;
         civilian.protected_noncombatant = protected_noncombatant;
         result = mk_scenario_add_civilian(scenario, &civilian, NULL);
         if (result != MK_OK) {
@@ -1663,6 +2067,11 @@ static mk_result_t mk_mosul_load_units(
         char name[MK_NAME_CAPACITY];
         char command_name[MK_NAME_CAPACITY];
         char callsign[MK_NAME_CAPACITY];
+        char template_id[MK_NAME_CAPACITY];
+        char group_id[MK_NAME_CAPACITY];
+        char spawn_zone_id[MK_NAME_CAPACITY];
+        char topology_node_id[MK_NAME_CAPACITY];
+        char level_id[MK_NAME_CAPACITY];
         mk_side_t side;
         mk_training_t training;
         mk_vec2_t position;
@@ -1694,6 +2103,31 @@ static mk_result_t mk_mosul_load_units(
 
         mk_mosul_make_indexed_key(key, sizeof(key), "unit", unit_index, "position");
         if (!mk_mosul_required_vec2(entries, key, &position)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "unit", unit_index, "template_id");
+        if (!mk_mosul_optional_text(entries, key, "", template_id, sizeof(template_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "unit", unit_index, "group_id");
+        if (!mk_mosul_optional_text(entries, key, "", group_id, sizeof(group_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "unit", unit_index, "spawn_zone_id");
+        if (!mk_mosul_optional_text(entries, key, "", spawn_zone_id, sizeof(spawn_zone_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "unit", unit_index, "topology_node_id");
+        if (!mk_mosul_optional_text(entries, key, "", topology_node_id, sizeof(topology_node_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "unit", unit_index, "level_id");
+        if (!mk_mosul_optional_text(entries, key, "", level_id, sizeof(level_id))) {
             return MK_ERROR_INVALID_DATA;
         }
 
@@ -1732,6 +2166,11 @@ static mk_result_t mk_mosul_load_units(
         unit.force_id = force_ids[force_index];
         unit.controller_id = controller_ids[controller_index];
         unit.command = mk_make_command_identity(command_name, callsign, side);
+        mk_mosul_copy_text(unit.template_id, sizeof(unit.template_id), template_id);
+        mk_mosul_copy_text(unit.group_id, sizeof(unit.group_id), group_id);
+        mk_mosul_copy_text(unit.spawn_zone_id, sizeof(unit.spawn_zone_id), spawn_zone_id);
+        mk_mosul_copy_text(unit.topology_node_id, sizeof(unit.topology_node_id), topology_node_id);
+        mk_mosul_copy_text(unit.level_id, sizeof(unit.level_id), level_id);
 
         mk_mosul_make_indexed_key(key, sizeof(key), "unit", unit_index, "hidden");
         if (!mk_mosul_optional_bool(entries, key, false, &hidden)) {
@@ -1903,6 +2342,26 @@ mk_result_t mk_mosul_load_scenario_file(
         force_ids,
         &force_count
     );
+    if (result != MK_OK) {
+        goto cleanup;
+    }
+
+    result = mk_mosul_load_spawn_zones(&entries, scenario);
+    if (result != MK_OK) {
+        goto cleanup;
+    }
+
+    result = mk_mosul_load_unit_templates(&entries, scenario);
+    if (result != MK_OK) {
+        goto cleanup;
+    }
+
+    result = mk_mosul_load_civilian_archetypes(&entries, scenario);
+    if (result != MK_OK) {
+        goto cleanup;
+    }
+
+    result = mk_mosul_load_civilian_groups(&entries, scenario);
     if (result != MK_OK) {
         goto cleanup;
     }

@@ -91,11 +91,11 @@ static void test_soldier_markers_from_snapshot(void) {
 
     assert(mk_board_view_fit_map(&view, &snapshot.map, 960.0f, 640.0f, 48.0f) == MK_OK);
     assert(mk_board_view_collect_soldier_markers(&view, &snapshot, NULL, 0, &needed_count) == MK_OK);
-    assert(needed_count == 4);
+    assert(needed_count == 7);
     assert(mk_board_view_collect_soldier_markers(&view, &snapshot, markers, 2, &marker_count) == MK_ERROR_CAPACITY);
-    assert(marker_count == 4);
+    assert(marker_count == 7);
     assert(mk_board_view_collect_soldier_markers(&view, &snapshot, markers, sizeof(markers) / sizeof(markers[0]), &marker_count) == MK_OK);
-    assert(marker_count == 4);
+    assert(marker_count == 7);
 
     assert(markers[0].unit_id == 1);
     assert(markers[0].soldier_id == 1);
@@ -127,7 +127,10 @@ static void test_tactical_overlays_from_snapshot(void) {
     bool saw_objective_control = false;
     bool saw_order_status = false;
     bool saw_hidden_contact = false;
+    bool saw_primary_hidden_contact = false;
     bool saw_civilian_risk = false;
+    bool saw_primary_civilian_risk = false;
+    bool saw_wounded_civilian_risk = false;
     bool saw_suspected_contact = false;
     bool saw_false_contact = false;
     bool saw_breach_search = false;
@@ -175,9 +178,9 @@ static void test_tactical_overlays_from_snapshot(void) {
     assert(mk_board_view_fit_map(&view, &snapshot.map, 960.0f, 640.0f, 48.0f) == MK_OK);
 
     assert(mk_board_view_collect_tactical_overlays(&view, &snapshot, NULL, 0, &overlay_count) == MK_OK);
-    assert(overlay_count == 16);
+    assert(overlay_count == 20);
     assert(mk_board_view_collect_tactical_overlays(&view, &snapshot, overlays, 3, &overlay_count) == MK_ERROR_CAPACITY);
-    assert(overlay_count == 16);
+    assert(overlay_count == 20);
     assert(mk_board_view_collect_tactical_overlays(
         &view,
         &snapshot,
@@ -185,7 +188,7 @@ static void test_tactical_overlays_from_snapshot(void) {
         sizeof(overlays) / sizeof(overlays[0]),
         &overlay_count
     ) == MK_OK);
-    assert(overlay_count == 16);
+    assert(overlay_count == 20);
 
     for (index = 0; index < overlay_count; ++index) {
         const mk_tactical_overlay_t *overlay = &overlays[index];
@@ -232,12 +235,24 @@ static void test_tactical_overlays_from_snapshot(void) {
             assert(overlay->side == MK_SIDE_PLAYER);
         } else if (overlay->kind == MK_TACTICAL_OVERLAY_HIDDEN_CONTACT) {
             saw_hidden_contact = true;
-            assert(overlay->unit_id == 2);
-            assert(overlay->intensity == 18);
+            if (overlay->unit_id == 2) {
+                saw_primary_hidden_contact = true;
+                assert(overlay->intensity == 18);
+            } else {
+                assert(overlay->unit_id >= 4);
+                assert(overlay->intensity >= 20);
+            }
         } else if (overlay->kind == MK_TACTICAL_OVERLAY_CIVILIAN_RISK) {
             saw_civilian_risk = true;
-            assert(overlay->civilian_id == 1);
-            assert(overlay->intensity == 4);
+            if (overlay->civilian_id == 1) {
+                saw_primary_civilian_risk = true;
+                assert(overlay->intensity == 4);
+            } else if (overlay->civilian_id == 7) {
+                saw_wounded_civilian_risk = true;
+                assert(overlay->intensity == 1);
+            } else {
+                assert(false);
+            }
         } else if (overlay->kind == MK_TACTICAL_OVERLAY_SUSPECTED_CONTACT) {
             saw_suspected_contact = true;
             assert(overlay->unit_id == 2);
@@ -274,7 +289,10 @@ static void test_tactical_overlays_from_snapshot(void) {
     assert(saw_objective_control);
     assert(saw_order_status);
     assert(saw_hidden_contact);
+    assert(saw_primary_hidden_contact);
     assert(saw_civilian_risk);
+    assert(saw_primary_civilian_risk);
+    assert(saw_wounded_civilian_risk);
     assert(saw_suspected_contact);
     assert(saw_false_contact);
     assert(saw_breach_search);

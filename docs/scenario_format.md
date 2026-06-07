@@ -30,10 +30,11 @@ The current loader supports:
 - `tile_range.*` records for compact tile overrides
 - `terrain.*` records for line-of-sight and cover zones
 - `controller.*`, `faction.*`, and `force.*` records
+- `spawn_zone.*`, `unit_template.*`, `civilian_archetype.*`, and `civilian_group.*` population records
 - `objective.*` records
 - `weapon.*` records
-- `civilian.*` records
-- `unit.*` records with optional `hidden`, `revealed`, and `concealment` fields
+- `civilian.*` records with optional population, sprite, level, and topology references
+- `unit.*` records with optional `hidden`, `revealed`, `concealment`, population, level, and topology fields
 - nested `unit.N.soldier.M.*` records
 
 References use zero-based indexes within their section. For example, `force.0.faction_index=0` references `faction.0`, while `unit.1.soldier.0.weapon_index=1` references `weapon.1`.
@@ -49,6 +50,8 @@ The loader rejects:
 - unknown enum values
 - invalid controller, faction, force, weapon, or soldier references
 - invalid hidden-contact fields, such as negative concealment
+- invalid population template ids, civilian group ids, spawn zone ids, sprite ids, or topology node ids
+- population starts outside their spawn zone, outside the authored topology node, or assigned to the wrong side
 - invalid score thresholds, such as a success threshold below the partial threshold
 - invalid score weights, such as negative objective, risk, casualty, or time weights
 - out-of-bounds map tiles, terrain, civilians, objectives, and units
@@ -56,6 +59,73 @@ The loader rejects:
 - scenarios that the portable C core refuses to load
 
 CTest covers the default 2003 data file, fixture parity, gameplay-area topology handoff, objective labels, briefing/after-action text, score thresholds and weights, hidden-contact fields, interaction terrain zones, missing asset references, missing Market topology, invalid force references, invalid threshold ordering, impossible objective bounds, the compact AI-only control smoke scenario, and a contested civilian-risk smoke scenario.
+
+Population CTests also cover bad civilian sprite ids, bad population topology ids, and unit templates whose default spawn zone belongs to the wrong side.
+
+## Scenario Population
+
+The 2003 demo scenario now carries population metadata as first-class C data. These records are optional for tiny smoke fixtures, but the main Mosul scenario should use them for all civilians, hidden threat groups, and player-force starts.
+
+Spawn zones define pathable placement areas:
+
+```text
+spawn_zone.1.id=market_stalls_crowd
+spawn_zone.1.name=Market Stalls Crowd
+spawn_zone.1.kind=crowd
+spawn_zone.1.side=civilian
+spawn_zone.1.level_id=level_01_ground
+spawn_zone.1.topology_node_id=market_stalls_ground
+spawn_zone.1.bounds=176,164,86,48
+spawn_zone.1.capacity=8
+spawn_zone.1.active=true
+```
+
+Unit templates give reusable scenario roles and default starts:
+
+```text
+unit_template.3.id=rooftop_watcher
+unit_template.3.name=Rooftop Watcher
+unit_template.3.role=overwatch
+unit_template.3.side=opfor
+unit_template.3.training=regular
+unit_template.3.default_spawn_zone_id=hotel_roof_threat
+unit_template.3.expected_soldiers=1
+```
+
+Civilian archetypes and groups bind runtime sprites, stress/risk defaults, and topology-aware population clusters:
+
+```text
+civilian_archetype.0.id=vendor_adult
+civilian_archetype.0.sprite_id=civilian_adult_128_n
+civilian_archetype.0.baseline_stress=1
+civilian_archetype.0.baseline_risk=0
+civilian_archetype.0.compliance=60
+civilian_archetype.0.protected_noncombatant=true
+
+civilian_group.0.id=market_vendors
+civilian_group.0.archetype_id=vendor_adult
+civilian_group.0.spawn_zone_id=market_stalls_crowd
+civilian_group.0.level_id=level_01_ground
+civilian_group.0.topology_node_id=market_stalls_ground
+civilian_group.0.expected_count=2
+```
+
+Units and civilians may then reference those records:
+
+```text
+civilian.1.archetype_id=vendor_adult
+civilian.1.group_id=market_vendors
+civilian.1.spawn_zone_id=market_stalls_crowd
+civilian.1.level_id=level_01_ground
+civilian.1.topology_node_id=market_stalls_ground
+
+unit.3.template_id=rooftop_watcher
+unit.3.spawn_zone_id=hotel_roof_threat
+unit.3.level_id=level_04_roof_access
+unit.3.topology_node_id=hotel_roof_access
+```
+
+The loader validates that referenced sprite runtime ids exist in the sprite manifest, referenced topology nodes exist on the declared level, positions fit the referenced spawn zone and topology node, and template spawn zones are neutral or owned by the template side.
 
 ## Gameplay Area And Topology
 

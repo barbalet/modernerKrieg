@@ -260,11 +260,21 @@ static void mk_headless_print_replay_header(FILE *stream, const mk_game_t *game,
     );
     fprintf(
         stream,
-        "event tick=%u kind=start units=%u objectives=%u contacts=%u\n",
+        "event tick=%u kind=start units=%u civilians=%u objectives=%u contacts=%u\n",
         game->tick,
         (unsigned)game->unit_count,
+        (unsigned)game->civilian_count,
         (unsigned)game->objective_count,
         (unsigned)game->contact_report_count
+    );
+    fprintf(
+        stream,
+        "event tick=%u kind=population spawn_zones=%u unit_templates=%u civilian_archetypes=%u civilian_groups=%u\n",
+        game->tick,
+        (unsigned)game->spawn_zone_count,
+        (unsigned)game->unit_template_count,
+        (unsigned)game->civilian_archetype_count,
+        (unsigned)game->civilian_group_count
     );
     if (mk_gameplay_area_is_loaded(&game->gameplay_area)) {
         fprintf(
@@ -294,6 +304,7 @@ static void mk_headless_print_replay_tick(
 ) {
     mk_score_t score;
     size_t unit_index;
+    size_t civilian_index;
     size_t objective_index;
     size_t contact_index;
 
@@ -306,10 +317,14 @@ static void mk_headless_print_replay_tick(
 
         fprintf(
             stream,
-            "event tick=%u kind=unit id=%u side=%s order=%s status=%s level=\"%s\" x=%.2f y=%.2f target_x=%.2f target_y=%.2f has_target=%d has_route=%d route_step=%u route_steps=%u route_cost=%d route_vertical=%u route_failures=%u route_reason=\"%s\" hidden=%d revealed=%d\n",
+            "event tick=%u kind=unit id=%u side=%s template=\"%s\" group=\"%s\" spawn=\"%s\" node=\"%s\" order=%s status=%s level=\"%s\" x=%.2f y=%.2f target_x=%.2f target_y=%.2f has_target=%d has_route=%d route_step=%u route_steps=%u route_cost=%d route_vertical=%u route_failures=%u route_reason=\"%s\" hidden=%d revealed=%d\n",
             game->tick,
             unit->id,
             mk_headless_side_name(unit->side),
+            unit->template_id,
+            unit->group_id,
+            unit->spawn_zone_id,
+            unit->topology_node_id,
             mk_headless_order_name(unit->order),
             mk_headless_status_name(unit->status),
             unit->level_id,
@@ -327,6 +342,29 @@ static void mk_headless_print_replay_tick(
             unit->route_failure_reason,
             unit->hidden ? 1 : 0,
             unit->revealed ? 1 : 0
+        );
+    }
+
+    for (civilian_index = 0; civilian_index < game->civilian_count; ++civilian_index) {
+        const mk_civilian_t *civilian = &game->civilians[civilian_index];
+
+        fprintf(
+            stream,
+            "event tick=%u kind=civilian id=%u archetype=\"%s\" group=\"%s\" spawn=\"%s\" node=\"%s\" level=\"%s\" x=%.2f y=%.2f stress=%d risk=%d compliance=%d protected=%d sprite=\"%s\"\n",
+            game->tick,
+            civilian->id,
+            civilian->archetype_id,
+            civilian->group_id,
+            civilian->spawn_zone_id,
+            civilian->topology_node_id,
+            civilian->level_id,
+            civilian->position_m.x,
+            civilian->position_m.y,
+            civilian->stress,
+            civilian->risk,
+            civilian->compliance,
+            civilian->protected_noncombatant ? 1 : 0,
+            civilian->sprite_id
         );
     }
 
