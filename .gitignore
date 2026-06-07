@@ -12,4 +12,5 @@ Testing/
 *.dylib
 *.so
 .DS_Store
-
+xcuserdata/
+DerivedData/

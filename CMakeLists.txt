@@ -117,6 +117,16 @@ target_compile_definitions(mk_headless_run
 )
 mk_apply_warnings(mk_headless_run)
 
+add_executable(mk_ai_battle
+  engine/tools/autoplay/mk_ai_battle.c
+)
+target_link_libraries(mk_ai_battle PRIVATE modernerKriegAi modernerKriegRender modernerKriegMosul)
+target_compile_definitions(mk_ai_battle
+  PRIVATE
+    MK_PROJECT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+mk_apply_warnings(mk_ai_battle)
+
 if(MK_BUILD_TESTS)
   enable_testing()
 
@@ -181,6 +191,7 @@ if(MK_BUILD_TESTS)
   add_test(NAME mk_mosul_scenario_data_tests COMMAND mk_mosul_scenario_data_tests)
   add_test(NAME mk_headless_run_smoke COMMAND mk_headless_run --steps 3 --quiet)
   add_test(NAME mk_headless_run_ai_smoke COMMAND mk_headless_run --steps 3 --quiet --ai-only)
+  add_test(NAME mk_ai_battle_smoke COMMAND mk_ai_battle --battles 1 --ticks 5 --quiet)
   add_test(
     NAME mk_headless_run_debug_balance
     COMMAND mk_headless_run

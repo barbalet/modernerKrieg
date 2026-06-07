@@ -76,6 +76,12 @@ Run both tactical sides under deterministic AI:
 ./build/bin/mk_headless_run --ai-only --max-ticks 10
 ```
 
+Run repeated AI-vs-AI battles with progress/watchdog output:
+
+```sh
+./build/bin/mk_ai_battle --battles 5 --ticks 160 --summary-every 10 --watchdog 40
+```
+
 Write an after-action summary into a deterministic AI-only transcript:
 
 ```sh
@@ -118,6 +124,22 @@ cmake --build build
 ```
 
 If SDL3 is not available, CMake still builds the portable core and tests.
+
+## Xcode AI Battles
+
+The checked-in Xcode command-line project is:
+
+```sh
+modernerKriegAIBattles.xcodeproj
+```
+
+Open it in Xcode and run the shared `mk_ai_battle` scheme to build the portable C core, asset parser, AI, renderer helper, Mosul scenario loader, and AI battle runner without SDL. The scheme runs five AI-vs-AI battles by default and prints regular battle summaries plus watchdog stall reports.
+
+You can also build it from Terminal:
+
+```sh
+xcodebuild -project modernerKriegAIBattles.xcodeproj -scheme mk_ai_battle -configuration Debug build
+```
 
 ## Current Demo Direction
 
