@@ -253,6 +253,22 @@ if(MK_BUILD_TESTS)
       --expect-min-score -40
   )
   add_test(
+    NAME mk_headless_run_civilian_evacuation_smoke
+    COMMAND mk_headless_run
+      --scenario game/mosul/scenarios/market_evacuation_smoke_2003.mkscenario
+      --steps 30
+      --quiet
+      --ai-only
+  )
+  add_test(
+    NAME mk_headless_run_cache_search_smoke
+    COMMAND mk_headless_run
+      --scenario game/mosul/scenarios/market_cache_search_smoke_2003.mkscenario
+      --steps 3
+      --quiet
+      --ai-only
+  )
+  add_test(
     NAME mk_core_no_platform_headers
     COMMAND ${CMAKE_COMMAND}
       -DMK_PROJECT_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}

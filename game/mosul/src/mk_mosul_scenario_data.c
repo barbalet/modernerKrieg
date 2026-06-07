@@ -248,6 +248,26 @@ static bool mk_mosul_required_float(const mk_mosul_scenario_entry_list_t *entrie
     return true;
 }
 
+static bool mk_mosul_optional_float(
+    const mk_mosul_scenario_entry_list_t *entries,
+    const char *key,
+    float default_value,
+    float *out_value
+) {
+    const char *value = mk_mosul_entry_value(entries, key);
+
+    if (out_value == NULL) {
+        return false;
+    }
+
+    if (value == NULL) {
+        *out_value = default_value;
+        return true;
+    }
+
+    return mk_mosul_required_float(entries, key, out_value);
+}
+
 static bool mk_mosul_required_bool(const mk_mosul_scenario_entry_list_t *entries, const char *key, bool *out_value) {
     const char *value = mk_mosul_entry_value(entries, key);
 
@@ -348,6 +368,28 @@ static bool mk_mosul_required_vec2(const mk_mosul_scenario_entry_list_t *entries
 
     *out_value = mk_vec2(x, y);
     return true;
+}
+
+static bool mk_mosul_optional_vec2(
+    const mk_mosul_scenario_entry_list_t *entries,
+    const char *key,
+    mk_vec2_t *out_value,
+    bool *out_present
+) {
+    const char *value = mk_mosul_entry_value(entries, key);
+
+    if (out_value == NULL || out_present == NULL) {
+        return false;
+    }
+
+    if (value == NULL) {
+        *out_present = false;
+        *out_value = mk_vec2(0.0f, 0.0f);
+        return true;
+    }
+
+    *out_present = true;
+    return mk_mosul_required_vec2(entries, key, out_value);
 }
 
 static bool mk_mosul_required_rect(const mk_mosul_scenario_entry_list_t *entries, const char *key, mk_rect_t *out_value) {
@@ -684,6 +726,76 @@ static bool mk_mosul_required_civilian_state(
 
     if (strcmp(value, "following_instructions") == 0) {
         *out_state = MK_CIVILIAN_FOLLOWING_INSTRUCTIONS;
+        return true;
+    }
+
+    if (strcmp(value, "evacuated") == 0) {
+        *out_state = MK_CIVILIAN_EVACUATED;
+        return true;
+    }
+
+    if (strcmp(value, "wounded") == 0) {
+        *out_state = MK_CIVILIAN_WOUNDED;
+        return true;
+    }
+
+    if (strcmp(value, "dead") == 0) {
+        *out_state = MK_CIVILIAN_DEAD;
+        return true;
+    }
+
+    return false;
+}
+
+static bool mk_mosul_optional_civilian_intent(
+    const mk_mosul_scenario_entry_list_t *entries,
+    const char *key,
+    mk_civilian_intent_t default_intent,
+    mk_civilian_intent_t *out_intent
+) {
+    const char *value = mk_mosul_entry_value(entries, key);
+
+    if (out_intent == NULL) {
+        return false;
+    }
+
+    if (value == NULL) {
+        *out_intent = default_intent;
+        return true;
+    }
+
+    if (strcmp(value, "none") == 0) {
+        *out_intent = MK_CIVILIAN_INTENT_NONE;
+        return true;
+    }
+
+    if (strcmp(value, "shelter") == 0) {
+        *out_intent = MK_CIVILIAN_INTENT_SHELTER;
+        return true;
+    }
+
+    if (strcmp(value, "flee") == 0) {
+        *out_intent = MK_CIVILIAN_INTENT_FLEE;
+        return true;
+    }
+
+    if (strcmp(value, "evacuate") == 0) {
+        *out_intent = MK_CIVILIAN_INTENT_EVACUATE;
+        return true;
+    }
+
+    if (strcmp(value, "follow_instructions") == 0) {
+        *out_intent = MK_CIVILIAN_INTENT_FOLLOW_INSTRUCTIONS;
+        return true;
+    }
+
+    if (strcmp(value, "freeze") == 0) {
+        *out_intent = MK_CIVILIAN_INTENT_FREEZE;
+        return true;
+    }
+
+    if (strcmp(value, "assist_group") == 0) {
+        *out_intent = MK_CIVILIAN_INTENT_ASSIST_GROUP;
         return true;
     }
 
@@ -1934,10 +2046,14 @@ static mk_result_t mk_mosul_load_civilians(
         char sprite_id[MK_NAME_CAPACITY];
         size_t faction_index = 0;
         mk_vec2_t position;
+        mk_vec2_t destination;
         mk_civilian_state_t state;
+        mk_civilian_intent_t intent = MK_CIVILIAN_INTENT_NONE;
         int stress = 0;
         int risk = 0;
         int compliance = 50;
+        float speed_m_per_tick = 0.0f;
+        bool has_destination = false;
         bool protected_noncombatant = true;
         const mk_civilian_archetype_t *archetype = NULL;
         mk_civilian_t civilian;
@@ -2000,6 +2116,16 @@ static mk_result_t mk_mosul_load_civilians(
             return MK_ERROR_INVALID_DATA;
         }
 
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian", civilian_index, "intent");
+        if (!mk_mosul_optional_civilian_intent(entries, key, MK_CIVILIAN_INTENT_NONE, &intent)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian", civilian_index, "destination");
+        if (!mk_mosul_optional_vec2(entries, key, &destination, &has_destination)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
         mk_mosul_make_indexed_key(key, sizeof(key), "civilian", civilian_index, "stress");
         if (!mk_mosul_required_int(entries, key, &stress)) {
             return MK_ERROR_INVALID_DATA;
@@ -2022,6 +2148,12 @@ static mk_result_t mk_mosul_load_civilians(
             return MK_ERROR_INVALID_DATA;
         }
 
+        mk_mosul_make_indexed_key(key, sizeof(key), "civilian", civilian_index, "speed_m_per_tick");
+        if (!mk_mosul_optional_float(entries, key, MK_DEFAULT_CIVILIAN_SPEED_M_PER_TICK, &speed_m_per_tick)
+            || speed_m_per_tick < 0.0f) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
         civilian = mk_make_civilian(name, faction_ids[faction_index], position);
         mk_mosul_copy_text(civilian.archetype_id, sizeof(civilian.archetype_id), archetype_id);
         mk_mosul_copy_text(civilian.group_id, sizeof(civilian.group_id), group_id);
@@ -2030,6 +2162,13 @@ static mk_result_t mk_mosul_load_civilians(
         mk_mosul_copy_text(civilian.topology_node_id, sizeof(civilian.topology_node_id), topology_node_id);
         mk_mosul_copy_text(civilian.sprite_id, sizeof(civilian.sprite_id), sprite_id);
         civilian.state = state;
+        civilian.intent = intent;
+        civilian.destination_m = destination;
+        civilian.has_destination = has_destination;
+        civilian.speed_m_per_tick = speed_m_per_tick;
+        if (has_destination) {
+            mk_mosul_copy_text(civilian.destination_level_id, sizeof(civilian.destination_level_id), level_id);
+        }
         civilian.stress = stress;
         civilian.risk = risk;
         civilian.compliance = compliance;

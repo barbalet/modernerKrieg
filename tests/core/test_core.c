@@ -190,7 +190,7 @@ static mk_gameplay_area_t make_test_gameplay_area(void) {
     area.topology_portals[1].vertical = true;
     area.topology_portals[1].movement_cost = 2;
 
-    area.semantic_zone_count = 1;
+    area.semantic_zone_count = 2;
     strcpy(area.semantic_zones[0].id, "shop_shelter");
     strcpy(area.semantic_zones[0].kind, "civilian_shelter");
     strcpy(area.semantic_zones[0].node_id, "shop");
@@ -201,6 +201,16 @@ static mk_gameplay_area_t make_test_gameplay_area(void) {
     area.semantic_zones[0].pixel_height = 60;
     area.semantic_zones[0].bounds_m = make_rect(9.0f, 19.0f, 6.0f, 6.0f);
     area.semantic_zones[0].priority = 2;
+    strcpy(area.semantic_zones[1].id, "street_exit");
+    strcpy(area.semantic_zones[1].kind, "evacuation_exit");
+    strcpy(area.semantic_zones[1].node_id, "street");
+    strcpy(area.semantic_zones[1].level_id, "ground");
+    area.semantic_zones[1].pixel_x = 10;
+    area.semantic_zones[1].pixel_y = 10;
+    area.semantic_zones[1].pixel_width = 50;
+    area.semantic_zones[1].pixel_height = 50;
+    area.semantic_zones[1].bounds_m = make_rect(1.0f, 1.0f, 5.0f, 5.0f);
+    area.semantic_zones[1].priority = 3;
 
     return area;
 }
@@ -532,6 +542,113 @@ static void test_topology_route_following_moves_units_between_levels(void) {
     assert(strcmp(stored_unit->route_failure_reason, "unreachable") == 0);
 }
 
+static void test_civilian_ai_and_instruction_routes_are_deterministic(void) {
+    mk_gameplay_area_t area = make_test_gameplay_area();
+    mk_scenario_definition_t scenario;
+    mk_game_t game;
+    mk_civilian_t civilian;
+    uint32_t civilian_id = 0;
+    int tick;
+
+    memset(&scenario, 0, sizeof(scenario));
+    strcpy(scenario.name, "Civilian Route Scenario");
+    scenario.seed = 11;
+    scenario.map = mk_make_map("Civilian Route Map", 100.0f, 100.0f);
+    assert(mk_scenario_set_gameplay_area(&scenario, &area) == MK_OK);
+
+    civilian = mk_make_civilian("Shopper", 0, mk_vec2(5.0f, 5.0f));
+    strcpy(civilian.level_id, "ground");
+    strcpy(civilian.topology_node_id, "street");
+    civilian.stress = 5;
+    civilian.compliance = 70;
+    assert(mk_scenario_add_civilian(&scenario, &civilian, &civilian_id) == MK_OK);
+    assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
+
+    assert(mk_game_update_civilian_ai(&game) == MK_OK);
+    assert(game.civilians[0].intent == MK_CIVILIAN_INTENT_SHELTER);
+    assert(game.civilians[0].has_destination);
+    assert(game.civilians[0].has_route);
+    assert(game.civilians[0].route_step_count == 2);
+
+    for (tick = 0; tick < 20 && game.civilians[0].has_destination; ++tick) {
+        mk_game_step(&game);
+    }
+
+    assert(!game.civilians[0].has_destination);
+    assert(game.civilians[0].state == MK_CIVILIAN_SHELTERING);
+    assert(strcmp(game.civilians[0].topology_node_id, "shop") == 0);
+
+    assert(mk_game_issue_civilian_instruction(
+        &game,
+        civilian_id,
+        MK_CIVILIAN_INTENT_EVACUATE,
+        "ground",
+        mk_vec2(3.0f, 3.0f)
+    ) == MK_OK);
+    assert(game.civilians[0].intent == MK_CIVILIAN_INTENT_EVACUATE);
+    assert(game.civilians[0].has_route);
+
+    for (tick = 0; tick < 20 && game.civilians[0].has_destination; ++tick) {
+        mk_game_step(&game);
+    }
+
+    assert(game.civilians[0].state == MK_CIVILIAN_EVACUATED);
+    assert(!game.civilians[0].has_destination);
+    assert(strcmp(game.civilians[0].topology_node_id, "street") == 0);
+}
+
+static void test_search_semantic_zone_and_cache_terrain_records_results(void) {
+    mk_gameplay_area_t area = make_test_gameplay_area();
+    mk_scenario_definition_t scenario;
+    mk_game_t game;
+    mk_unit_t searcher;
+    mk_unit_t hidden;
+    mk_soldier_t soldier;
+    mk_weapon_profile_t rifle;
+    mk_terrain_zone_t cache;
+    mk_search_result_t search_result;
+    uint32_t searcher_id = 0;
+    uint32_t hidden_id = 0;
+    uint32_t terrain_id = 0;
+
+    memset(&scenario, 0, sizeof(scenario));
+    strcpy(scenario.name, "Search Scenario");
+    scenario.seed = 12;
+    scenario.map = mk_make_map("Search Map", 100.0f, 100.0f);
+    assert(mk_scenario_set_gameplay_area(&scenario, &area) == MK_OK);
+
+    rifle = mk_make_weapon("M4", 300, 2, 35, 8);
+    soldier = mk_make_soldier("Searcher", MK_ROLE_RIFLEMAN, rifle);
+    searcher = mk_make_unit("Search Team", MK_SIDE_PLAYER, MK_TRAINING_REGULAR, mk_vec2(12.0f, 20.0f));
+    strcpy(searcher.level_id, "ground");
+    strcpy(searcher.topology_node_id, "shop");
+    assert(mk_unit_add_soldier(&searcher, &soldier, NULL) == MK_OK);
+    assert(mk_scenario_add_unit(&scenario, &searcher, &searcher_id) == MK_OK);
+
+    hidden = mk_make_unit("Hidden Threat", MK_SIDE_OPFOR, MK_TRAINING_REGULAR, mk_vec2(13.0f, 21.0f));
+    strcpy(hidden.level_id, "ground");
+    strcpy(hidden.topology_node_id, "shop");
+    hidden.hidden = true;
+    hidden.revealed = false;
+    assert(mk_unit_add_soldier(&hidden, &soldier, NULL) == MK_OK);
+    assert(mk_scenario_add_unit(&scenario, &hidden, &hidden_id) == MK_OK);
+
+    cache = mk_make_terrain_zone("Suspected Cache", MK_TERRAIN_SUSPECTED_IED, mk_rect(50.0f, 50.0f, 5.0f, 5.0f), 1, 2, false);
+    assert(mk_map_add_terrain(&scenario.map, &cache, &terrain_id) == MK_OK);
+    assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
+
+    assert(mk_game_search_semantic_zone(&game, searcher_id, "shop_shelter", &search_result) == MK_OK);
+    assert(search_result.outcome == MK_SEARCH_OUTCOME_THREAT_REVEALED);
+    assert(search_result.revealed_unit_id == hidden_id);
+    assert(search_result.contact_report_id != 0);
+    assert(game.units[1].revealed);
+
+    assert(mk_game_search_terrain(&game, searcher_id, terrain_id, &search_result) == MK_OK);
+    assert(search_result.outcome == MK_SEARCH_OUTCOME_CACHE_FOUND);
+    assert(search_result.terrain_id == terrain_id);
+    assert(search_result.contact_report_id != 0);
+}
+
 static void test_unit_and_soldier_creation(void) {
     mk_game_t game;
     mk_weapon_profile_t rifle;
@@ -687,6 +804,8 @@ static void test_scenario_loading_populates_core_state(void) {
     assert(strcmp(game.civilian_groups[0].topology_node_id, "market_stalls_ground") == 0);
     assert(game.civilians[0].protected_noncombatant);
     assert(game.civilians[0].state == MK_CIVILIAN_SHELTERING);
+    assert(game.civilians[0].intent == MK_CIVILIAN_INTENT_NONE);
+    assert_close(game.civilians[0].speed_m_per_tick, MK_DEFAULT_CIVILIAN_SPEED_M_PER_TICK);
     assert(strcmp(game.civilians[6].archetype_id, "wounded_bystander") == 0);
     assert(game.civilians[6].risk == 1);
     assert(game.units[0].faction_id == 1);
@@ -1398,6 +1517,8 @@ int main(void) {
     test_math_value_helpers();
     test_gameplay_area_coordinate_and_blocker_queries();
     test_topology_route_following_moves_units_between_levels();
+    test_civilian_ai_and_instruction_routes_are_deterministic();
+    test_search_semantic_zone_and_cache_terrain_records_results();
     test_unit_and_soldier_creation();
     test_map_tiles_are_configurable_and_addressable();
     test_capacity_limits_are_reported();

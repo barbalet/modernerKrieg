@@ -1,0 +1,119 @@
+# MOSUL 2003 civilian-panic smoke scenario.
+
+format=modernerKrieg.scenario.v1
+id=market_civilian_panic_smoke_2003
+name=Market Civilian Panic Smoke 2003
+seed=84985359904822
+briefing=Validate civilian panic, destination, and close armed-unit risk.
+
+asset.map_manifest=assets/mosul/manifests/market_commercial_streets_2003.mapmanifest
+asset.sprite_manifest=assets/mosul/manifests/mosul_2003_sprites.spritemanifest
+asset.building_level_manifest=assets/mosul/manifests/market_commercial_streets_2003_building_levels.json
+asset.topology_manifest=assets/mosul/manifests/market_commercial_streets_2003_topology.json
+
+map.name=Market / Commercial Streets
+map.width_m=500
+map.height_m=500
+map.tile_columns=10
+map.tile_rows=10
+map.tile_width_m=50
+map.tile_height_m=50
+map.default_terrain=open
+
+tile_range.count=0
+terrain.count=0
+
+controller.count=2
+controller.0.name=US Patrol Tactical AI
+controller.0.side=player
+controller.0.kind=tactical_ai
+controller.1.name=Armed Threat Tactical AI
+controller.1.side=opfor
+controller.1.kind=tactical_ai
+
+faction.count=3
+faction.0.name=US Army Patrol
+faction.0.side=player
+faction.0.color=80,132,170,255
+faction.1.name=Armed Irregular Cell
+faction.1.side=opfor
+faction.1.color=132,69,55,255
+faction.2.name=Civilians
+faction.2.side=civilian
+faction.2.color=184,166,112,255
+
+force.count=2
+force.0.name=US Patrol Force
+force.0.side=player
+force.0.faction_index=0
+force.0.controller_index=0
+force.0.command_name=US Patrol Force
+force.0.callsign=PATROL-P
+force.1.name=Armed Irregular Cell
+force.1.side=opfor
+force.1.faction_index=1
+force.1.controller_index=1
+force.1.command_name=Local Armed Cell
+force.1.callsign=CELL-P
+
+objective.count=0
+
+weapon.count=2
+weapon.0.name=M4
+weapon.0.effective_range_m=300
+weapon.0.shots_per_action=2
+weapon.0.damage=35
+weapon.0.suppression=8
+weapon.1.name=AKM
+weapon.1.effective_range_m=250
+weapon.1.shots_per_action=2
+weapon.1.damage=30
+weapon.1.suppression=7
+
+civilian.count=1
+civilian.0.name=Panicked Shopper
+civilian.0.faction_index=2
+civilian.0.position=252,206
+civilian.0.level_id=level_01_ground
+civilian.0.topology_node_id=market_stalls_ground
+civilian.0.state=fleeing
+civilian.0.intent=evacuate
+civilian.0.destination=45,170
+civilian.0.stress=8
+civilian.0.risk=2
+civilian.0.protected_noncombatant=true
+civilian.0.compliance=45
+
+unit.count=2
+unit.0.name=US Patrol Element
+unit.0.side=player
+unit.0.training=veteran
+unit.0.position=246,206
+unit.0.level_id=level_01_ground
+unit.0.topology_node_id=market_stalls_ground
+unit.0.faction_index=0
+unit.0.force_index=0
+unit.0.controller_index=0
+unit.0.command_name=US Patrol Element
+unit.0.callsign=PATROL-P1
+unit.0.soldier_count=1
+unit.0.soldier.0.name=Patrol Lead
+unit.0.soldier.0.role=leader
+unit.0.soldier.0.weapon_index=0
+unit.0.soldier.0.offset=0,0
+unit.1.name=Close Armed Threat
+unit.1.side=opfor
+unit.1.training=regular
+unit.1.position=260,206
+unit.1.level_id=level_01_ground
+unit.1.topology_node_id=market_stalls_ground
+unit.1.faction_index=1
+unit.1.force_index=1
+unit.1.controller_index=1
+unit.1.command_name=Close Armed Threat
+unit.1.callsign=CELL-P1
+unit.1.soldier_count=1
+unit.1.soldier.0.name=Armed Rifleman
+unit.1.soldier.0.role=rifleman
+unit.1.soldier.0.weapon_index=1
+unit.1.soldier.0.offset=0,0

@@ -104,6 +104,8 @@ static const char *mk_headless_contact_kind_name(mk_contact_report_kind_t kind) 
             return "suspected_danger";
         case MK_CONTACT_REPORT_FALSE_CONTACT:
             return "false_contact";
+        case MK_CONTACT_REPORT_SEARCH:
+            return "search";
         default:
             return "unknown";
     }
@@ -350,7 +352,7 @@ static void mk_headless_print_replay_tick(
 
         fprintf(
             stream,
-            "event tick=%u kind=civilian id=%u archetype=\"%s\" group=\"%s\" spawn=\"%s\" node=\"%s\" level=\"%s\" x=%.2f y=%.2f stress=%d risk=%d compliance=%d protected=%d sprite=\"%s\"\n",
+            "event tick=%u kind=civilian id=%u archetype=\"%s\" group=\"%s\" spawn=\"%s\" node=\"%s\" level=\"%s\" x=%.2f y=%.2f intent=%s dest_x=%.2f dest_y=%.2f has_destination=%d has_route=%d route_step=%u route_steps=%u route_cost=%d route_failures=%u route_reason=\"%s\" stress=%d risk=%d compliance=%d protected=%d sprite=\"%s\"\n",
             game->tick,
             civilian->id,
             civilian->archetype_id,
@@ -360,6 +362,16 @@ static void mk_headless_print_replay_tick(
             civilian->level_id,
             civilian->position_m.x,
             civilian->position_m.y,
+            mk_civilian_intent_name(civilian->intent),
+            civilian->destination_m.x,
+            civilian->destination_m.y,
+            civilian->has_destination ? 1 : 0,
+            civilian->has_route ? 1 : 0,
+            (unsigned)civilian->route_step_index,
+            (unsigned)civilian->route_step_count,
+            civilian->route_total_cost,
+            (unsigned)civilian->route_failure_count,
+            civilian->route_failure_reason,
             civilian->stress,
             civilian->risk,
             civilian->compliance,

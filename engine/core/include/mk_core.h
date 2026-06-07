@@ -40,6 +40,7 @@ extern "C" {
 #define MK_AFTER_ACTION_SUMMARY_CAPACITY 256
 #define MK_UNIT_PICK_RADIUS_M 8.0f
 #define MK_DEFAULT_MOVE_SPEED_M_PER_TICK 6.0f
+#define MK_DEFAULT_CIVILIAN_SPEED_M_PER_TICK 2.0f
 #define MK_DEFAULT_SCORE_SUCCESS_THRESHOLD 450
 #define MK_DEFAULT_SCORE_PARTIAL_THRESHOLD 150
 #define MK_DEFAULT_SCORE_OBJECTIVE_WEIGHT 100
@@ -173,16 +174,37 @@ typedef enum {
     MK_CIVILIAN_SHELTERING = 0,
     MK_CIVILIAN_FLEEING = 1,
     MK_CIVILIAN_FROZEN = 2,
-    MK_CIVILIAN_FOLLOWING_INSTRUCTIONS = 3
+    MK_CIVILIAN_FOLLOWING_INSTRUCTIONS = 3,
+    MK_CIVILIAN_EVACUATED = 4,
+    MK_CIVILIAN_WOUNDED = 5,
+    MK_CIVILIAN_DEAD = 6
 } mk_civilian_state_t;
+
+typedef enum {
+    MK_CIVILIAN_INTENT_NONE = 0,
+    MK_CIVILIAN_INTENT_SHELTER = 1,
+    MK_CIVILIAN_INTENT_FLEE = 2,
+    MK_CIVILIAN_INTENT_EVACUATE = 3,
+    MK_CIVILIAN_INTENT_FOLLOW_INSTRUCTIONS = 4,
+    MK_CIVILIAN_INTENT_FREEZE = 5,
+    MK_CIVILIAN_INTENT_ASSIST_GROUP = 6
+} mk_civilian_intent_t;
 
 typedef enum {
     MK_CONTACT_REPORT_FIRE = 0,
     MK_CONTACT_REPORT_REVEAL = 1,
     MK_CONTACT_REPORT_CIVILIAN_RISK = 2,
     MK_CONTACT_REPORT_SUSPECTED_DANGER = 3,
-    MK_CONTACT_REPORT_FALSE_CONTACT = 4
+    MK_CONTACT_REPORT_FALSE_CONTACT = 4,
+    MK_CONTACT_REPORT_SEARCH = 5
 } mk_contact_report_kind_t;
+
+typedef enum {
+    MK_SEARCH_OUTCOME_CLEAR = 0,
+    MK_SEARCH_OUTCOME_CACHE_FOUND = 1,
+    MK_SEARCH_OUTCOME_THREAT_REVEALED = 2,
+    MK_SEARCH_OUTCOME_CIVILIAN_FOUND = 3
+} mk_search_outcome_t;
 
 typedef enum {
     MK_OUTCOME_IN_PROGRESS = 0,
@@ -617,6 +639,26 @@ typedef struct {
     char sprite_id[MK_NAME_CAPACITY];
     mk_vec2_t position_m;
     mk_civilian_state_t state;
+    mk_civilian_intent_t intent;
+    mk_vec2_t destination_m;
+    bool has_destination;
+    float speed_m_per_tick;
+    bool has_route;
+    size_t route_step_count;
+    size_t route_step_index;
+    int route_total_cost;
+    bool route_uses_vertical_transition;
+    mk_vec2_t route_waypoints_m[MK_MAX_GAMEPLAY_ROUTE_STEPS];
+    char route_step_level_ids[MK_MAX_GAMEPLAY_ROUTE_STEPS][MK_NAME_CAPACITY];
+    char route_step_portal_ids[MK_MAX_GAMEPLAY_ROUTE_STEPS][MK_NAME_CAPACITY];
+    bool route_step_vertical_transition[MK_MAX_GAMEPLAY_ROUTE_STEPS];
+    uint32_t route_request_id;
+    uint32_t route_stuck_ticks;
+    uint32_t route_failure_count;
+    uint32_t route_vertical_transitions_completed;
+    mk_vec2_t route_last_position_m;
+    char route_failure_reason[MK_KIND_CAPACITY];
+    char destination_level_id[MK_NAME_CAPACITY];
     int stress;
     int risk;
     int compliance;
@@ -678,6 +720,19 @@ typedef struct {
     mk_unit_status_t target_status_after;
     bool resolved;
 } mk_fire_result_t;
+
+typedef struct {
+    mk_search_outcome_t outcome;
+    uint32_t unit_id;
+    uint32_t terrain_id;
+    uint32_t contact_report_id;
+    uint32_t revealed_unit_id;
+    char semantic_zone_id[MK_NAME_CAPACITY];
+    char topology_node_id[MK_NAME_CAPACITY];
+    char level_id[MK_NAME_CAPACITY];
+    mk_vec2_t position_m;
+    bool resolved;
+} mk_search_result_t;
 
 typedef struct {
     int objective_points;
@@ -886,9 +941,29 @@ mk_result_t mk_game_selected_unit_fire(
 );
 mk_result_t mk_game_update_hidden_contacts(mk_game_t *game);
 mk_result_t mk_game_update_civilian_risk(mk_game_t *game);
+mk_result_t mk_game_update_civilian_ai(mk_game_t *game);
+mk_result_t mk_game_issue_civilian_instruction(
+    mk_game_t *game,
+    uint32_t civilian_id,
+    mk_civilian_intent_t intent,
+    const char *target_level_id,
+    mk_vec2_t target_position_m
+);
 mk_result_t mk_game_update_objective_control(mk_game_t *game);
 mk_result_t mk_game_score(const mk_game_t *game, mk_score_t *out_score);
 mk_result_t mk_game_after_action_report(const mk_game_t *game, mk_after_action_report_t *out_report);
+mk_result_t mk_game_search_semantic_zone(
+    mk_game_t *game,
+    uint32_t unit_id,
+    const char *semantic_zone_id,
+    mk_search_result_t *out_search_result
+);
+mk_result_t mk_game_search_terrain(
+    mk_game_t *game,
+    uint32_t unit_id,
+    uint32_t terrain_id,
+    mk_search_result_t *out_search_result
+);
 
 mk_vec2_t mk_vec2(float x, float y);
 mk_ivec2_t mk_ivec2(int x, int y);
@@ -1014,6 +1089,7 @@ bool mk_gameplay_area_blocks_movement_at(
     const char *level_id,
     mk_vec2_t position_m
 );
+const char *mk_civilian_intent_name(mk_civilian_intent_t intent);
 
 mk_weapon_profile_t mk_make_weapon(
     const char *name,

@@ -1464,7 +1464,9 @@ static int mk_game_apply_civilian_fire_risk(
         float distance_to_lane;
         int risk_added = 0;
 
-        if (!civilian->protected_noncombatant) {
+        if (!civilian->protected_noncombatant
+            || civilian->state == MK_CIVILIAN_DEAD
+            || civilian->state == MK_CIVILIAN_EVACUATED) {
             continue;
         }
 
@@ -1763,7 +1765,6 @@ static bool mk_unit_assign_route(mk_unit_t *unit, const mk_gameplay_route_t *rou
     return true;
 }
 
-
 static const char *mk_game_default_level_id(const mk_game_t *game) {
     if (game != NULL
         && mk_gameplay_area_is_loaded(&game->gameplay_area)
@@ -1890,6 +1891,429 @@ static void mk_update_unit_movement(mk_game_t *game, mk_unit_t *unit) {
     }
 
     (void)game;
+}
+
+static void mk_civilian_clear_route(mk_civilian_t *civilian) {
+    if (civilian == NULL) {
+        return;
+    }
+
+    civilian->has_route = false;
+    civilian->route_step_count = 0;
+    civilian->route_step_index = 0;
+    civilian->route_total_cost = 0;
+    civilian->route_uses_vertical_transition = false;
+    memset(civilian->route_waypoints_m, 0, sizeof(civilian->route_waypoints_m));
+    memset(civilian->route_step_level_ids, 0, sizeof(civilian->route_step_level_ids));
+    memset(civilian->route_step_portal_ids, 0, sizeof(civilian->route_step_portal_ids));
+    memset(civilian->route_step_vertical_transition, 0, sizeof(civilian->route_step_vertical_transition));
+    civilian->route_stuck_ticks = 0;
+}
+
+static void mk_civilian_set_route_failure(mk_civilian_t *civilian, const char *reason) {
+    if (civilian == NULL) {
+        return;
+    }
+
+    mk_copy_text(civilian->route_failure_reason, sizeof(civilian->route_failure_reason), reason);
+    civilian->route_failure_count += 1;
+    mk_civilian_clear_route(civilian);
+}
+
+static bool mk_civilian_assign_route(mk_civilian_t *civilian, const mk_gameplay_route_t *route) {
+    size_t index;
+
+    if (civilian == NULL
+        || route == NULL
+        || !route->valid
+        || route->step_count == 0
+        || route->step_count > MK_MAX_GAMEPLAY_ROUTE_STEPS) {
+        return false;
+    }
+
+    mk_civilian_clear_route(civilian);
+    civilian->has_route = true;
+    civilian->route_step_count = route->step_count;
+    civilian->route_step_index = 0;
+    civilian->route_total_cost = route->total_cost;
+    civilian->route_uses_vertical_transition = route->uses_vertical_transition;
+    for (index = 0; index < route->step_count; ++index) {
+        civilian->route_waypoints_m[index] = route->steps[index].waypoint_m;
+        mk_copy_name(civilian->route_step_level_ids[index], route->steps[index].level_id);
+        mk_copy_name(civilian->route_step_portal_ids[index], route->steps[index].portal_id);
+        civilian->route_step_vertical_transition[index] = route->steps[index].vertical_transition;
+    }
+
+    return true;
+}
+
+static const char *mk_civilian_current_level_id(const mk_game_t *game, const mk_civilian_t *civilian) {
+    if (civilian != NULL && civilian->level_id[0] != '\0') {
+        return civilian->level_id;
+    }
+
+    return mk_game_default_level_id(game);
+}
+
+static void mk_game_refresh_civilian_topology(mk_game_t *game, mk_civilian_t *civilian) {
+    const char *level_id;
+    const mk_gameplay_topology_node_t *node;
+
+    if (game == NULL || civilian == NULL || !mk_gameplay_area_topology_is_loaded(&game->gameplay_area)) {
+        return;
+    }
+
+    level_id = mk_civilian_current_level_id(game, civilian);
+    node = mk_gameplay_area_find_topology_node_at_world(&game->gameplay_area, level_id, civilian->position_m);
+    if (node != NULL) {
+        mk_copy_name(civilian->topology_node_id, node->id);
+        mk_copy_name(civilian->level_id, node->level_id);
+    }
+}
+
+static bool mk_game_find_best_semantic_zone(
+    const mk_game_t *game,
+    const mk_civilian_t *civilian,
+    const char *kind,
+    const mk_gameplay_semantic_zone_t **out_zone
+) {
+    const mk_gameplay_semantic_zone_t *best_zone = NULL;
+    float best_score = FLT_MAX;
+    size_t index;
+
+    if (out_zone != NULL) {
+        *out_zone = NULL;
+    }
+
+    if (game == NULL
+        || civilian == NULL
+        || kind == NULL
+        || out_zone == NULL
+        || !mk_gameplay_area_topology_is_loaded(&game->gameplay_area)) {
+        return false;
+    }
+
+    for (index = 0; index < game->gameplay_area.semantic_zone_count; ++index) {
+        const mk_gameplay_semantic_zone_t *zone = &game->gameplay_area.semantic_zones[index];
+        const mk_gameplay_topology_node_t *node;
+        mk_vec2_t zone_center;
+        float distance;
+        float score;
+
+        if (strcmp(zone->kind, kind) != 0) {
+            continue;
+        }
+
+        node = mk_gameplay_area_find_topology_node(&game->gameplay_area, zone->node_id);
+        if (node == NULL || !node->enterable) {
+            continue;
+        }
+
+        zone_center = mk_rect_center(zone->bounds_m);
+        distance = mk_distance(civilian->position_m, zone_center);
+        score = distance - (float)zone->priority * 6.0f;
+        if (civilian->level_id[0] != '\0' && strcmp(zone->level_id, civilian->level_id) == 0) {
+            score -= 12.0f;
+        }
+
+        if (score < best_score) {
+            best_score = score;
+            best_zone = zone;
+        }
+    }
+
+    *out_zone = best_zone;
+    return best_zone != NULL;
+}
+
+static bool mk_game_civilian_pick_destination(mk_game_t *game, mk_civilian_t *civilian) {
+    const mk_gameplay_semantic_zone_t *zone = NULL;
+    const char *preferred_kind = "civilian_shelter";
+
+    if (game == NULL || civilian == NULL) {
+        return false;
+    }
+
+    if (civilian->intent == MK_CIVILIAN_INTENT_EVACUATE
+        || civilian->intent == MK_CIVILIAN_INTENT_FLEE
+        || civilian->risk >= 4
+        || civilian->stress >= 9) {
+        preferred_kind = "evacuation_exit";
+    }
+
+    if (!mk_game_find_best_semantic_zone(game, civilian, preferred_kind, &zone)
+        && strcmp(preferred_kind, "evacuation_exit") == 0) {
+        (void)mk_game_find_best_semantic_zone(game, civilian, "civilian_shelter", &zone);
+    }
+
+    if (zone == NULL) {
+        return false;
+    }
+
+    civilian->destination_m = mk_rect_center(zone->bounds_m);
+    mk_copy_name(civilian->destination_level_id, zone->level_id);
+    civilian->has_destination = true;
+    return true;
+}
+
+static mk_result_t mk_game_try_assign_civilian_route(
+    const mk_game_t *game,
+    mk_civilian_t *civilian,
+    const char *target_level_id,
+    mk_vec2_t target_position_m,
+    bool require_route
+) {
+    const char *start_level_id;
+    const char *goal_level_id;
+    mk_gameplay_route_t route;
+    mk_result_t result;
+
+    if (game == NULL || civilian == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    mk_civilian_clear_route(civilian);
+    if (!mk_gameplay_area_topology_is_loaded(&game->gameplay_area)) {
+        return require_route ? MK_ERROR_INVALID_DATA : MK_OK;
+    }
+
+    start_level_id = mk_civilian_current_level_id(game, civilian);
+    goal_level_id = target_level_id != NULL && target_level_id[0] != '\0' ? target_level_id : start_level_id;
+    if (start_level_id[0] == '\0' || goal_level_id[0] == '\0') {
+        return require_route ? MK_ERROR_INVALID_DATA : MK_OK;
+    }
+
+    result = mk_gameplay_area_plan_route(
+        &game->gameplay_area,
+        start_level_id,
+        civilian->position_m,
+        goal_level_id,
+        target_position_m,
+        &route
+    );
+    if (result != MK_OK) {
+        mk_copy_text(civilian->route_failure_reason, sizeof(civilian->route_failure_reason), route.blocked_reason);
+        return require_route ? result : MK_OK;
+    }
+
+    if (!mk_civilian_assign_route(civilian, &route)) {
+        mk_copy_text(civilian->route_failure_reason, sizeof(civilian->route_failure_reason), "route_capacity");
+        return MK_ERROR_CAPACITY;
+    }
+
+    civilian->route_request_id += 1U;
+    civilian->route_stuck_ticks = 0U;
+    civilian->route_vertical_transitions_completed = 0U;
+    civilian->route_last_position_m = civilian->position_m;
+    mk_copy_text(civilian->route_failure_reason, sizeof(civilian->route_failure_reason), "");
+    if (civilian->level_id[0] == '\0') {
+        mk_copy_name(civilian->level_id, start_level_id);
+    }
+
+    return MK_OK;
+}
+
+static float mk_civilian_move_speed(const mk_civilian_t *civilian) {
+    float speed;
+
+    if (civilian == NULL) {
+        return 0.0f;
+    }
+
+    speed = civilian->speed_m_per_tick > 0.0f
+        ? civilian->speed_m_per_tick
+        : MK_DEFAULT_CIVILIAN_SPEED_M_PER_TICK;
+    if (civilian->state == MK_CIVILIAN_FROZEN) {
+        speed *= 0.45f;
+    }
+    if (civilian->state == MK_CIVILIAN_WOUNDED) {
+        speed *= 0.35f;
+    }
+    if (civilian->intent == MK_CIVILIAN_INTENT_EVACUATE || civilian->intent == MK_CIVILIAN_INTENT_FLEE) {
+        speed *= 1.15f;
+    }
+    if (civilian->compliance < 35) {
+        speed *= 0.75f;
+    }
+    if (civilian->stress > 8) {
+        speed *= 0.85f;
+    }
+
+    return mk_clamp_f32(speed, 0.25f, 3.0f);
+}
+
+static void mk_game_update_civilian_movement(mk_game_t *game, mk_civilian_t *civilian) {
+    mk_vec2_t movement_target;
+    float dx;
+    float dy;
+    float distance_squared;
+    float speed;
+    float step_squared;
+    float distance;
+
+    if (game == NULL
+        || civilian == NULL
+        || !civilian->has_destination
+        || civilian->state == MK_CIVILIAN_DEAD
+        || civilian->state == MK_CIVILIAN_EVACUATED
+        || civilian->intent == MK_CIVILIAN_INTENT_FREEZE) {
+        return;
+    }
+
+    movement_target = civilian->destination_m;
+    if (civilian->has_route) {
+        if (civilian->route_step_count == 0 || civilian->route_step_index >= civilian->route_step_count) {
+            mk_civilian_set_route_failure(civilian, "route_exhausted");
+            civilian->has_destination = false;
+            civilian->intent = MK_CIVILIAN_INTENT_FREEZE;
+            civilian->state = MK_CIVILIAN_FROZEN;
+            return;
+        }
+
+        movement_target = civilian->route_waypoints_m[civilian->route_step_index];
+    }
+
+    dx = movement_target.x - civilian->position_m.x;
+    dy = movement_target.y - civilian->position_m.y;
+    distance_squared = dx * dx + dy * dy;
+    speed = mk_civilian_move_speed(civilian);
+    step_squared = speed * speed;
+
+    if (distance_squared <= step_squared || distance_squared <= 0.0001f) {
+        civilian->position_m = movement_target;
+        if (civilian->has_route) {
+            if (civilian->route_step_level_ids[civilian->route_step_index][0] != '\0') {
+                mk_copy_name(civilian->level_id, civilian->route_step_level_ids[civilian->route_step_index]);
+            }
+            if (civilian->route_step_vertical_transition[civilian->route_step_index]) {
+                civilian->route_vertical_transitions_completed += 1U;
+            }
+
+            civilian->route_step_index += 1U;
+            civilian->route_stuck_ticks = 0U;
+            civilian->route_last_position_m = civilian->position_m;
+            mk_game_refresh_civilian_topology(game, civilian);
+            if (civilian->route_step_index < civilian->route_step_count) {
+                return;
+            }
+        }
+
+        civilian->position_m = civilian->destination_m;
+        if (civilian->destination_level_id[0] != '\0') {
+            mk_copy_name(civilian->level_id, civilian->destination_level_id);
+        }
+        civilian->has_destination = false;
+        mk_civilian_clear_route(civilian);
+        mk_game_refresh_civilian_topology(game, civilian);
+        if (civilian->intent == MK_CIVILIAN_INTENT_EVACUATE || civilian->intent == MK_CIVILIAN_INTENT_FLEE) {
+            civilian->state = MK_CIVILIAN_EVACUATED;
+            civilian->intent = MK_CIVILIAN_INTENT_NONE;
+            civilian->stress = mk_subtract_floor_zero(civilian->stress, 3);
+            return;
+        }
+        if (civilian->intent == MK_CIVILIAN_INTENT_FOLLOW_INSTRUCTIONS) {
+            civilian->state = MK_CIVILIAN_FOLLOWING_INSTRUCTIONS;
+        } else {
+            civilian->state = MK_CIVILIAN_SHELTERING;
+        }
+        civilian->intent = MK_CIVILIAN_INTENT_NONE;
+        civilian->risk = mk_subtract_floor_zero(civilian->risk, 1);
+        civilian->stress = mk_subtract_floor_zero(civilian->stress, 2);
+        return;
+    }
+
+    distance = sqrtf(distance_squared);
+    civilian->position_m.x += dx / distance * speed;
+    civilian->position_m.y += dy / distance * speed;
+    mk_game_refresh_civilian_topology(game, civilian);
+
+    if (civilian->has_route) {
+        float moved_since_last = mk_vec2_distance(civilian->route_last_position_m, civilian->position_m);
+
+        if (moved_since_last < 0.01f) {
+            civilian->route_stuck_ticks += 1U;
+        } else {
+            civilian->route_stuck_ticks = 0U;
+            civilian->route_last_position_m = civilian->position_m;
+        }
+
+        if (civilian->route_stuck_ticks > 8U) {
+            mk_civilian_set_route_failure(civilian, "stuck");
+            civilian->has_destination = false;
+            civilian->intent = MK_CIVILIAN_INTENT_FREEZE;
+            civilian->state = MK_CIVILIAN_FROZEN;
+        }
+    }
+}
+
+static float mk_game_nearest_armed_unit_distance(const mk_game_t *game, const mk_civilian_t *civilian) {
+    float nearest_distance = FLT_MAX;
+    size_t index;
+
+    if (game == NULL || civilian == NULL) {
+        return nearest_distance;
+    }
+
+    for (index = 0; index < game->unit_count; ++index) {
+        const mk_unit_t *unit = &game->units[index];
+        float distance;
+
+        if (unit->side == MK_SIDE_CIVILIAN || unit->status == MK_UNIT_BROKEN) {
+            continue;
+        }
+
+        distance = mk_distance(civilian->position_m, unit->position_m);
+        if (distance < nearest_distance) {
+            nearest_distance = distance;
+        }
+    }
+
+    return nearest_distance;
+}
+
+static mk_civilian_intent_t mk_game_select_civilian_intent(
+    const mk_game_t *game,
+    const mk_civilian_t *civilian
+) {
+    float nearest_armed_distance;
+
+    if (game == NULL
+        || civilian == NULL
+        || !civilian->protected_noncombatant
+        || civilian->state == MK_CIVILIAN_DEAD
+        || civilian->state == MK_CIVILIAN_EVACUATED) {
+        return MK_CIVILIAN_INTENT_NONE;
+    }
+
+    nearest_armed_distance = mk_game_nearest_armed_unit_distance(game, civilian);
+    if (civilian->risk >= 4 || civilian->stress >= 9 || nearest_armed_distance <= 16.0f) {
+        return MK_CIVILIAN_INTENT_EVACUATE;
+    }
+
+    if (civilian->risk >= 1 || civilian->stress >= 5 || nearest_armed_distance <= 32.0f) {
+        if (civilian->compliance < 35 && civilian->risk < 3) {
+            return MK_CIVILIAN_INTENT_FREEZE;
+        }
+        return civilian->compliance >= 55 ? MK_CIVILIAN_INTENT_SHELTER : MK_CIVILIAN_INTENT_FLEE;
+    }
+
+    return MK_CIVILIAN_INTENT_NONE;
+}
+
+static mk_civilian_t *mk_game_find_civilian(mk_game_t *game, uint32_t civilian_id) {
+    size_t index;
+
+    if (game == NULL || civilian_id == 0U) {
+        return NULL;
+    }
+
+    for (index = 0; index < game->civilian_count; ++index) {
+        if (game->civilians[index].id == civilian_id) {
+            return &game->civilians[index];
+        }
+    }
+
+    return NULL;
 }
 
 static bool mk_faction_id_exists(const mk_scenario_definition_t *scenario, uint32_t faction_id) {
@@ -2328,9 +2752,18 @@ static bool mk_scenario_is_valid(const mk_scenario_definition_t *scenario) {
         if (civilian->id == 0
             || !mk_faction_id_exists(scenario, civilian->faction_id)
             || !mk_position_fits_map(civilian->position_m, &scenario->map)
+            || civilian->state > MK_CIVILIAN_DEAD
+            || civilian->intent > MK_CIVILIAN_INTENT_ASSIST_GROUP
             || civilian->stress < 0
             || civilian->risk < 0
             || civilian->compliance < 0
+            || civilian->compliance > 100
+            || civilian->speed_m_per_tick < 0.0f
+            || (civilian->has_destination && !mk_position_fits_map(civilian->destination_m, &scenario->map))
+            || (civilian->has_destination
+                && mk_text_is_present(civilian->destination_level_id)
+                && mk_gameplay_area_is_loaded(&scenario->gameplay_area)
+                && mk_gameplay_area_find_level(&scenario->gameplay_area, civilian->destination_level_id) == NULL)
             || (mk_text_is_present(civilian->level_id)
                 && mk_gameplay_area_is_loaded(&scenario->gameplay_area)
                 && mk_gameplay_area_find_level(&scenario->gameplay_area, civilian->level_id) == NULL)
@@ -2392,6 +2825,26 @@ static bool mk_scenario_is_valid(const mk_scenario_definition_t *scenario) {
 
 const char *mk_version(void) {
     return "0.1.0";
+}
+
+const char *mk_civilian_intent_name(mk_civilian_intent_t intent) {
+    switch (intent) {
+        case MK_CIVILIAN_INTENT_SHELTER:
+            return "shelter";
+        case MK_CIVILIAN_INTENT_FLEE:
+            return "flee";
+        case MK_CIVILIAN_INTENT_EVACUATE:
+            return "evacuate";
+        case MK_CIVILIAN_INTENT_FOLLOW_INSTRUCTIONS:
+            return "follow_instructions";
+        case MK_CIVILIAN_INTENT_FREEZE:
+            return "freeze";
+        case MK_CIVILIAN_INTENT_ASSIST_GROUP:
+            return "assist_group";
+        case MK_CIVILIAN_INTENT_NONE:
+        default:
+            return "none";
+    }
 }
 
 mk_vec2_t mk_vec2(float x, float y) {
@@ -3531,6 +3984,7 @@ void mk_game_step(mk_game_t *game) {
     mk_game_update_investigation_contacts(game);
     (void)mk_game_update_hidden_contacts(game);
     (void)mk_game_update_civilian_risk(game);
+    (void)mk_game_update_civilian_ai(game);
     (void)mk_game_update_objective_control(game);
 }
 
@@ -3601,7 +4055,9 @@ mk_result_t mk_game_update_civilian_risk(mk_game_t *game) {
         mk_civilian_t *civilian = &game->civilians[civilian_index];
         size_t unit_index;
 
-        if (!civilian->protected_noncombatant) {
+        if (!civilian->protected_noncombatant
+            || civilian->state == MK_CIVILIAN_DEAD
+            || civilian->state == MK_CIVILIAN_EVACUATED) {
             continue;
         }
 
@@ -3637,6 +4093,60 @@ mk_result_t mk_game_update_civilian_risk(mk_game_t *game) {
                 break;
             }
         }
+    }
+
+    return MK_OK;
+}
+
+mk_result_t mk_game_update_civilian_ai(mk_game_t *game) {
+    size_t civilian_index;
+
+    if (game == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    for (civilian_index = 0; civilian_index < game->civilian_count; ++civilian_index) {
+        mk_civilian_t *civilian = &game->civilians[civilian_index];
+        mk_civilian_intent_t selected_intent;
+
+        if (!civilian->protected_noncombatant
+            || civilian->state == MK_CIVILIAN_DEAD
+            || civilian->state == MK_CIVILIAN_EVACUATED) {
+            continue;
+        }
+
+        if (civilian->speed_m_per_tick <= 0.0f) {
+            civilian->speed_m_per_tick = MK_DEFAULT_CIVILIAN_SPEED_M_PER_TICK;
+        }
+
+        selected_intent = mk_game_select_civilian_intent(game, civilian);
+        if (selected_intent != MK_CIVILIAN_INTENT_NONE
+            && (civilian->intent == MK_CIVILIAN_INTENT_NONE
+                || civilian->intent == MK_CIVILIAN_INTENT_FREEZE
+                || !civilian->has_destination
+                || (selected_intent == MK_CIVILIAN_INTENT_EVACUATE
+                    && civilian->intent != MK_CIVILIAN_INTENT_EVACUATE
+                    && (game->tick % 2U) == 0U))) {
+            civilian->intent = selected_intent;
+            if (selected_intent == MK_CIVILIAN_INTENT_FREEZE) {
+                civilian->has_destination = false;
+                mk_civilian_clear_route(civilian);
+                civilian->state = MK_CIVILIAN_FROZEN;
+            } else if (mk_game_civilian_pick_destination(game, civilian)) {
+                (void)mk_game_try_assign_civilian_route(
+                    game,
+                    civilian,
+                    civilian->destination_level_id,
+                    civilian->destination_m,
+                    false
+                );
+                civilian->state = selected_intent == MK_CIVILIAN_INTENT_SHELTER
+                    ? MK_CIVILIAN_FOLLOWING_INSTRUCTIONS
+                    : MK_CIVILIAN_FLEEING;
+            }
+        }
+
+        mk_game_update_civilian_movement(game, civilian);
     }
 
     return MK_OK;
@@ -3907,6 +4417,18 @@ mk_result_t mk_game_load_scenario(mk_game_t *game, const mk_scenario_definition_
     for (index = 0; index < game->civilian_count; ++index) {
         if (game->civilians[index].level_id[0] == '\0') {
             mk_copy_name(game->civilians[index].level_id, mk_game_default_level_id(game));
+        }
+        if (game->civilians[index].has_destination) {
+            if (game->civilians[index].destination_level_id[0] == '\0') {
+                mk_copy_name(game->civilians[index].destination_level_id, game->civilians[index].level_id);
+            }
+            (void)mk_game_try_assign_civilian_route(
+                game,
+                &game->civilians[index],
+                game->civilians[index].destination_level_id,
+                game->civilians[index].destination_m,
+                false
+            );
         }
     }
 
@@ -4206,6 +4728,63 @@ mk_result_t mk_game_issue_selected_investigate_order(mk_game_t *game, mk_vec2_t 
     return mk_game_issue_investigate_order(game, game->selected_unit_id, target_position_m);
 }
 
+mk_result_t mk_game_issue_civilian_instruction(
+    mk_game_t *game,
+    uint32_t civilian_id,
+    mk_civilian_intent_t intent,
+    const char *target_level_id,
+    mk_vec2_t target_position_m
+) {
+    mk_civilian_t *civilian;
+    mk_result_t route_result;
+
+    if (game == NULL || intent > MK_CIVILIAN_INTENT_ASSIST_GROUP) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    civilian = mk_game_find_civilian(game, civilian_id);
+    if (civilian == NULL) {
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    if (intent == MK_CIVILIAN_INTENT_NONE || intent == MK_CIVILIAN_INTENT_FREEZE) {
+        civilian->intent = intent;
+        civilian->has_destination = false;
+        mk_civilian_clear_route(civilian);
+        civilian->state = intent == MK_CIVILIAN_INTENT_FREEZE ? MK_CIVILIAN_FROZEN : civilian->state;
+        return MK_OK;
+    }
+
+    if (!mk_position_fits_map(target_position_m, &game->map)) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    civilian->intent = intent;
+    civilian->destination_m = target_position_m;
+    civilian->has_destination = true;
+    if (target_level_id != NULL) {
+        mk_copy_name(civilian->destination_level_id, target_level_id);
+    } else {
+        mk_copy_name(civilian->destination_level_id, mk_civilian_current_level_id(game, civilian));
+    }
+
+    route_result = mk_game_try_assign_civilian_route(
+        game,
+        civilian,
+        civilian->destination_level_id,
+        target_position_m,
+        false
+    );
+    if (route_result != MK_OK) {
+        return route_result;
+    }
+
+    civilian->state = intent == MK_CIVILIAN_INTENT_FOLLOW_INSTRUCTIONS
+        ? MK_CIVILIAN_FOLLOWING_INSTRUCTIONS
+        : MK_CIVILIAN_FLEEING;
+    return MK_OK;
+}
+
 mk_result_t mk_game_trace_line_of_sight(
     const mk_game_t *game,
     mk_vec2_t from_m,
@@ -4439,6 +5018,210 @@ mk_result_t mk_game_selected_unit_fire(
     return mk_game_unit_fire(game, game->selected_unit_id, target_unit_id, out_fire_result);
 }
 
+static void mk_search_result_init(mk_search_result_t *search_result, uint32_t unit_id, mk_vec2_t position_m) {
+    if (search_result == NULL) {
+        return;
+    }
+
+    memset(search_result, 0, sizeof(*search_result));
+    search_result->outcome = MK_SEARCH_OUTCOME_CLEAR;
+    search_result->unit_id = unit_id;
+    search_result->position_m = position_m;
+    search_result->resolved = true;
+}
+
+static uint32_t mk_game_search_reveal_hidden_at(
+    mk_game_t *game,
+    const mk_unit_t *searcher,
+    const char *topology_node_id,
+    mk_vec2_t position_m,
+    float radius_m
+) {
+    size_t index;
+
+    if (game == NULL || searcher == NULL) {
+        return 0U;
+    }
+
+    for (index = 0; index < game->unit_count; ++index) {
+        mk_unit_t *unit = &game->units[index];
+        bool same_node = topology_node_id != NULL
+            && topology_node_id[0] != '\0'
+            && strcmp(unit->topology_node_id, topology_node_id) == 0;
+
+        if (!unit->hidden
+            || unit->revealed
+            || unit->side == MK_SIDE_CIVILIAN
+            || unit->side == searcher->side
+            || unit->status == MK_UNIT_BROKEN) {
+            continue;
+        }
+
+        if (same_node || mk_distance(unit->position_m, position_m) <= radius_m) {
+            mk_game_reveal_unit(game, unit, searcher);
+            return unit->id;
+        }
+    }
+
+    return 0U;
+}
+
+static uint32_t mk_game_record_search_contact(
+    mk_game_t *game,
+    const mk_unit_t *searcher,
+    mk_vec2_t position_m,
+    uint32_t terrain_id,
+    uint32_t revealed_unit_id,
+    mk_search_outcome_t outcome
+) {
+    mk_contact_report_t *report;
+
+    if (game == NULL || searcher == NULL) {
+        return 0U;
+    }
+
+    report = mk_game_add_contact_report(game, MK_CONTACT_REPORT_SEARCH);
+    if (report == NULL) {
+        return 0U;
+    }
+
+    report->attacker_unit_id = searcher->id;
+    report->target_unit_id = revealed_unit_id;
+    report->terrain_id = terrain_id;
+    if (revealed_unit_id != 0U) {
+        const mk_unit_t *revealed_unit = mk_game_find_unit_const(game, revealed_unit_id);
+
+        report->side = revealed_unit != NULL ? revealed_unit->side : MK_SIDE_NEUTRAL;
+    } else {
+        report->side = MK_SIDE_NEUTRAL;
+    }
+    report->position_m = position_m;
+    report->target_position_m = position_m;
+    report->confidence = outcome == MK_SEARCH_OUTCOME_CLEAR ? 60 : 100;
+    report->visible = true;
+    report->resolved = true;
+    return report->id;
+}
+
+mk_result_t mk_game_search_semantic_zone(
+    mk_game_t *game,
+    uint32_t unit_id,
+    const char *semantic_zone_id,
+    mk_search_result_t *out_search_result
+) {
+    mk_unit_t *unit;
+    const mk_gameplay_semantic_zone_t *zone;
+    mk_vec2_t position;
+    uint32_t revealed_unit_id;
+    bool civilian_found = false;
+    size_t civilian_index;
+
+    if (game == NULL || semantic_zone_id == NULL || out_search_result == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    unit = mk_game_find_unit(game, unit_id);
+    if (unit == NULL) {
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    zone = mk_gameplay_area_find_semantic_zone(&game->gameplay_area, semantic_zone_id);
+    if (zone == NULL) {
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    position = mk_rect_center(zone->bounds_m);
+    mk_search_result_init(out_search_result, unit_id, position);
+    mk_copy_name(out_search_result->semantic_zone_id, zone->id);
+    mk_copy_name(out_search_result->topology_node_id, zone->node_id);
+    mk_copy_name(out_search_result->level_id, zone->level_id);
+
+    revealed_unit_id = mk_game_search_reveal_hidden_at(game, unit, zone->node_id, position, 32.0f);
+    if (revealed_unit_id != 0U) {
+        out_search_result->outcome = MK_SEARCH_OUTCOME_THREAT_REVEALED;
+        out_search_result->revealed_unit_id = revealed_unit_id;
+    } else if (strcmp(zone->kind, "cache") == 0) {
+        out_search_result->outcome = MK_SEARCH_OUTCOME_CACHE_FOUND;
+    } else {
+        for (civilian_index = 0; civilian_index < game->civilian_count; ++civilian_index) {
+            const mk_civilian_t *civilian = &game->civilians[civilian_index];
+
+            if (civilian->protected_noncombatant
+                && strcmp(civilian->topology_node_id, zone->node_id) == 0) {
+                civilian_found = true;
+                break;
+            }
+        }
+        if (civilian_found) {
+            out_search_result->outcome = MK_SEARCH_OUTCOME_CIVILIAN_FOUND;
+        }
+    }
+
+    out_search_result->contact_report_id = mk_game_record_search_contact(
+        game,
+        unit,
+        position,
+        0U,
+        out_search_result->revealed_unit_id,
+        out_search_result->outcome
+    );
+    return MK_OK;
+}
+
+mk_result_t mk_game_search_terrain(
+    mk_game_t *game,
+    uint32_t unit_id,
+    uint32_t terrain_id,
+    mk_search_result_t *out_search_result
+) {
+    mk_unit_t *unit;
+    const mk_terrain_zone_t *terrain = NULL;
+    mk_vec2_t position;
+    uint32_t revealed_unit_id;
+    size_t terrain_index;
+
+    if (game == NULL || out_search_result == NULL || terrain_id == 0U) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    unit = mk_game_find_unit(game, unit_id);
+    if (unit == NULL) {
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    for (terrain_index = 0; terrain_index < game->map.terrain_count; ++terrain_index) {
+        if (game->map.terrain[terrain_index].id == terrain_id) {
+            terrain = &game->map.terrain[terrain_index];
+            break;
+        }
+    }
+    if (terrain == NULL) {
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    position = mk_rect_center(terrain->bounds_m);
+    mk_search_result_init(out_search_result, unit_id, position);
+    out_search_result->terrain_id = terrain_id;
+
+    revealed_unit_id = mk_game_search_reveal_hidden_at(game, unit, "", position, 35.0f);
+    if (revealed_unit_id != 0U) {
+        out_search_result->outcome = MK_SEARCH_OUTCOME_THREAT_REVEALED;
+        out_search_result->revealed_unit_id = revealed_unit_id;
+    } else if (terrain->kind == MK_TERRAIN_SUSPECTED_IED) {
+        out_search_result->outcome = MK_SEARCH_OUTCOME_CACHE_FOUND;
+    }
+
+    out_search_result->contact_report_id = mk_game_record_search_contact(
+        game,
+        unit,
+        position,
+        terrain_id,
+        out_search_result->revealed_unit_id,
+        out_search_result->outcome
+    );
+    return MK_OK;
+}
+
 mk_weapon_profile_t mk_make_weapon(
     const char *name,
     int effective_range_m,
@@ -4659,6 +5442,8 @@ mk_civilian_t mk_make_civilian(const char *name, uint32_t faction_id, mk_vec2_t 
     civilian.faction_id = faction_id;
     civilian.position_m = position_m;
     civilian.state = MK_CIVILIAN_SHELTERING;
+    civilian.intent = MK_CIVILIAN_INTENT_NONE;
+    civilian.speed_m_per_tick = MK_DEFAULT_CIVILIAN_SPEED_M_PER_TICK;
     civilian.compliance = 50;
     civilian.protected_noncombatant = true;
 

@@ -478,6 +478,16 @@ static bool mk_replay_validate_civilian_event(
     const char *line,
     uint32_t line_number
 ) {
+    static const char *const intents[] = {
+        "none",
+        "shelter",
+        "flee",
+        "evacuate",
+        "follow_instructions",
+        "freeze",
+        "assist_group"
+    };
+    char word[32];
     uint32_t id;
     int scratch_int;
 
@@ -494,6 +504,16 @@ static bool mk_replay_validate_civilian_event(
         || !mk_replay_has_quoted_field(line, "level")
         || !mk_replay_read_field_number(line, "x")
         || !mk_replay_read_field_number(line, "y")
+        || !mk_replay_read_enum(line, "intent", intents, sizeof(intents) / sizeof(intents[0]), word, sizeof(word))
+        || !mk_replay_read_field_number(line, "dest_x")
+        || !mk_replay_read_field_number(line, "dest_y")
+        || !mk_replay_validate_bool_field(line, "has_destination")
+        || !mk_replay_validate_bool_field(line, "has_route")
+        || !mk_replay_read_field_u32(line, "route_step", &id)
+        || !mk_replay_read_field_u32(line, "route_steps", &id)
+        || !mk_replay_read_field_i32(line, "route_cost", &scratch_int)
+        || !mk_replay_read_field_u32(line, "route_failures", &id)
+        || !mk_replay_has_quoted_field(line, "route_reason")
         || !mk_replay_read_field_i32(line, "stress", &scratch_int)
         || !mk_replay_read_field_i32(line, "risk", &scratch_int)
         || !mk_replay_read_field_i32(line, "compliance", &scratch_int)
@@ -632,7 +652,8 @@ static bool mk_replay_validate_contact_event(
         "reveal",
         "civilian_risk",
         "suspected_danger",
-        "false_contact"
+        "false_contact",
+        "search"
     };
     char word[32];
     uint32_t id;

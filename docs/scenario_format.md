@@ -33,7 +33,7 @@ The current loader supports:
 - `spawn_zone.*`, `unit_template.*`, `civilian_archetype.*`, and `civilian_group.*` population records
 - `objective.*` records
 - `weapon.*` records
-- `civilian.*` records with optional population, sprite, level, and topology references
+- `civilian.*` records with optional population, sprite, level, topology, intent, destination, and speed references
 - `unit.*` records with optional `hidden`, `revealed`, `concealment`, population, level, and topology fields
 - nested `unit.N.soldier.M.*` records
 
@@ -60,7 +60,7 @@ The loader rejects:
 
 CTest covers the default 2003 data file, fixture parity, gameplay-area topology handoff, objective labels, briefing/after-action text, score thresholds and weights, hidden-contact fields, interaction terrain zones, missing asset references, missing Market topology, invalid force references, invalid threshold ordering, impossible objective bounds, the compact AI-only control smoke scenario, and a contested civilian-risk smoke scenario.
 
-Population CTests also cover bad civilian sprite ids, bad population topology ids, and unit templates whose default spawn zone belongs to the wrong side.
+Population CTests also cover bad civilian sprite ids, bad population topology ids, unit templates whose default spawn zone belongs to the wrong side, and compact scenario variants for empty-map, interior contact, civilian panic, rooftop threat, cache search, evacuation, and blocked-path coverage.
 
 ## Scenario Population
 
@@ -118,6 +118,9 @@ civilian.1.group_id=market_vendors
 civilian.1.spawn_zone_id=market_stalls_crowd
 civilian.1.level_id=level_01_ground
 civilian.1.topology_node_id=market_stalls_ground
+civilian.1.intent=evacuate
+civilian.1.destination=45,170
+civilian.1.speed_m_per_tick=2.25
 
 unit.3.template_id=rooftop_watcher
 unit.3.spawn_zone_id=hotel_roof_threat
@@ -126,6 +129,8 @@ unit.3.topology_node_id=hotel_roof_access
 ```
 
 The loader validates that referenced sprite runtime ids exist in the sprite manifest, referenced topology nodes exist on the declared level, positions fit the referenced spawn zone and topology node, and template spawn zones are neutral or owned by the template side.
+
+Civilian intent is optional. Supported values are `none`, `shelter`, `flee`, `evacuate`, `follow_instructions`, `freeze`, and `assist_group`. A civilian with `destination` starts with `has_destination` set in core state; if the topology can route between the current node and destination level, the route is assigned during scenario load. If no route is available, the core keeps a deterministic straight-line fallback and records the route failure reason.
 
 ## Gameplay Area And Topology
 
@@ -150,6 +155,14 @@ topology nodes, units follow compact route waypoints through portals and update
 their level when a vertical connector is reached. Existing straight-line orders
 remain a fallback for smoke fixtures or targets outside the authored topology.
 
+Civilian AI also consumes the topology. The fixed-step loop updates civilian
+risk first, then civilian intent and movement. Civilians can seek authored
+`civilian_shelter` zones, evacuate toward `evacuation_exit` zones, follow a
+C-level instruction destination, or freeze when low compliance and danger make
+movement unreliable. Replay civilian events expose intent, destination, route
+state, route failure reason, stress, and risk so CI artifacts can explain
+movement problems.
+
 ## Interaction Terrain
 
 Terrain zones can carry first-pass interaction affordances before final interaction art and rules are complete. Frontends project these zones through the marker manifest:
@@ -168,6 +181,12 @@ terrain.3.cover=2
 terrain.3.movement_cost=3
 terrain.3.blocks_line_of_sight=false
 ```
+
+The C core now exposes first-pass search hooks for semantic zones and terrain
+zones. `cache` semantic zones and `suspected_ied` terrain can resolve to a
+cache-found result, while searches inside a topology node can reveal a hidden
+enemy assigned to that node. Search actions emit deterministic `search` contact
+records for headless replay review.
 
 ## Briefing And Outcome Text
 

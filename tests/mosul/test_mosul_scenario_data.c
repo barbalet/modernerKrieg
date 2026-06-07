@@ -308,6 +308,28 @@ static void test_contested_risk_smoke_scenario_loads(void) {
     MK_TEST_ASSERT(mk_game_load_scenario(&game, &scenario) == MK_OK);
 }
 
+static void test_scenario_variant_smokes_load(void) {
+    static const char *const variants[] = {
+        "game/mosul/scenarios/market_empty_smoke_2003.mkscenario",
+        "game/mosul/scenarios/market_interior_contact_smoke_2003.mkscenario",
+        "game/mosul/scenarios/market_civilian_panic_smoke_2003.mkscenario",
+        "game/mosul/scenarios/market_rooftop_threat_smoke_2003.mkscenario",
+        "game/mosul/scenarios/market_cache_search_smoke_2003.mkscenario",
+        "game/mosul/scenarios/market_evacuation_smoke_2003.mkscenario",
+        "game/mosul/scenarios/market_blocked_path_smoke_2003.mkscenario"
+    };
+    size_t index;
+
+    for (index = 0; index < sizeof(variants) / sizeof(variants[0]); ++index) {
+        char path[512];
+        mk_scenario_definition_t scenario;
+
+        make_project_path(path, sizeof(path), variants[index]);
+        MK_TEST_ASSERT(mk_mosul_load_scenario_file(path, MK_TEST_PROJECT_ROOT, &scenario) == MK_OK);
+        MK_TEST_ASSERT(mk_gameplay_area_topology_is_loaded(&scenario.gameplay_area));
+    }
+}
+
 static void test_missing_asset_manifest_is_rejected(void) {
     char path[512];
     mk_scenario_definition_t scenario;
@@ -673,6 +695,7 @@ int main(void) {
     test_public_default_scenario_uses_data_file();
     test_control_smoke_scenario_loads();
     test_contested_risk_smoke_scenario_loads();
+    test_scenario_variant_smokes_load();
     test_missing_asset_manifest_is_rejected();
     test_market_scenario_requires_building_level_manifest();
     test_market_scenario_requires_topology_manifest();

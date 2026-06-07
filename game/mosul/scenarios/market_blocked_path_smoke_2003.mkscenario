@@ -1,0 +1,83 @@
+# MOSUL 2003 blocked-path smoke scenario.
+
+format=modernerKrieg.scenario.v1
+id=market_blocked_path_smoke_2003
+name=Market Blocked Path Smoke 2003
+seed=84985359904826
+briefing=Validate blocked terrain and the authored blocked garage court context.
+
+asset.map_manifest=assets/mosul/manifests/market_commercial_streets_2003.mapmanifest
+asset.sprite_manifest=assets/mosul/manifests/mosul_2003_sprites.spritemanifest
+asset.building_level_manifest=assets/mosul/manifests/market_commercial_streets_2003_building_levels.json
+asset.topology_manifest=assets/mosul/manifests/market_commercial_streets_2003_topology.json
+
+map.name=Market / Commercial Streets
+map.width_m=500
+map.height_m=500
+map.tile_columns=10
+map.tile_rows=10
+map.tile_width_m=50
+map.tile_height_m=50
+map.default_terrain=open
+
+tile_range.count=0
+terrain.count=1
+terrain.0.name=Blocked Garage Court
+terrain.0.kind=obstacle
+terrain.0.bounds=371,243,64,45
+terrain.0.cover=4
+terrain.0.movement_cost=999
+terrain.0.blocks_line_of_sight=true
+
+controller.count=1
+controller.0.name=US Patrol Tactical AI
+controller.0.side=player
+controller.0.kind=tactical_ai
+
+faction.count=1
+faction.0.name=US Army Patrol
+faction.0.side=player
+faction.0.color=80,132,170,255
+
+force.count=1
+force.0.name=US Patrol Force
+force.0.side=player
+force.0.faction_index=0
+force.0.controller_index=0
+force.0.command_name=US Patrol Force
+force.0.callsign=PATROL-B
+
+objective.count=1
+objective.0.name=Inspect Blocked Court
+objective.0.label=Blocked Court
+objective.0.kind=search
+objective.0.position=405,266
+objective.0.radius_m=22
+objective.0.value=1
+
+weapon.count=1
+weapon.0.name=M4
+weapon.0.effective_range_m=300
+weapon.0.shots_per_action=2
+weapon.0.damage=35
+weapon.0.suppression=8
+
+civilian.count=0
+
+unit.count=1
+unit.0.name=Blocked Path Patrol
+unit.0.side=player
+unit.0.training=veteran
+unit.0.position=250,200
+unit.0.level_id=level_01_ground
+unit.0.topology_node_id=street_market_junction
+unit.0.faction_index=0
+unit.0.force_index=0
+unit.0.controller_index=0
+unit.0.command_name=Blocked Path Patrol
+unit.0.callsign=PATROL-B1
+unit.0.soldier_count=1
+unit.0.soldier.0.name=Patrol Lead
+unit.0.soldier.0.role=leader
+unit.0.soldier.0.weapon_index=0
+unit.0.soldier.0.offset=0,0

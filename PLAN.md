@@ -233,10 +233,10 @@ Implementation approach:
 - Added budget from gameplay-area integration rebaseline: 20 cycles.
 - Planned cycle budget: 100 cycles.
 - Planned cycle shape: 10 milestones x 10 cycles each.
-- Completed cycles in this ledger: 46.
-- Current cycle: 46.
-- Remaining planned cycles: 54.
-- Next cycle batch: cycles 47-50, Scenario Population And Data Expansion close-out.
+- Completed cycles in this ledger: 61.
+- Current cycle: 61.
+- Remaining planned cycles: 39.
+- Next cycle batch: cycles 62-70, Urban Combat, Breach, Search, And Rooftops.
 
 Prior implementation work is captured in the current audit and is not counted
 against this rebaselined ledger. When a development batch is completed,
@@ -252,6 +252,7 @@ increment `Completed cycles in this ledger`, advance `Current cycle`, reduce
 | 2026-06-07 | 40 | 40 | 60 | Topology-Aware Movement | Added deterministic topology route planning, compact per-unit route following, vertical level transitions, route failure reporting, board-view route waypoint overlays, AI withdraw route requests, replay route fields, and heap-backed Mosul scenario validation. |
 | 2026-06-07 | 41 | 41 | 59 | CI Automation Guardrail | Added a per-commit GitHub Actions C-engine workflow, CI runner script, timestamped failure logs, cross-platform default/strict tests, AI-only smoke checks, and sanitizer coverage on macOS/Linux. |
 | 2026-06-07 | 46 | 46 | 54 | Scenario Population Data Foundation | Added C-level spawn zones, unit templates, civilian archetypes/groups, richer Market 2003 civilians and hidden opfor, topology-linked population validation, replay exposure, docs, and tests. |
+| 2026-06-07 | 61 | 61 | 39 | Scenario Variants, Civilian AI, And Search Hook | Added seven compact Market 2003 scenario variants, C-level civilian intent/destination/path state, deterministic civilian AI movement, civilian instruction API, replay route exposure, search/cache reveal hooks, docs, and smoke tests. |
 
 ## Cycle Delta From Previous Plan
 
@@ -413,10 +414,10 @@ Exit criteria:
 
 ### Cycles 41-50: Scenario Population And Data Expansion
 
-Status: in progress. Cycle 41 completed on 2026-06-07 for CI automation at user
-request. Cycles 42-46 completed on 2026-06-07 for population schema, richer
-Market 2003 data, replay exposure, and validation. Cycles 47-50 remain for
-scenario variants and final content-convention close-out.
+Status: completed on 2026-06-07. Cycle 41 completed for CI automation at user
+request. Cycles 42-46 completed for population schema, richer Market 2003 data,
+replay exposure, and validation. Cycles 47-50 completed with compact scenario
+variants and data/content convention close-out.
 
 Goal: make the 2003 battle scenario data-rich enough for a real demo.
 
@@ -448,6 +449,8 @@ Exit criteria:
   civilian groups, bad topology ids, and impossible force templates.
 
 ### Cycles 51-60: Civilian Movement And Civilian AI
+
+Status: completed on 2026-06-07.
 
 Goal: turn civilians into deterministic moving agents whose behavior affects
 tactics and scoring.
@@ -481,6 +484,10 @@ Exit criteria:
 - Civilian harm/risk is explainable in replay and AAR output.
 
 ### Cycles 61-70: Urban Combat, Breach, Search, And Rooftops
+
+Status: in progress. Cycle 61 completed on 2026-06-07 with first-pass
+C-level semantic-zone and terrain search hooks, cache-found outcomes, hidden
+threat reveals, replay contact records, and tests.
 
 Goal: make the modern urban systems mechanically real.
 
