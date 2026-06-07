@@ -256,7 +256,7 @@ static mk_result_t mk_ai_issue_player_order(mk_game_t *game, const mk_unit_t *un
     }
 
     if (suspected_contact != NULL) {
-        if (mk_vec2_distance(unit->position_m, suspected_contact->position_m) <= 80.0f) {
+        if (mk_vec2_distance(unit->position_m, suspected_contact->position_m) <= 18.0f) {
             return mk_game_issue_order(game, unit->id, MK_ORDER_OVERWATCH);
         }
 

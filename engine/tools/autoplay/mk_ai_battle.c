@@ -27,10 +27,12 @@ typedef struct {
     bool quiet;
     bool verbose;
     bool fail_on_stall;
+    bool keep_running_after_outcome;
 } mk_ai_battle_config_t;
 
 typedef struct {
     uint32_t battles_run;
+    uint32_t settled_battles;
     uint32_t stalled_battles;
     uint32_t failed_battles;
     int best_score;
@@ -147,7 +149,7 @@ static bool mk_ai_battle_parse_u64(const char *text, uint64_t *out_value) {
 static void mk_ai_battle_print_usage(const char *program_name) {
     fprintf(
         stderr,
-        "usage: %s [--scenario PATH] [--project-root PATH] [--battles N|--forever] [--ticks N|--max-ticks N] [--seed N] [--summary-every N] [--watchdog N] [--fail-on-stall] [--quiet] [--verbose]\n"
+        "usage: %s [--scenario PATH] [--project-root PATH] [--battles N|--forever] [--ticks N|--max-ticks N] [--seed N] [--summary-every N] [--watchdog N] [--fail-on-stall] [--keep-running-after-outcome] [--quiet] [--verbose]\n"
         "\n"
         "Runs deterministic MOSUL AI-vs-AI battles with both tactical sides controlled by AI.\n",
         program_name
@@ -237,16 +239,24 @@ static int mk_ai_battle_quantize_position(float value) {
     return (int)(value * 100.0f);
 }
 
-static uint64_t mk_ai_battle_progress_signature(const mk_game_t *game, const mk_score_t *score) {
+static uint64_t mk_ai_battle_progress_signature(const mk_game_t *game) {
     uint64_t hash = UINT64_C(1469598103934665603);
     size_t index;
 
-    if (game == NULL || score == NULL) {
+    if (game == NULL) {
         return 0;
     }
 
-    hash = mk_ai_battle_hash_i32(hash, score->total_score);
     hash = mk_ai_battle_hash_u64(hash, game->contact_report_count);
+
+    for (index = 0; index < game->contact_report_count; ++index) {
+        const mk_contact_report_t *report = &game->contact_reports[index];
+
+        hash = mk_ai_battle_hash_u64(hash, report->id);
+        hash = mk_ai_battle_hash_u64(hash, (uint64_t)report->kind);
+        hash = mk_ai_battle_hash_u64(hash, report->resolved ? 1U : 0U);
+        hash = mk_ai_battle_hash_i32(hash, report->confidence);
+    }
 
     for (index = 0; index < game->objective_count; ++index) {
         const mk_objective_t *objective = &game->objectives[index];
@@ -310,6 +320,23 @@ static void mk_ai_battle_count_objectives(
     }
 }
 
+static uint32_t mk_ai_battle_resolved_contact_count(const mk_game_t *game) {
+    uint32_t resolved = 0;
+    size_t index;
+
+    if (game == NULL) {
+        return 0;
+    }
+
+    for (index = 0; index < game->contact_report_count; ++index) {
+        if (game->contact_reports[index].resolved) {
+            resolved += 1;
+        }
+    }
+
+    return resolved;
+}
+
 static void mk_ai_battle_print_unit_line(const mk_game_t *game) {
     size_t index;
 
@@ -348,14 +375,16 @@ static void mk_ai_battle_print_summary(
     uint32_t player_objectives = 0;
     uint32_t opfor_objectives = 0;
     uint32_t neutral_objectives = 0;
+    uint32_t resolved_contacts;
 
     if (game == NULL || score == NULL) {
         return;
     }
 
     mk_ai_battle_count_objectives(game, &player_objectives, &opfor_objectives, &neutral_objectives);
+    resolved_contacts = mk_ai_battle_resolved_contact_count(game);
     printf(
-        "battle=%u tick=%u score=%d outcome=%s objectives(player=%u,opfor=%u,neutral=%u,contested=%u) contacts=%u risk=%d\n",
+        "battle=%u tick=%u score=%d outcome=%s objectives(player=%u,opfor=%u,neutral=%u,contested=%u) contacts=%u resolved=%u risk=%d\n",
         battle_index,
         game->tick,
         score->total_score,
@@ -365,6 +394,7 @@ static void mk_ai_battle_print_summary(
         neutral_objectives,
         (unsigned)score->contested_objectives,
         (unsigned)game->contact_report_count,
+        resolved_contacts,
         score->civilian_risk
     );
 
@@ -386,6 +416,7 @@ static mk_result_t mk_ai_battle_run_one(
     uint32_t stagnant_ticks = 0;
     uint32_t tick_index;
     bool stalled = false;
+    bool settled = false;
 
     result = mk_ai_battle_load_scenario(config, &scenario);
     if (result != MK_OK) {
@@ -419,7 +450,7 @@ static mk_result_t mk_ai_battle_run_one(
     if (mk_game_score(&game, &score) != MK_OK) {
         memset(&score, 0, sizeof(score));
     }
-    previous_signature = mk_ai_battle_progress_signature(&game, &score);
+    previous_signature = mk_ai_battle_progress_signature(&game);
 
     for (tick_index = 0; tick_index < config->max_ticks; ++tick_index) {
         uint64_t signature;
@@ -437,7 +468,7 @@ static mk_result_t mk_ai_battle_run_one(
             return result;
         }
 
-        signature = mk_ai_battle_progress_signature(&game, &score);
+        signature = mk_ai_battle_progress_signature(&game);
         if (signature == previous_signature) {
             stagnant_ticks += 1;
         } else {
@@ -449,6 +480,21 @@ static mk_result_t mk_ai_battle_run_one(
             && config->summary_every > 0
             && (game.tick == 1U || game.tick % config->summary_every == 0U)) {
             mk_ai_battle_print_summary(battle_index, &game, &score, config->verbose);
+        }
+
+        if (!config->keep_running_after_outcome
+            && (score.outcome == MK_OUTCOME_PLAYER_SUCCESS || score.outcome == MK_OUTCOME_PLAYER_PARTIAL)) {
+            settled = true;
+            if (!config->quiet) {
+                printf(
+                    "battle=%u settled tick=%u score=%d outcome=%s\n",
+                    battle_index,
+                    game.tick,
+                    score.total_score,
+                    mk_ai_battle_outcome_name(score.outcome)
+                );
+            }
+            break;
         }
 
         if (config->watchdog_ticks > 0 && stagnant_ticks >= config->watchdog_ticks) {
@@ -472,6 +518,9 @@ static mk_result_t mk_ai_battle_run_one(
 
     if (totals != NULL) {
         totals->battles_run += 1;
+        if (settled) {
+            totals->settled_battles += 1;
+        }
         if (stalled) {
             totals->stalled_battles += 1;
         }
@@ -529,6 +578,11 @@ static bool mk_ai_battle_parse_arguments(int argc, char **argv, mk_ai_battle_con
 
         if (strcmp(argument, "--fail-on-stall") == 0) {
             config->fail_on_stall = true;
+            continue;
+        }
+
+        if (strcmp(argument, "--keep-running-after-outcome") == 0) {
+            config->keep_running_after_outcome = true;
             continue;
         }
 
@@ -621,9 +675,10 @@ int main(int argc, char **argv) {
 
     if (!config.quiet) {
         printf(
-            "ai_battle_totals battles=%u failed=%u stalled=%u best_score=%d worst_score=%d\n",
+            "ai_battle_totals battles=%u failed=%u settled=%u stalled=%u best_score=%d worst_score=%d\n",
             totals.battles_run,
             totals.failed_battles,
+            totals.settled_battles,
             totals.stalled_battles,
             totals.best_score,
             totals.worst_score

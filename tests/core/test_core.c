@@ -363,6 +363,53 @@ static void test_pick_contact_and_investigate_order(void) {
     assert(unit->order == MK_ORDER_INVESTIGATE);
 }
 
+static void test_investigate_resolves_contact_reports(void) {
+    mk_scenario_definition_t scenario = make_east_mosul_block_scenario_fixture();
+    mk_game_t game;
+
+    assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
+    game.units[0].position_m = make_vec2(346.0f, 230.0f);
+    game.contact_report_count = 1;
+    memset(&game.contact_reports[0], 0, sizeof(game.contact_reports[0]));
+    game.contact_reports[0].id = 1;
+    game.contact_reports[0].kind = MK_CONTACT_REPORT_SUSPECTED_DANGER;
+    game.contact_reports[0].side = MK_SIDE_OPFOR;
+    game.contact_reports[0].attacker_unit_id = 1;
+    game.contact_reports[0].target_unit_id = 2;
+    game.contact_reports[0].position_m = game.units[1].position_m;
+    game.contact_reports[0].target_position_m = game.units[1].position_m;
+    game.contact_reports[0].confidence = 55;
+    game.contact_reports[0].visible = true;
+    assert(mk_game_issue_investigate_order(&game, 1, game.contact_reports[0].position_m) == MK_OK);
+
+    mk_game_step(&game);
+    assert(game.contact_reports[0].resolved);
+    assert(game.units[1].revealed);
+    assert(game.contact_report_count == 2);
+    assert(game.contact_reports[1].kind == MK_CONTACT_REPORT_REVEAL);
+
+    game = (mk_game_t){0};
+    assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
+    game.units[0].position_m = make_vec2(218.0f, 330.0f);
+    game.contact_report_count = 1;
+    memset(&game.contact_reports[0], 0, sizeof(game.contact_reports[0]));
+    game.contact_reports[0].id = 1;
+    game.contact_reports[0].kind = MK_CONTACT_REPORT_FALSE_CONTACT;
+    game.contact_reports[0].side = MK_SIDE_NEUTRAL;
+    game.contact_reports[0].attacker_unit_id = 1;
+    game.contact_reports[0].terrain_id = 3;
+    game.contact_reports[0].position_m = game.units[0].position_m;
+    game.contact_reports[0].target_position_m = game.units[0].position_m;
+    game.contact_reports[0].confidence = 30;
+    game.contact_reports[0].visible = true;
+    assert(mk_game_issue_investigate_order(&game, 1, game.contact_reports[0].position_m) == MK_OK);
+
+    mk_game_step(&game);
+    assert(game.contact_reports[0].resolved);
+    assert(game.contact_reports[0].confidence == 0);
+    assert(game.contact_report_count == 1);
+}
+
 static void test_interaction_errors_are_reported(void) {
     mk_scenario_definition_t scenario = make_east_mosul_block_scenario_fixture();
     mk_game_t game;
@@ -808,6 +855,7 @@ int main(void) {
     test_snapshot_is_stable_copy();
     test_pick_select_and_move_order();
     test_pick_contact_and_investigate_order();
+    test_investigate_resolves_contact_reports();
     test_interaction_errors_are_reported();
     test_line_of_sight_reports_target_cover();
     test_line_of_sight_reports_blocking_terrain();

@@ -134,6 +134,7 @@ modernerKriegAIBattles.xcodeproj
 ```
 
 Open it in Xcode and run the shared `mk_ai_battle` scheme to build the portable C core, asset parser, AI, renderer helper, Mosul scenario loader, and AI battle runner without SDL. The scheme runs five AI-vs-AI battles by default and prints regular battle summaries plus watchdog stall reports.
+Battles stop once they reach a success or partial outcome; pass `--keep-running-after-outcome` for longer soak runs that should keep checking for late tactical stalls.
 
 You can also build it from Terminal:
 

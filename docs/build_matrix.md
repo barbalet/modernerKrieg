@@ -34,6 +34,8 @@ cmake --build build --target mk_ai_battle
 ./build/bin/mk_ai_battle --battles 5 --ticks 160 --summary-every 10 --watchdog 40
 ```
 
+Add `--keep-running-after-outcome --fail-on-stall` when you want a longer soak that keeps ticking after an objective outcome and returns nonzero on a tactical stall.
+
 Run the same AI battle tool through the checked-in Xcode command-line project:
 
 ```sh

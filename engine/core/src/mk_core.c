@@ -600,6 +600,75 @@ static bool mk_game_hidden_enemy_near_position(
     return false;
 }
 
+static mk_unit_t *mk_game_find_investigation_target(mk_game_t *game, const mk_unit_t *investigator, const mk_contact_report_t *report) {
+    mk_unit_t *target;
+
+    if (game == NULL || investigator == NULL || report == NULL || report->target_unit_id == 0) {
+        return NULL;
+    }
+
+    target = mk_game_find_unit(game, report->target_unit_id);
+    if (target == NULL
+        || target->side == MK_SIDE_CIVILIAN
+        || target->side == investigator->side
+        || target->status == MK_UNIT_BROKEN) {
+        return NULL;
+    }
+
+    return target;
+}
+
+static void mk_game_update_investigation_contacts(mk_game_t *game) {
+    size_t unit_index;
+
+    if (game == NULL) {
+        return;
+    }
+
+    for (unit_index = 0; unit_index < game->unit_count; ++unit_index) {
+        mk_unit_t *unit = &game->units[unit_index];
+        size_t report_index;
+
+        if (unit->order != MK_ORDER_INVESTIGATE
+            || unit->side == MK_SIDE_CIVILIAN
+            || unit->status == MK_UNIT_BROKEN) {
+            continue;
+        }
+
+        for (report_index = 0; report_index < game->contact_report_count; ++report_index) {
+            mk_contact_report_t *report = &game->contact_reports[report_index];
+            mk_unit_t *target;
+
+            if (report->resolved
+                || !report->visible
+                || (report->kind != MK_CONTACT_REPORT_SUSPECTED_DANGER
+                    && report->kind != MK_CONTACT_REPORT_FALSE_CONTACT)
+                || mk_distance(unit->position_m, report->position_m) > 18.0f) {
+                continue;
+            }
+
+            if (report->side != MK_SIDE_NEUTRAL
+                && report->side != MK_SIDE_CIVILIAN
+                && report->side == unit->side
+                && report->attacker_unit_id != unit->id) {
+                continue;
+            }
+
+            report->resolved = true;
+            report->tick = game->tick;
+            if (report->kind == MK_CONTACT_REPORT_FALSE_CONTACT) {
+                report->confidence = 0;
+                continue;
+            }
+
+            target = mk_game_find_investigation_target(game, unit, report);
+            if (target != NULL && target->hidden && !target->revealed) {
+                mk_game_reveal_unit(game, target, unit);
+            }
+        }
+    }
+}
+
 static void mk_game_record_false_contact(
     mk_game_t *game,
     const mk_unit_t *observer,
@@ -1265,6 +1334,7 @@ void mk_game_step(mk_game_t *game) {
     }
 
     game->tick += 1;
+    mk_game_update_investigation_contacts(game);
 
     for (unit_index = 0; unit_index < game->unit_count; ++unit_index) {
         mk_unit_t *unit = &game->units[unit_index];
@@ -1289,6 +1359,7 @@ void mk_game_step(mk_game_t *game) {
         mk_update_unit_status(unit);
     }
 
+    mk_game_update_investigation_contacts(game);
     (void)mk_game_update_hidden_contacts(game);
     (void)mk_game_update_civilian_risk(game);
     (void)mk_game_update_objective_control(game);

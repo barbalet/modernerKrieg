@@ -34,4 +34,5 @@ Future cycles should extend this into richer AI-vs-AI autoplay with controller a
 - `--summary-every N`: print progress every `N` ticks.
 - `--watchdog N`: report a stall when battle state does not change for `N` ticks.
 - `--fail-on-stall`: return a failure code when the watchdog trips.
+- `--keep-running-after-outcome`: continue ticking after success or partial outcome for soak testing.
 - `--verbose`: include per-unit order and position lines.

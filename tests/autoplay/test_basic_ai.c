@@ -178,7 +178,7 @@ static void test_basic_ai_investigates_suspected_contact(void) {
     MK_TEST_ASSERT_CLOSE(game.units[0].target_position_m.y, 246.0f);
 }
 
-static void test_basic_ai_overwatches_near_suspected_contact(void) {
+static void test_basic_ai_overwatches_at_investigation_distance(void) {
     mk_game_t game = make_loaded_game();
 
     game.contact_report_count = 1;
@@ -188,7 +188,7 @@ static void test_basic_ai_overwatches_near_suspected_contact(void) {
     game.contact_reports[0].side = MK_SIDE_OPFOR;
     game.contact_reports[0].attacker_unit_id = game.units[0].id;
     game.contact_reports[0].target_unit_id = game.units[1].id;
-    game.contact_reports[0].position_m = mk_test_vec2(128.0f, 246.0f);
+    game.contact_reports[0].position_m = mk_test_vec2(92.0f, 246.0f);
     game.contact_reports[0].target_position_m = game.contact_reports[0].position_m;
     game.contact_reports[0].confidence = 55;
     game.contact_reports[0].visible = true;
@@ -268,7 +268,7 @@ int main(void) {
     test_basic_ai_opfor_withdraws_after_reveal();
     test_basic_ai_opfor_withdraws_after_taking_fire();
     test_basic_ai_investigates_suspected_contact();
-    test_basic_ai_overwatches_near_suspected_contact();
+    test_basic_ai_overwatches_at_investigation_distance();
     test_basic_ai_transcript_is_deterministic();
 
     puts("mk_basic_ai_tests: ok");

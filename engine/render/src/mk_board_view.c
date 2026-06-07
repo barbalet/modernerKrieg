@@ -149,8 +149,8 @@ mk_result_t mk_board_view_collect_tactical_overlays(
         mk_contact_report_kind_t kind = snapshot->contact_reports[contact_index].kind;
 
         if (kind == MK_CONTACT_REPORT_FIRE
-            || kind == MK_CONTACT_REPORT_SUSPECTED_DANGER
-            || kind == MK_CONTACT_REPORT_FALSE_CONTACT) {
+            || ((kind == MK_CONTACT_REPORT_SUSPECTED_DANGER || kind == MK_CONTACT_REPORT_FALSE_CONTACT)
+                && !snapshot->contact_reports[contact_index].resolved)) {
             needed += 1;
         }
     }
@@ -231,6 +231,10 @@ mk_result_t mk_board_view_collect_tactical_overlays(
                 report->kind == MK_CONTACT_REPORT_SUSPECTED_DANGER ? 10.0f : 8.0f
             );
             mk_result_t result;
+
+            if (report->resolved) {
+                continue;
+            }
 
             overlay.unit_id = report->target_unit_id;
             overlay.terrain_id = report->terrain_id;
