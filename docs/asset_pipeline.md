@@ -38,12 +38,12 @@ The compact C-validated sprite manifest is:
 
 - `assets/mosul/manifests/mosul_2003_sprites.spritemanifest`
 
-The full imported render-pipeline manifests are:
+The full imported render-pipeline manifests are loaded and validated by the C asset layer:
 
 - `assets/mosul/runtime/sprites/manifest.json`
 - `assets/mosul/runtime/sprites/rendered/render_manifest.json`
 
-The current runtime sprite set contains 896 PNGs:
+The current runtime sprite set contains 896 PNGs, and tests assert that every render-manifest path exists:
 
 - 640 infantry sprites: 16 demo roles x 5 states x 8 facings.
 - 64 weapon sprites: 8 weapon types x 8 facings.

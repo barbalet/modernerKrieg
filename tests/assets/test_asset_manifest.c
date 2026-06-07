@@ -85,6 +85,11 @@ static void test_sprite_manifest_loads_first_frames(void) {
     MK_TEST_ASSERT(strcmp(manifest.id, "mosul_2003_sprites") == 0);
     MK_TEST_ASSERT(manifest.sheet_count == 4);
     MK_TEST_ASSERT(manifest.frame_count == 5);
+    MK_TEST_ASSERT(strcmp(manifest.runtime_render_manifest, "assets/mosul/runtime/sprites/rendered/render_manifest.json") == 0);
+    MK_TEST_ASSERT(manifest.runtime_rendered_count == 896);
+    MK_TEST_ASSERT(manifest.runtime_infantry_count == 640);
+    MK_TEST_ASSERT(manifest.runtime_weapon_count == 64);
+    MK_TEST_ASSERT(manifest.runtime_vehicle_count == 192);
 
     sheet = mk_asset_find_sprite_sheet(&manifest, "us_allied_troops_128");
     MK_TEST_ASSERT(sheet != NULL);
@@ -101,6 +106,61 @@ static void test_sprite_manifest_loads_first_frames(void) {
     frame = mk_asset_find_sprite_frame(&manifest, "fallback_unit_marker");
     MK_TEST_ASSERT(frame != NULL);
     MK_TEST_ASSERT(strcmp(frame->state, "fallback") == 0);
+}
+
+static void test_sprite_render_manifest_loads_all_runtime_facings(void) {
+    char path[512];
+    char render_path[512];
+    mk_asset_sprite_manifest_t compact_manifest;
+    static mk_asset_sprite_render_manifest_t render_manifest;
+    const mk_asset_sprite_render_entry_t *entry;
+
+    make_project_path(path, sizeof(path), "assets/mosul/manifests/mosul_2003_sprites.spritemanifest");
+    MK_TEST_ASSERT(mk_asset_load_sprite_manifest(path, MK_TEST_PROJECT_ROOT, &compact_manifest) == MK_OK);
+    make_project_path(render_path, sizeof(render_path), compact_manifest.runtime_render_manifest);
+
+    MK_TEST_ASSERT(mk_asset_load_sprite_render_manifest(render_path, MK_TEST_PROJECT_ROOT, &render_manifest) == MK_OK);
+    MK_TEST_ASSERT(render_manifest.schema_version == 1);
+    MK_TEST_ASSERT(strcmp(render_manifest.source_manifest, "assets/mosul/runtime/sprites/manifest.json") == 0);
+    MK_TEST_ASSERT(render_manifest.rendered_count == 896);
+    MK_TEST_ASSERT(render_manifest.missing_source_count == 0);
+    MK_TEST_ASSERT(render_manifest.error_count == 0);
+    MK_TEST_ASSERT(render_manifest.infantry_count == 640);
+    MK_TEST_ASSERT(render_manifest.weapon_count == 64);
+    MK_TEST_ASSERT(render_manifest.vehicle_count == 192);
+
+    entry = mk_asset_find_sprite_render_entry(
+        &render_manifest,
+        "infantry",
+        "us_army_rifleman",
+        "standing",
+        "allied",
+        "north"
+    );
+    MK_TEST_ASSERT(entry != NULL);
+    MK_TEST_ASSERT(strcmp(entry->path, "assets/mosul/runtime/sprites/rendered/infantry_128/allied/us_army_rifleman/standing/north.png") == 0);
+
+    entry = mk_asset_find_sprite_render_entry(
+        &render_manifest,
+        "weapon",
+        "m16_rifle",
+        NULL,
+        NULL,
+        "south_west"
+    );
+    MK_TEST_ASSERT(entry != NULL);
+    MK_TEST_ASSERT(strcmp(entry->path, "assets/mosul/runtime/sprites/rendered/weapons_128/m16_rifle/south_west.png") == 0);
+
+    entry = mk_asset_find_sprite_render_entry(
+        &render_manifest,
+        "vehicle",
+        "armed_sedan",
+        "destroyed",
+        "opposing",
+        "south_west"
+    );
+    MK_TEST_ASSERT(entry != NULL);
+    MK_TEST_ASSERT(strcmp(entry->path, "assets/mosul/runtime/sprites/rendered/vehicles_1024/opposing/armed_sedan/destroyed/south_west.png") == 0);
 }
 
 static void test_marker_manifest_loads_tactical_markers(void) {
@@ -221,13 +281,44 @@ static void test_marker_manifest_rejects_bad_color(void) {
     MK_TEST_ASSERT(mk_asset_load_marker_manifest(path, &manifest) == MK_ERROR_INVALID_DATA);
 }
 
+static void test_sprite_render_manifest_rejects_missing_runtime_png(void) {
+    char path[512];
+    static mk_asset_sprite_render_manifest_t manifest;
+
+    make_binary_path(path, sizeof(path), "bad_missing_runtime_sprite.json");
+    write_text_file(
+        path,
+        "{\n"
+        "  \"schema_version\": 1,\n"
+        "  \"source_manifest\": \"assets/mosul/runtime/sprites/manifest.json\",\n"
+        "  \"rendered_count\": 1,\n"
+        "  \"missing_source_count\": 0,\n"
+        "  \"error_count\": 0,\n"
+        "  \"rendered\": [\n"
+        "    {\n"
+        "      \"path\": \"assets/mosul/runtime/sprites/rendered/infantry_128/allied/us_army_rifleman/standing/missing.png\",\n"
+        "      \"kind\": \"infantry\",\n"
+        "      \"item_id\": \"us_army_rifleman\",\n"
+        "      \"state\": \"standing\",\n"
+        "      \"faction\": \"allied\",\n"
+        "      \"angle\": \"north\"\n"
+        "    }\n"
+        "  ]\n"
+        "}\n"
+    );
+
+    MK_TEST_ASSERT(mk_asset_load_sprite_render_manifest(path, MK_TEST_PROJECT_ROOT, &manifest) == MK_ERROR_INVALID_DATA);
+}
+
 int main(void) {
     test_map_manifest_loads_market_layers();
     test_sprite_manifest_loads_first_frames();
+    test_sprite_render_manifest_loads_all_runtime_facings();
     test_marker_manifest_loads_tactical_markers();
     test_missing_map_layer_is_rejected();
     test_sprite_manifest_rejects_missing_sheet_reference();
     test_marker_manifest_rejects_bad_color();
+    test_sprite_render_manifest_rejects_missing_runtime_png();
 
     puts("mk_asset_manifest_tests: ok");
     return 0;

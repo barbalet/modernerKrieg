@@ -171,7 +171,7 @@ The public MOSUL demo target is the 2003 Market / Commercial Streets scenario: a
 - 128 px top-down combatant, stance, vehicle, and weapon sheets
 - complete source-angle infantry, weapon, and vehicle sprites
 - 896 rendered runtime-facing PNGs under `assets/mosul/runtime/sprites/rendered`
-- JSON sprite pipeline manifests under `assets/mosul/runtime/sprites/`
+- JSON sprite pipeline manifests under `assets/mosul/runtime/sprites/`, validated by the C asset loader
 - reference plates for combatants, weapons, vehicles, and urban tactics
 
 The current demo scenario now loads from validated data at `game/mosul/scenarios/market_commercial_streets_2003.mkscenario`. A C fixture remains available for tests so the data-backed path can be compared against the original scenario shape.

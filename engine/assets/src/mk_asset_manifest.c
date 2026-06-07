@@ -135,6 +135,56 @@ static mk_result_t mk_asset_read_entries(const char *manifest_path, mk_asset_ent
     return MK_OK;
 }
 
+static mk_result_t mk_asset_read_text_file(const char *path, char **out_text) {
+    FILE *file;
+    long length;
+    char *text;
+    size_t read_count;
+
+    if (path == NULL || out_text == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    *out_text = NULL;
+    file = fopen(path, "rb");
+    if (file == NULL) {
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    if (fseek(file, 0, SEEK_END) != 0) {
+        fclose(file);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    length = ftell(file);
+    if (length < 0) {
+        fclose(file);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    if (fseek(file, 0, SEEK_SET) != 0) {
+        fclose(file);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    text = (char *)malloc((size_t)length + 1U);
+    if (text == NULL) {
+        fclose(file);
+        return MK_ERROR_CAPACITY;
+    }
+
+    read_count = fread(text, 1, (size_t)length, file);
+    fclose(file);
+    if (read_count != (size_t)length) {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    text[length] = '\0';
+    *out_text = text;
+    return MK_OK;
+}
+
 static const char *mk_asset_entry_value(const mk_asset_entry_list_t *entries, const char *key) {
     size_t index;
 
@@ -183,6 +233,222 @@ static bool mk_asset_required_int(const mk_asset_entry_list_t *entries, const ch
 
     *out_value = (int)parsed;
     return true;
+}
+
+static bool mk_asset_optional_path(
+    const mk_asset_entry_list_t *entries,
+    const char *key,
+    const char *project_root,
+    bool must_exist,
+    char *out_text,
+    size_t capacity
+) {
+    const char *value = mk_asset_entry_value(entries, key);
+
+    if (value == NULL) {
+        return true;
+    }
+
+    if (value[0] == '\0' || !mk_asset_path_is_safe(value)) {
+        return false;
+    }
+
+    if (must_exist && !mk_asset_file_exists(project_root, value)) {
+        return false;
+    }
+
+    mk_asset_copy_text(out_text, capacity, value);
+    return true;
+}
+
+static bool mk_asset_optional_count(const mk_asset_entry_list_t *entries, const char *key, size_t *out_count) {
+    const char *value = mk_asset_entry_value(entries, key);
+    char *end = NULL;
+    long parsed;
+
+    if (value == NULL) {
+        return true;
+    }
+
+    parsed = strtol(value, &end, 10);
+    if (end == value || *end != '\0' || parsed < 0) {
+        return false;
+    }
+
+    *out_count = (size_t)parsed;
+    return true;
+}
+
+static const char *mk_asset_json_skip_whitespace(const char *cursor, const char *limit) {
+    while (cursor < limit && isspace((unsigned char)*cursor)) {
+        cursor += 1;
+    }
+
+    return cursor;
+}
+
+static const char *mk_asset_json_skip_string(const char *cursor, const char *limit) {
+    if (cursor >= limit || *cursor != '"') {
+        return NULL;
+    }
+
+    cursor += 1;
+    while (cursor < limit) {
+        if (*cursor == '\\') {
+            cursor += 2;
+            continue;
+        }
+
+        if (*cursor == '"') {
+            return cursor + 1;
+        }
+
+        cursor += 1;
+    }
+
+    return NULL;
+}
+
+static const char *mk_asset_json_find_matching(
+    const char *cursor,
+    const char *limit,
+    char open,
+    char close
+) {
+    int depth = 0;
+
+    if (cursor >= limit || *cursor != open) {
+        return NULL;
+    }
+
+    while (cursor < limit) {
+        if (*cursor == '"') {
+            cursor = mk_asset_json_skip_string(cursor, limit);
+            if (cursor == NULL) {
+                return NULL;
+            }
+            continue;
+        }
+
+        if (*cursor == open) {
+            depth += 1;
+        } else if (*cursor == close) {
+            depth -= 1;
+            if (depth == 0) {
+                return cursor;
+            }
+        }
+
+        cursor += 1;
+    }
+
+    return NULL;
+}
+
+static const char *mk_asset_json_find_key(
+    const char *start,
+    const char *limit,
+    const char *key
+) {
+    char pattern[96];
+    size_t pattern_length;
+    const char *cursor = start;
+
+    if (snprintf(pattern, sizeof(pattern), "\"%s\"", key) >= (int)sizeof(pattern)) {
+        return NULL;
+    }
+
+    pattern_length = strlen(pattern);
+    while (cursor < limit) {
+        const char *found = strstr(cursor, pattern);
+        const char *after_key;
+
+        if (found == NULL || found >= limit) {
+            return NULL;
+        }
+
+        after_key = found + pattern_length;
+        if (after_key < limit) {
+            after_key = mk_asset_json_skip_whitespace(after_key, limit);
+        }
+
+        if (after_key < limit && *after_key == ':') {
+            return mk_asset_json_skip_whitespace(after_key + 1, limit);
+        }
+
+        cursor = found + 1;
+    }
+
+    return NULL;
+}
+
+static bool mk_asset_json_required_int(
+    const char *start,
+    const char *limit,
+    const char *key,
+    int *out_value
+) {
+    const char *value = mk_asset_json_find_key(start, limit, key);
+    char *end = NULL;
+    long parsed;
+
+    if (value == NULL || out_value == NULL) {
+        return false;
+    }
+
+    parsed = strtol(value, &end, 10);
+    if (end == (char *)value || end > limit) {
+        return false;
+    }
+
+    *out_value = (int)parsed;
+    return true;
+}
+
+static bool mk_asset_json_required_string(
+    const char *start,
+    const char *limit,
+    const char *key,
+    bool allow_empty,
+    char *out_text,
+    size_t capacity
+) {
+    const char *value = mk_asset_json_find_key(start, limit, key);
+    const char *cursor;
+    size_t copied = 0;
+
+    if (value == NULL || out_text == NULL || capacity == 0 || value >= limit || *value != '"') {
+        return false;
+    }
+
+    cursor = value + 1;
+    while (cursor < limit && *cursor != '"') {
+        if (*cursor == '\\' || copied + 1 >= capacity) {
+            return false;
+        }
+
+        out_text[copied] = *cursor;
+        copied += 1;
+        cursor += 1;
+    }
+
+    if (cursor >= limit || *cursor != '"') {
+        return false;
+    }
+
+    out_text[copied] = '\0';
+    return allow_empty || copied > 0;
+}
+
+static bool mk_asset_angle_is_valid(const char *angle) {
+    return strcmp(angle, "north") == 0
+        || strcmp(angle, "south") == 0
+        || strcmp(angle, "east") == 0
+        || strcmp(angle, "west") == 0
+        || strcmp(angle, "north_east") == 0
+        || strcmp(angle, "north_west") == 0
+        || strcmp(angle, "south_east") == 0
+        || strcmp(angle, "south_west") == 0;
 }
 
 static bool mk_asset_required_float(const mk_asset_entry_list_t *entries, const char *key, float *out_value) {
@@ -287,6 +553,47 @@ static bool mk_asset_marker_ids_are_unique(const mk_asset_marker_manifest_t *man
     }
 
     return true;
+}
+
+static bool mk_asset_sprite_render_paths_are_unique(const mk_asset_sprite_render_manifest_t *manifest) {
+    size_t index;
+
+    for (index = 0; index < manifest->rendered_count; ++index) {
+        size_t other_index;
+
+        for (other_index = index + 1; other_index < manifest->rendered_count; ++other_index) {
+            if (strcmp(manifest->rendered[index].path, manifest->rendered[other_index].path) == 0) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+static bool mk_asset_sprite_render_entry_is_valid(
+    const mk_asset_sprite_render_entry_t *entry,
+    const char *project_root
+) {
+    if (entry == NULL
+        || entry->path[0] == '\0'
+        || entry->kind[0] == '\0'
+        || entry->item_id[0] == '\0'
+        || entry->angle[0] == '\0'
+        || !mk_asset_angle_is_valid(entry->angle)
+        || !mk_asset_file_exists(project_root, entry->path)) {
+        return false;
+    }
+
+    if (strcmp(entry->kind, "infantry") == 0 || strcmp(entry->kind, "vehicle") == 0) {
+        return entry->state[0] != '\0' && entry->faction[0] != '\0';
+    }
+
+    if (strcmp(entry->kind, "weapon") == 0) {
+        return entry->state[0] == '\0' && entry->faction[0] == '\0';
+    }
+
+    return false;
 }
 
 mk_result_t mk_asset_load_map_manifest(
@@ -423,6 +730,18 @@ mk_result_t mk_asset_load_sprite_manifest(
         return MK_ERROR_INVALID_DATA;
     }
 
+    if (!mk_asset_optional_path(&entries, "source_angle_root", project_root, false, out_manifest->source_angle_root, sizeof(out_manifest->source_angle_root))
+        || !mk_asset_optional_path(&entries, "runtime_rendered_root", project_root, false, out_manifest->runtime_rendered_root, sizeof(out_manifest->runtime_rendered_root))
+        || !mk_asset_optional_path(&entries, "runtime_pipeline_manifest", project_root, true, out_manifest->runtime_pipeline_manifest, sizeof(out_manifest->runtime_pipeline_manifest))
+        || !mk_asset_optional_path(&entries, "runtime_render_manifest", project_root, true, out_manifest->runtime_render_manifest, sizeof(out_manifest->runtime_render_manifest))
+        || !mk_asset_optional_count(&entries, "runtime_rendered_count", &out_manifest->runtime_rendered_count)
+        || !mk_asset_optional_count(&entries, "runtime_infantry_count", &out_manifest->runtime_infantry_count)
+        || !mk_asset_optional_count(&entries, "runtime_weapon_count", &out_manifest->runtime_weapon_count)
+        || !mk_asset_optional_count(&entries, "runtime_vehicle_count", &out_manifest->runtime_vehicle_count)
+        || out_manifest->runtime_rendered_count > MK_ASSET_MAX_SPRITE_RENDER_ENTRIES) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
     out_manifest->sheet_count = (size_t)sheet_count;
     for (index = 0; index < sheet_count; ++index) {
         mk_asset_sprite_sheet_t *sheet = &out_manifest->sheets[index];
@@ -525,6 +844,123 @@ mk_result_t mk_asset_load_sprite_manifest(
         return MK_ERROR_INVALID_DATA;
     }
 
+    return MK_OK;
+}
+
+mk_result_t mk_asset_load_sprite_render_manifest(
+    const char *manifest_path,
+    const char *project_root,
+    mk_asset_sprite_render_manifest_t *out_manifest
+) {
+    char *text = NULL;
+    const char *limit;
+    const char *array_value;
+    const char *array_end;
+    const char *cursor;
+    int rendered_count;
+    int missing_source_count;
+    int error_count;
+    mk_result_t result;
+
+    if (out_manifest == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    memset(out_manifest, 0, sizeof(*out_manifest));
+    result = mk_asset_read_text_file(manifest_path, &text);
+    if (result != MK_OK) {
+        return result;
+    }
+
+    limit = text + strlen(text);
+    if (!mk_asset_json_required_int(text, limit, "schema_version", &out_manifest->schema_version)
+        || out_manifest->schema_version <= 0
+        || !mk_asset_json_required_string(text, limit, "source_manifest", false, out_manifest->source_manifest, sizeof(out_manifest->source_manifest))
+        || !mk_asset_path_is_safe(out_manifest->source_manifest)
+        || !mk_asset_file_exists(project_root, out_manifest->source_manifest)
+        || !mk_asset_json_required_int(text, limit, "rendered_count", &rendered_count)
+        || !mk_asset_json_required_int(text, limit, "missing_source_count", &missing_source_count)
+        || !mk_asset_json_required_int(text, limit, "error_count", &error_count)
+        || rendered_count <= 0
+        || rendered_count > MK_ASSET_MAX_SPRITE_RENDER_ENTRIES
+        || missing_source_count != 0
+        || error_count != 0) {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    out_manifest->missing_source_count = (size_t)missing_source_count;
+    out_manifest->error_count = (size_t)error_count;
+
+    array_value = mk_asset_json_find_key(text, limit, "rendered");
+    if (array_value == NULL || array_value >= limit || *array_value != '[') {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    array_end = mk_asset_json_find_matching(array_value, limit, '[', ']');
+    if (array_end == NULL) {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    cursor = array_value + 1;
+    while (cursor < array_end) {
+        const char *object_end;
+        mk_asset_sprite_render_entry_t *entry;
+
+        cursor = mk_asset_json_skip_whitespace(cursor, array_end);
+        if (cursor >= array_end) {
+            break;
+        }
+
+        if (*cursor == ',') {
+            cursor += 1;
+            continue;
+        }
+
+        if (*cursor != '{' || out_manifest->rendered_count >= MK_ASSET_MAX_SPRITE_RENDER_ENTRIES) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        object_end = mk_asset_json_find_matching(cursor, array_end + 1, '{', '}');
+        if (object_end == NULL) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        entry = &out_manifest->rendered[out_manifest->rendered_count];
+        if (!mk_asset_json_required_string(cursor, object_end, "path", false, entry->path, sizeof(entry->path))
+            || !mk_asset_json_required_string(cursor, object_end, "kind", false, entry->kind, sizeof(entry->kind))
+            || !mk_asset_json_required_string(cursor, object_end, "item_id", false, entry->item_id, sizeof(entry->item_id))
+            || !mk_asset_json_required_string(cursor, object_end, "state", true, entry->state, sizeof(entry->state))
+            || !mk_asset_json_required_string(cursor, object_end, "faction", true, entry->faction, sizeof(entry->faction))
+            || !mk_asset_json_required_string(cursor, object_end, "angle", false, entry->angle, sizeof(entry->angle))
+            || !mk_asset_sprite_render_entry_is_valid(entry, project_root)) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        if (strcmp(entry->kind, "infantry") == 0) {
+            out_manifest->infantry_count += 1;
+        } else if (strcmp(entry->kind, "weapon") == 0) {
+            out_manifest->weapon_count += 1;
+        } else if (strcmp(entry->kind, "vehicle") == 0) {
+            out_manifest->vehicle_count += 1;
+        }
+
+        out_manifest->rendered_count += 1;
+        cursor = object_end + 1;
+    }
+
+    if (out_manifest->rendered_count != (size_t)rendered_count
+        || !mk_asset_sprite_render_paths_are_unique(out_manifest)) {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    free(text);
     return MK_OK;
 }
 
@@ -657,6 +1093,37 @@ const mk_asset_sprite_frame_t *mk_asset_find_sprite_frame(
     for (index = 0; index < manifest->frame_count; ++index) {
         if (strcmp(manifest->frames[index].runtime_id, runtime_id) == 0) {
             return &manifest->frames[index];
+        }
+    }
+
+    return NULL;
+}
+
+const mk_asset_sprite_render_entry_t *mk_asset_find_sprite_render_entry(
+    const mk_asset_sprite_render_manifest_t *manifest,
+    const char *kind,
+    const char *item_id,
+    const char *state,
+    const char *faction,
+    const char *angle
+) {
+    const char *entry_state = state == NULL ? "" : state;
+    const char *entry_faction = faction == NULL ? "" : faction;
+    size_t index;
+
+    if (manifest == NULL || kind == NULL || item_id == NULL || angle == NULL) {
+        return NULL;
+    }
+
+    for (index = 0; index < manifest->rendered_count; ++index) {
+        const mk_asset_sprite_render_entry_t *entry = &manifest->rendered[index];
+
+        if (strcmp(entry->kind, kind) == 0
+            && strcmp(entry->item_id, item_id) == 0
+            && strcmp(entry->state, entry_state) == 0
+            && strcmp(entry->faction, entry_faction) == 0
+            && strcmp(entry->angle, angle) == 0) {
+            return entry;
         }
     }
 

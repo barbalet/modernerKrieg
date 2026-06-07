@@ -14,6 +14,7 @@ extern "C" {
 #define MK_ASSET_MAX_MAP_LAYERS 16
 #define MK_ASSET_MAX_SPRITE_SHEETS 16
 #define MK_ASSET_MAX_SPRITE_FRAMES 128
+#define MK_ASSET_MAX_SPRITE_RENDER_ENTRIES 1024
 #define MK_ASSET_MAX_MARKERS 64
 
 typedef struct {
@@ -67,11 +68,40 @@ typedef struct {
     char id[MK_NAME_CAPACITY];
     char name[MK_NAME_CAPACITY];
     char fallback_runtime_id[MK_NAME_CAPACITY];
+    char source_angle_root[MK_ASSET_PATH_CAPACITY];
+    char runtime_rendered_root[MK_ASSET_PATH_CAPACITY];
+    char runtime_pipeline_manifest[MK_ASSET_PATH_CAPACITY];
+    char runtime_render_manifest[MK_ASSET_PATH_CAPACITY];
+    size_t runtime_rendered_count;
+    size_t runtime_infantry_count;
+    size_t runtime_weapon_count;
+    size_t runtime_vehicle_count;
     size_t sheet_count;
     mk_asset_sprite_sheet_t sheets[MK_ASSET_MAX_SPRITE_SHEETS];
     size_t frame_count;
     mk_asset_sprite_frame_t frames[MK_ASSET_MAX_SPRITE_FRAMES];
 } mk_asset_sprite_manifest_t;
+
+typedef struct {
+    char path[MK_ASSET_PATH_CAPACITY];
+    char kind[MK_ASSET_KIND_CAPACITY];
+    char item_id[MK_NAME_CAPACITY];
+    char state[MK_ASSET_KIND_CAPACITY];
+    char faction[MK_ASSET_KIND_CAPACITY];
+    char angle[MK_ASSET_KIND_CAPACITY];
+} mk_asset_sprite_render_entry_t;
+
+typedef struct {
+    int schema_version;
+    char source_manifest[MK_ASSET_PATH_CAPACITY];
+    size_t rendered_count;
+    size_t missing_source_count;
+    size_t error_count;
+    size_t infantry_count;
+    size_t weapon_count;
+    size_t vehicle_count;
+    mk_asset_sprite_render_entry_t rendered[MK_ASSET_MAX_SPRITE_RENDER_ENTRIES];
+} mk_asset_sprite_render_manifest_t;
 
 typedef struct {
     char id[MK_NAME_CAPACITY];
@@ -101,6 +131,12 @@ mk_result_t mk_asset_load_sprite_manifest(
     mk_asset_sprite_manifest_t *out_manifest
 );
 
+mk_result_t mk_asset_load_sprite_render_manifest(
+    const char *manifest_path,
+    const char *project_root,
+    mk_asset_sprite_render_manifest_t *out_manifest
+);
+
 mk_result_t mk_asset_load_marker_manifest(
     const char *manifest_path,
     mk_asset_marker_manifest_t *out_manifest
@@ -114,6 +150,15 @@ const mk_asset_sprite_sheet_t *mk_asset_find_sprite_sheet(
 const mk_asset_sprite_frame_t *mk_asset_find_sprite_frame(
     const mk_asset_sprite_manifest_t *manifest,
     const char *runtime_id
+);
+
+const mk_asset_sprite_render_entry_t *mk_asset_find_sprite_render_entry(
+    const mk_asset_sprite_render_manifest_t *manifest,
+    const char *kind,
+    const char *item_id,
+    const char *state,
+    const char *faction,
+    const char *angle
 );
 
 const mk_asset_marker_t *mk_asset_find_marker(
