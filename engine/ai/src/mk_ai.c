@@ -1,6 +1,7 @@
 #include "mk_ai.h"
 
 #include <float.h>
+#include <string.h>
 
 static const mk_controller_slot_t *mk_ai_find_controller(const mk_game_t *game, uint32_t controller_id) {
     size_t index;
@@ -49,6 +50,30 @@ static mk_vec2_t mk_ai_clamp_to_map(const mk_game_t *game, mk_vec2_t position) {
     clamped.x = mk_clamp_f32(clamped.x, 0.0f, game->map.width_m);
     clamped.y = mk_clamp_f32(clamped.y, 0.0f, game->map.height_m);
     return clamped;
+}
+
+static mk_vec2_t mk_ai_rect_center(mk_rect_t rect) {
+    mk_vec2_t center;
+
+    center.x = rect.x + rect.width * 0.5f;
+    center.y = rect.y + rect.height * 0.5f;
+    return center;
+}
+
+static const mk_terrain_zone_t *mk_ai_find_terrain(const mk_game_t *game, uint32_t terrain_id) {
+    size_t index;
+
+    if (game == NULL || terrain_id == 0U) {
+        return NULL;
+    }
+
+    for (index = 0; index < game->map.terrain_count; ++index) {
+        if (game->map.terrain[index].id == terrain_id) {
+            return &game->map.terrain[index];
+        }
+    }
+
+    return NULL;
 }
 
 static float mk_ai_distance_point_to_segment(mk_vec2_t point, mk_vec2_t segment_start, mk_vec2_t segment_end) {
@@ -209,7 +234,26 @@ static const mk_unit_t *mk_ai_find_nearest_enemy(const mk_game_t *game, const mk
     return nearest;
 }
 
-static const mk_contact_report_t *mk_ai_find_best_suspected_contact(const mk_game_t *game, const mk_unit_t *unit) {
+static bool mk_ai_contact_needs_investigation(const mk_game_t *game, const mk_contact_report_t *report) {
+    const mk_terrain_zone_t *terrain;
+
+    if (game == NULL || report == NULL || report->resolved || !report->visible) {
+        return false;
+    }
+
+    if (report->kind == MK_CONTACT_REPORT_SUSPECTED_DANGER) {
+        return true;
+    }
+
+    if (report->kind != MK_CONTACT_REPORT_FALSE_CONTACT || report->terrain_id == 0U) {
+        return false;
+    }
+
+    terrain = mk_ai_find_terrain(game, report->terrain_id);
+    return terrain == NULL || !terrain->searched;
+}
+
+static const mk_contact_report_t *mk_ai_find_best_investigation_contact(const mk_game_t *game, const mk_unit_t *unit) {
     const mk_contact_report_t *best_report = NULL;
     int best_confidence = -1;
     size_t index;
@@ -221,9 +265,7 @@ static const mk_contact_report_t *mk_ai_find_best_suspected_contact(const mk_gam
     for (index = 0; index < game->contact_report_count; ++index) {
         const mk_contact_report_t *report = &game->contact_reports[index];
 
-        if (report->kind != MK_CONTACT_REPORT_SUSPECTED_DANGER
-            || report->resolved
-            || !report->visible
+        if (!mk_ai_contact_needs_investigation(game, report)
             || report->side == MK_SIDE_CIVILIAN
             || report->side == unit->side) {
             continue;
@@ -238,11 +280,136 @@ static const mk_contact_report_t *mk_ai_find_best_suspected_contact(const mk_gam
     return best_report;
 }
 
+static const mk_gameplay_semantic_zone_t *mk_ai_find_nearby_unsearched_search_zone(
+    const mk_game_t *game,
+    const mk_unit_t *unit,
+    float radius_m
+) {
+    const mk_gameplay_semantic_zone_t *best_zone = NULL;
+    float best_distance = FLT_MAX;
+    size_t index;
+
+    if (game == NULL || unit == NULL) {
+        return NULL;
+    }
+
+    for (index = 0; index < game->gameplay_area.semantic_zone_count; ++index) {
+        const mk_gameplay_semantic_zone_t *zone = &game->gameplay_area.semantic_zones[index];
+        mk_vec2_t center;
+        float distance;
+        bool searchable_kind;
+
+        if (zone->searched) {
+            continue;
+        }
+
+        searchable_kind = strcmp(zone->kind, "cache") == 0
+            || strcmp(zone->kind, "search_objective") == 0
+            || strcmp(zone->kind, "danger_area") == 0;
+        if (!searchable_kind) {
+            continue;
+        }
+
+        if (unit->level_id[0] != '\0'
+            && zone->level_id[0] != '\0'
+            && strcmp(unit->level_id, zone->level_id) != 0) {
+            continue;
+        }
+
+        center = mk_ai_rect_center(zone->bounds_m);
+        distance = mk_vec2_distance(unit->position_m, center);
+        if (distance <= radius_m && distance < best_distance) {
+            best_zone = zone;
+            best_distance = distance;
+        }
+    }
+
+    return best_zone;
+}
+
+static bool mk_ai_portal_can_be_breached(const mk_gameplay_topology_portal_t *portal) {
+    if (portal == NULL) {
+        return false;
+    }
+
+    return (strcmp(portal->state, "closed") == 0 || strcmp(portal->state, "locked") == 0)
+        && strcmp(portal->kind, "window") != 0
+        && strcmp(portal->kind, "roof_edge") != 0
+        && strcmp(portal->state, "blocked") != 0
+        && strcmp(portal->state, "unsafe") != 0;
+}
+
+static const mk_gameplay_topology_portal_t *mk_ai_find_nearby_breachable_portal(
+    const mk_game_t *game,
+    const mk_unit_t *unit,
+    float radius_m
+) {
+    const mk_gameplay_topology_portal_t *best_portal = NULL;
+    float best_distance = FLT_MAX;
+    size_t index;
+
+    if (game == NULL || unit == NULL) {
+        return NULL;
+    }
+
+    for (index = 0; index < game->gameplay_area.topology_portal_count; ++index) {
+        const mk_gameplay_topology_portal_t *portal = &game->gameplay_area.topology_portals[index];
+        mk_vec2_t center;
+        float distance;
+        bool same_node;
+
+        if (!mk_ai_portal_can_be_breached(portal)) {
+            continue;
+        }
+
+        if (unit->level_id[0] != '\0'
+            && portal->level_id[0] != '\0'
+            && strcmp(unit->level_id, portal->level_id) != 0) {
+            continue;
+        }
+
+        same_node = strcmp(unit->topology_node_id, portal->from_node_id) == 0
+            || strcmp(unit->topology_node_id, portal->to_node_id) == 0;
+        center = mk_ai_rect_center(portal->bounds_m);
+        distance = mk_vec2_distance(unit->position_m, center);
+        if ((same_node || distance <= radius_m) && distance < best_distance) {
+            best_portal = portal;
+            best_distance = distance;
+        }
+    }
+
+    return best_portal;
+}
+
+static mk_result_t mk_ai_search_contact_or_hold(mk_game_t *game, const mk_unit_t *unit, const mk_contact_report_t *contact) {
+    const mk_terrain_zone_t *terrain;
+    mk_search_result_t search_result;
+
+    if (game == NULL || unit == NULL || contact == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (mk_vec2_distance(unit->position_m, contact->position_m) > 18.0f) {
+        return mk_game_issue_investigate_order(game, unit->id, contact->position_m);
+    }
+
+    terrain = mk_ai_find_terrain(game, contact->terrain_id);
+    if (terrain != NULL && !terrain->searched) {
+        return mk_game_search_terrain(game, unit->id, terrain->id, &search_result);
+    }
+
+    return mk_game_issue_order(game, unit->id, MK_ORDER_OVERWATCH);
+}
+
 static mk_result_t mk_ai_issue_player_order(mk_game_t *game, const mk_unit_t *unit) {
     mk_vec2_t objective_position;
     const mk_unit_t *enemy = mk_ai_find_nearest_enemy(game, unit);
-    const mk_contact_report_t *suspected_contact = mk_ai_find_best_suspected_contact(game, unit);
+    const mk_contact_report_t *investigation_contact = mk_ai_find_best_investigation_contact(game, unit);
+    const mk_gameplay_topology_portal_t *breach_portal;
+    const mk_gameplay_semantic_zone_t *search_zone;
     mk_line_of_sight_t line_of_sight;
+    mk_breach_result_t breach_result;
+    mk_search_result_t search_result;
 
     if (mk_ai_protected_civilian_near_position(game, unit->position_m, 24.0f)) {
         return mk_game_issue_order(game, unit->id, MK_ORDER_HOLD);
@@ -252,12 +419,18 @@ static mk_result_t mk_ai_issue_player_order(mk_game_t *game, const mk_unit_t *un
         return mk_ai_issue_withdraw_order(game, mk_game_find_unit(game, unit->id), enemy);
     }
 
-    if (suspected_contact != NULL) {
-        if (mk_vec2_distance(unit->position_m, suspected_contact->position_m) <= 18.0f) {
-            return mk_game_issue_order(game, unit->id, MK_ORDER_OVERWATCH);
-        }
+    if (investigation_contact != NULL) {
+        return mk_ai_search_contact_or_hold(game, unit, investigation_contact);
+    }
 
-        return mk_game_issue_investigate_order(game, unit->id, suspected_contact->position_m);
+    breach_portal = mk_ai_find_nearby_breachable_portal(game, unit, 20.0f);
+    if (breach_portal != NULL) {
+        return mk_game_breach_portal(game, unit->id, breach_portal->id, &breach_result);
+    }
+
+    search_zone = mk_ai_find_nearby_unsearched_search_zone(game, unit, 22.0f);
+    if (search_zone != NULL) {
+        return mk_game_search_semantic_zone(game, unit->id, search_zone->id, &search_result);
     }
 
     if (enemy != NULL

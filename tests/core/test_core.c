@@ -190,7 +190,7 @@ static mk_gameplay_area_t make_test_gameplay_area(void) {
     area.topology_portals[1].vertical = true;
     area.topology_portals[1].movement_cost = 2;
 
-    area.semantic_zone_count = 2;
+    area.semantic_zone_count = 4;
     strcpy(area.semantic_zones[0].id, "shop_shelter");
     strcpy(area.semantic_zones[0].kind, "civilian_shelter");
     strcpy(area.semantic_zones[0].node_id, "shop");
@@ -211,6 +211,26 @@ static mk_gameplay_area_t make_test_gameplay_area(void) {
     area.semantic_zones[1].pixel_height = 50;
     area.semantic_zones[1].bounds_m = make_rect(1.0f, 1.0f, 5.0f, 5.0f);
     area.semantic_zones[1].priority = 3;
+    strcpy(area.semantic_zones[2].id, "shop_cache");
+    strcpy(area.semantic_zones[2].kind, "cache");
+    strcpy(area.semantic_zones[2].node_id, "shop");
+    strcpy(area.semantic_zones[2].level_id, "ground");
+    area.semantic_zones[2].pixel_x = 160;
+    area.semantic_zones[2].pixel_y = 220;
+    area.semantic_zones[2].pixel_width = 20;
+    area.semantic_zones[2].pixel_height = 20;
+    area.semantic_zones[2].bounds_m = make_rect(16.0f, 22.0f, 2.0f, 2.0f);
+    area.semantic_zones[2].priority = 4;
+    strcpy(area.semantic_zones[3].id, "street_danger");
+    strcpy(area.semantic_zones[3].kind, "danger_area");
+    strcpy(area.semantic_zones[3].node_id, "street");
+    strcpy(area.semantic_zones[3].level_id, "ground");
+    area.semantic_zones[3].pixel_x = 62;
+    area.semantic_zones[3].pixel_y = 10;
+    area.semantic_zones[3].pixel_width = 10;
+    area.semantic_zones[3].pixel_height = 10;
+    area.semantic_zones[3].bounds_m = make_rect(6.2f, 1.0f, 1.0f, 1.0f);
+    area.semantic_zones[3].priority = 4;
 
     return area;
 }
@@ -607,6 +627,7 @@ static void test_search_semantic_zone_and_cache_terrain_records_results(void) {
     mk_weapon_profile_t rifle;
     mk_terrain_zone_t cache;
     mk_search_result_t search_result;
+    mk_score_t score;
     uint32_t searcher_id = 0;
     uint32_t hidden_id = 0;
     uint32_t terrain_id = 0;
@@ -641,12 +662,95 @@ static void test_search_semantic_zone_and_cache_terrain_records_results(void) {
     assert(search_result.outcome == MK_SEARCH_OUTCOME_THREAT_REVEALED);
     assert(search_result.revealed_unit_id == hidden_id);
     assert(search_result.contact_report_id != 0);
+    assert(search_result.score_delta > 0);
     assert(game.units[1].revealed);
+    assert(game.gameplay_area.semantic_zones[0].searched);
+    assert(game.gameplay_area.semantic_zones[0].last_search_outcome == MK_SEARCH_OUTCOME_THREAT_REVEALED);
+
+    assert(mk_game_search_semantic_zone(&game, searcher_id, "shop_cache", &search_result) == MK_OK);
+    assert(search_result.outcome == MK_SEARCH_OUTCOME_CACHE_FOUND);
+    assert(search_result.score_delta > 0);
+    assert(game.gameplay_area.semantic_zones[2].searched);
 
     assert(mk_game_search_terrain(&game, searcher_id, terrain_id, &search_result) == MK_OK);
     assert(search_result.outcome == MK_SEARCH_OUTCOME_CACHE_FOUND);
     assert(search_result.terrain_id == terrain_id);
     assert(search_result.contact_report_id != 0);
+    assert(search_result.score_delta > 0);
+    assert(game.map.terrain[0].searched);
+
+    assert(mk_game_search_semantic_zone(&game, searcher_id, "street_danger", &search_result) == MK_OK);
+    assert(search_result.outcome == MK_SEARCH_OUTCOME_BOOBY_TRAP);
+    assert(search_result.score_delta < 0);
+    assert(game.gameplay_area.semantic_zones[3].searched);
+
+    assert(mk_game_score(&game, &score) == MK_OK);
+    assert(score.interaction_points > 0);
+
+    assert(mk_game_search_semantic_zone(&game, searcher_id, "shop_cache", &search_result) == MK_OK);
+    assert(search_result.outcome == MK_SEARCH_OUTCOME_CACHE_FOUND);
+    assert(search_result.score_delta == 0);
+}
+
+static void test_breach_portal_opens_route_and_scores(void) {
+    mk_gameplay_area_t area = make_test_gameplay_area();
+    mk_scenario_definition_t scenario;
+    mk_game_t game;
+    mk_unit_t breacher;
+    mk_soldier_t soldier;
+    mk_weapon_profile_t rifle;
+    mk_breach_result_t breach_result;
+    mk_score_t score;
+    mk_gameplay_route_t route;
+    const mk_gameplay_topology_portal_t *portal;
+    uint32_t unit_id = 0;
+
+    memset(&scenario, 0, sizeof(scenario));
+    strcpy(scenario.name, "Breach Scenario");
+    scenario.seed = 21;
+    scenario.map = mk_make_map("Breach Map", 100.0f, 100.0f);
+    assert(mk_scenario_set_gameplay_area(&scenario, &area) == MK_OK);
+
+    rifle = mk_make_weapon("M4", 300, 2, 35, 8);
+    soldier = mk_make_soldier("Engineer", MK_ROLE_ENGINEER, rifle);
+    breacher = mk_make_unit("Breach Team", MK_SIDE_PLAYER, MK_TRAINING_REGULAR, mk_vec2(4.0f, 4.0f));
+    strcpy(breacher.level_id, "ground");
+    strcpy(breacher.topology_node_id, "street");
+    assert(mk_unit_add_soldier(&breacher, &soldier, NULL) == MK_OK);
+    assert(mk_scenario_add_unit(&scenario, &breacher, &unit_id) == MK_OK);
+    assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
+    strcpy(game.gameplay_area.topology_portals[0].state, "locked");
+
+    assert(mk_gameplay_area_plan_route(
+        &game.gameplay_area,
+        "ground",
+        mk_vec2(4.0f, 4.0f),
+        "ground",
+        mk_vec2(12.0f, 20.0f),
+        &route
+    ) == MK_ERROR_NOT_FOUND);
+    assert(mk_game_breach_portal(&game, unit_id, "street_to_shop", &breach_result) == MK_OK);
+    assert(breach_result.outcome == MK_BREACH_OUTCOME_BREACHED);
+    assert(breach_result.score_delta > 0);
+    assert(breach_result.contact_report_id != 0);
+    assert(game.contact_reports[0].kind == MK_CONTACT_REPORT_BREACH);
+
+    portal = mk_gameplay_area_find_topology_portal(&game.gameplay_area, "street_to_shop");
+    assert(portal != NULL);
+    assert(strcmp(portal->state, "breached") == 0);
+    assert(portal->breached);
+    assert(mk_gameplay_area_plan_route(
+        &game.gameplay_area,
+        "ground",
+        mk_vec2(4.0f, 4.0f),
+        "ground",
+        mk_vec2(12.0f, 20.0f),
+        &route
+    ) == MK_OK);
+    assert(route.valid);
+    assert(strcmp(route.steps[0].portal_id, "street_to_shop") == 0);
+    assert(mk_game_score(&game, &score) == MK_OK);
+    assert(score.interaction_points == 20);
 }
 
 static void test_unit_and_soldier_creation(void) {
@@ -1519,6 +1623,7 @@ int main(void) {
     test_topology_route_following_moves_units_between_levels();
     test_civilian_ai_and_instruction_routes_are_deterministic();
     test_search_semantic_zone_and_cache_terrain_records_results();
+    test_breach_portal_opens_route_and_scores();
     test_unit_and_soldier_creation();
     test_map_tiles_are_configurable_and_addressable();
     test_capacity_limits_are_reported();

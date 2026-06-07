@@ -106,6 +106,8 @@ static const char *mk_headless_contact_kind_name(mk_contact_report_kind_t kind) 
             return "false_contact";
         case MK_CONTACT_REPORT_SEARCH:
             return "search";
+        case MK_CONTACT_REPORT_BREACH:
+            return "breach";
         default:
             return "unknown";
     }
@@ -208,10 +210,11 @@ static void mk_headless_print_debug_tick(FILE *stream, const mk_game_t *game) {
 
     fprintf(
         stream,
-        "debug tick=%u rng=%llu score=%d controlled=%u contested=%u",
+        "debug tick=%u rng=%llu score=%d interaction=%d controlled=%u contested=%u",
         game->tick,
         (unsigned long long)game->rng_state,
         score.total_score,
+        score.interaction_points,
         (unsigned)score.controlled_objectives,
         (unsigned)score.contested_objectives
     );
@@ -399,12 +402,13 @@ static void mk_headless_print_replay_tick(
     }
     fprintf(
         stream,
-        "event tick=%u kind=score total=%d outcome=%s controlled=%u contested=%u civilian_risk=%d\n",
+        "event tick=%u kind=score total=%d outcome=%s controlled=%u contested=%u interaction=%d civilian_risk=%d\n",
         game->tick,
         score.total_score,
         mk_headless_outcome_name(score.outcome),
         (unsigned)score.controlled_objectives,
         (unsigned)score.contested_objectives,
+        score.interaction_points,
         score.civilian_risk
     );
 

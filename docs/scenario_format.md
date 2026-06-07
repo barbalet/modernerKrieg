@@ -182,11 +182,29 @@ terrain.3.movement_cost=3
 terrain.3.blocks_line_of_sight=false
 ```
 
-The C core now exposes first-pass search hooks for semantic zones and terrain
-zones. `cache` semantic zones and `suspected_ied` terrain can resolve to a
-cache-found result, while searches inside a topology node can reveal a hidden
-enemy assigned to that node. Search actions emit deterministic `search` contact
-records for headless replay review.
+The C core exposes persistent search and breach hooks for semantic zones,
+terrain zones, and topology portals. Searchable semantic zones and terrain keep
+`searched`, `searched_tick`, and `last_search_outcome` runtime state so
+AI-vs-AI runs, scoring, and replay validation can see what happened after the
+caller returns.
+
+Supported search outcomes are clear/no threat, cache found, hidden threat
+revealed, protected civilian found, booby-trap/future hazard hook, and
+intelligence clue. `cache` semantic zones and `suspected_ied` terrain resolve
+to cache-found when no hidden threat is revealed first; `danger_area` semantic
+zones resolve to the booby-trap hook; `search_objective` zones and rubble or
+breach terrain can resolve to intelligence. Search actions emit deterministic
+`search` contact records for headless replay review.
+
+Topology portals can be breached at runtime. Closed or locked doors, gates, and
+shutters can transition to `breached`, which makes the portal routeable by the
+topology pathfinder. Blocked, unsafe, window, and roof-edge portals remain
+unsafe for breach. Breach actions emit deterministic `breach` contact records.
+
+The score model now includes `interaction_points` for searched terrain,
+searched semantic zones, and breached portals. Replay score events include the
+same `interaction` field so CI artifacts expose whether an AI-only battle is
+actually performing urban interaction work.
 
 ## Briefing And Outcome Text
 

@@ -209,6 +209,18 @@ if(MK_BUILD_TESTS)
       --expect-max-stalled 0
       --expect-min-worst-score -1500
   )
+  add_test(
+    NAME mk_ai_battle_cache_search_smoke
+    COMMAND mk_ai_battle
+      --scenario game/mosul/scenarios/market_cache_search_smoke_2003.mkscenario
+      --battles 2
+      --ticks 80
+      --watchdog 40
+      --fail-on-stall
+      --quiet
+      --expect-max-stalled 0
+      --expect-min-worst-score -1200
+  )
   add_test(NAME mk_replay_validate_usage COMMAND mk_replay_validate --help)
   add_test(
     NAME mk_headless_run_debug_smoke

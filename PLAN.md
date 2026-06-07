@@ -233,10 +233,10 @@ Implementation approach:
 - Added budget from gameplay-area integration rebaseline: 20 cycles.
 - Planned cycle budget: 100 cycles.
 - Planned cycle shape: 10 milestones x 10 cycles each.
-- Completed cycles in this ledger: 61.
-- Current cycle: 61.
-- Remaining planned cycles: 39.
-- Next cycle batch: cycles 62-70, Urban Combat, Breach, Search, And Rooftops.
+- Completed cycles in this ledger: 76.
+- Current cycle: 76.
+- Remaining planned cycles: 24.
+- Next cycle batch: cycles 77-80, Tactical AI And AI-Vs-AI Balance.
 
 Prior implementation work is captured in the current audit and is not counted
 against this rebaselined ledger. When a development batch is completed,
@@ -253,6 +253,7 @@ increment `Completed cycles in this ledger`, advance `Current cycle`, reduce
 | 2026-06-07 | 41 | 41 | 59 | CI Automation Guardrail | Added a per-commit GitHub Actions C-engine workflow, CI runner script, timestamped failure logs, cross-platform default/strict tests, AI-only smoke checks, and sanitizer coverage on macOS/Linux. |
 | 2026-06-07 | 46 | 46 | 54 | Scenario Population Data Foundation | Added C-level spawn zones, unit templates, civilian archetypes/groups, richer Market 2003 civilians and hidden opfor, topology-linked population validation, replay exposure, docs, and tests. |
 | 2026-06-07 | 61 | 61 | 39 | Scenario Variants, Civilian AI, And Search Hook | Added seven compact Market 2003 scenario variants, C-level civilian intent/destination/path state, deterministic civilian AI movement, civilian instruction API, replay route exposure, search/cache reveal hooks, docs, and smoke tests. |
+| 2026-06-07 | 76 | 76 | 24 | Urban Interactions And AI Guardrails | Completed cycles 62-70 with persistent search state, breachable portal state, interaction scoring, rooftop/elevation fire modifiers, replay/contact support, and core tests; completed cycles 71-76 with player AI search/breach behavior, broader AI-battle stall signatures, and cache-search AI battle CTest coverage. |
 
 ## Cycle Delta From Previous Plan
 
@@ -485,9 +486,12 @@ Exit criteria:
 
 ### Cycles 61-70: Urban Combat, Breach, Search, And Rooftops
 
-Status: in progress. Cycle 61 completed on 2026-06-07 with first-pass
-C-level semantic-zone and terrain search hooks, cache-found outcomes, hidden
-threat reveals, replay contact records, and tests.
+Status: completed on 2026-06-07. Cycle 61 added first-pass C-level
+semantic-zone and terrain search hooks, cache-found outcomes, hidden threat
+reveals, replay contact records, and tests. Cycles 62-70 completed persistent
+search state, portal breach results, breached routeability, interaction scoring,
+booby-trap/intelligence outcomes, rooftop/elevation fire modifiers, replay
+contact names, and core search/breach tests.
 
 Goal: make the modern urban systems mechanically real.
 
@@ -520,6 +524,12 @@ Exit criteria:
 - Search/breach choices affect objectives and AAR scoring.
 
 ### Cycles 71-80: Tactical AI And AI-Vs-AI Balance
+
+Status: in progress. Cycles 71-76 completed on 2026-06-07 with player-side AI
+searching nearby false-contact terrain, searching nearby semantic cache/search
+zones, breaching nearby closed/locked portals, expanded AI battle progress
+signatures for civilians/search/portal state, and CTest coverage for cache
+search AI battles.
 
 Goal: make AI-only runs meaningful enough to expose engine problems early.
 

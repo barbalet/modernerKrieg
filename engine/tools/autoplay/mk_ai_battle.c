@@ -261,6 +261,20 @@ static uint64_t mk_ai_battle_hash_i32(uint64_t hash, int value) {
     return mk_ai_battle_hash_u64(hash, (uint64_t)(uint32_t)value);
 }
 
+static uint64_t mk_ai_battle_hash_text(uint64_t hash, const char *text) {
+    size_t index;
+
+    if (text == NULL) {
+        return mk_ai_battle_hash_u64(hash, 0U);
+    }
+
+    for (index = 0; text[index] != '\0'; ++index) {
+        hash = mk_ai_battle_hash_u64(hash, (uint64_t)(unsigned char)text[index]);
+    }
+
+    return mk_ai_battle_hash_u64(hash, 0U);
+}
+
 static int mk_ai_battle_quantize_position(float value) {
     return (int)(value * 100.0f);
 }
@@ -307,6 +321,51 @@ static uint64_t mk_ai_battle_progress_signature(const mk_game_t *game) {
         hash = mk_ai_battle_hash_i32(hash, mk_ai_battle_quantize_position(unit->target_position_m.y));
         hash = mk_ai_battle_hash_u64(hash, unit->has_move_target ? 1U : 0U);
         hash = mk_ai_battle_hash_u64(hash, unit->revealed ? 1U : 0U);
+    }
+
+    for (index = 0; index < game->civilian_count; ++index) {
+        const mk_civilian_t *civilian = &game->civilians[index];
+
+        hash = mk_ai_battle_hash_u64(hash, civilian->id);
+        hash = mk_ai_battle_hash_u64(hash, (uint64_t)civilian->state);
+        hash = mk_ai_battle_hash_u64(hash, (uint64_t)civilian->intent);
+        hash = mk_ai_battle_hash_i32(hash, mk_ai_battle_quantize_position(civilian->position_m.x));
+        hash = mk_ai_battle_hash_i32(hash, mk_ai_battle_quantize_position(civilian->position_m.y));
+        hash = mk_ai_battle_hash_i32(hash, mk_ai_battle_quantize_position(civilian->destination_m.x));
+        hash = mk_ai_battle_hash_i32(hash, mk_ai_battle_quantize_position(civilian->destination_m.y));
+        hash = mk_ai_battle_hash_u64(hash, civilian->has_destination ? 1U : 0U);
+        hash = mk_ai_battle_hash_u64(hash, civilian->has_route ? 1U : 0U);
+        hash = mk_ai_battle_hash_i32(hash, civilian->risk);
+        hash = mk_ai_battle_hash_i32(hash, civilian->stress);
+    }
+
+    for (index = 0; index < game->map.terrain_count; ++index) {
+        const mk_terrain_zone_t *terrain = &game->map.terrain[index];
+
+        hash = mk_ai_battle_hash_u64(hash, terrain->id);
+        hash = mk_ai_battle_hash_u64(hash, terrain->searched ? 1U : 0U);
+        hash = mk_ai_battle_hash_u64(hash, terrain->searched_tick);
+        hash = mk_ai_battle_hash_u64(hash, (uint64_t)terrain->last_search_outcome);
+    }
+
+    for (index = 0; index < game->gameplay_area.semantic_zone_count; ++index) {
+        const mk_gameplay_semantic_zone_t *zone = &game->gameplay_area.semantic_zones[index];
+
+        hash = mk_ai_battle_hash_text(hash, zone->id);
+        hash = mk_ai_battle_hash_u64(hash, zone->searched ? 1U : 0U);
+        hash = mk_ai_battle_hash_u64(hash, zone->searched_tick);
+        hash = mk_ai_battle_hash_u64(hash, (uint64_t)zone->last_search_outcome);
+    }
+
+    for (index = 0; index < game->gameplay_area.topology_portal_count; ++index) {
+        const mk_gameplay_topology_portal_t *portal = &game->gameplay_area.topology_portals[index];
+
+        hash = mk_ai_battle_hash_text(hash, portal->id);
+        hash = mk_ai_battle_hash_text(hash, portal->state);
+        hash = mk_ai_battle_hash_u64(hash, portal->breached ? 1U : 0U);
+        hash = mk_ai_battle_hash_u64(hash, portal->breached_tick);
+        hash = mk_ai_battle_hash_u64(hash, portal->searched ? 1U : 0U);
+        hash = mk_ai_battle_hash_u64(hash, portal->searched_tick);
     }
 
     return hash;
@@ -410,7 +469,7 @@ static void mk_ai_battle_print_summary(
     mk_ai_battle_count_objectives(game, &player_objectives, &opfor_objectives, &neutral_objectives);
     resolved_contacts = mk_ai_battle_resolved_contact_count(game);
     printf(
-        "battle=%u tick=%u score=%d outcome=%s objectives(player=%u,opfor=%u,neutral=%u,contested=%u) contacts=%u resolved=%u risk=%d\n",
+        "battle=%u tick=%u score=%d outcome=%s objectives(player=%u,opfor=%u,neutral=%u,contested=%u) contacts=%u resolved=%u interaction=%d risk=%d\n",
         battle_index,
         game->tick,
         score->total_score,
@@ -421,6 +480,7 @@ static void mk_ai_battle_print_summary(
         (unsigned)score->contested_objectives,
         (unsigned)game->contact_report_count,
         resolved_contacts,
+        score->interaction_points,
         score->civilian_risk
     );
 

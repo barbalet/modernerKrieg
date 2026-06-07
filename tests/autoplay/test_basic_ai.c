@@ -15,6 +15,79 @@ static mk_game_t make_loaded_game(void) {
     return game;
 }
 
+static mk_vec2_t test_rect_center(mk_rect_t rect) {
+    return mk_test_vec2(rect.x + rect.width * 0.5f, rect.y + rect.height * 0.5f);
+}
+
+static void test_disable_protected_civilians(mk_game_t *game) {
+    size_t index;
+
+    MK_TEST_ASSERT(game != NULL);
+    for (index = 0; index < game->civilian_count; ++index) {
+        game->civilians[index].protected_noncombatant = false;
+    }
+}
+
+static size_t test_find_suspected_terrain_index(const mk_game_t *game) {
+    size_t index;
+
+    MK_TEST_ASSERT(game != NULL);
+    for (index = 0; index < game->map.terrain_count; ++index) {
+        if (game->map.terrain[index].kind == MK_TERRAIN_SUSPECTED_IED) {
+            return index;
+        }
+    }
+
+    MK_TEST_ASSERT(false);
+    return 0;
+}
+
+static size_t test_find_semantic_zone_kind_index(const mk_game_t *game, const char *kind) {
+    size_t index;
+
+    MK_TEST_ASSERT(game != NULL);
+    MK_TEST_ASSERT(kind != NULL);
+    for (index = 0; index < game->gameplay_area.semantic_zone_count; ++index) {
+        if (strcmp(game->gameplay_area.semantic_zones[index].kind, kind) == 0) {
+            return index;
+        }
+    }
+
+    MK_TEST_ASSERT(false);
+    return 0;
+}
+
+static size_t test_find_breachable_portal_index(const mk_game_t *game) {
+    size_t index;
+
+    MK_TEST_ASSERT(game != NULL);
+    for (index = 0; index < game->gameplay_area.topology_portal_count; ++index) {
+        const mk_gameplay_topology_portal_t *portal = &game->gameplay_area.topology_portals[index];
+
+        if ((strcmp(portal->state, "closed") == 0 || strcmp(portal->state, "locked") == 0)
+            && strcmp(portal->kind, "window") != 0
+            && strcmp(portal->kind, "roof_edge") != 0) {
+            return index;
+        }
+    }
+
+    MK_TEST_ASSERT(false);
+    return 0;
+}
+
+static void test_open_breachable_portals(mk_game_t *game) {
+    size_t index;
+
+    MK_TEST_ASSERT(game != NULL);
+    for (index = 0; index < game->gameplay_area.topology_portal_count; ++index) {
+        mk_gameplay_topology_portal_t *portal = &game->gameplay_area.topology_portals[index];
+
+        if (strcmp(portal->state, "closed") == 0 || strcmp(portal->state, "locked") == 0) {
+            strcpy(portal->state, "open");
+        }
+    }
+}
+
 static void test_basic_ai_emits_orders_for_both_sides(void) {
     mk_game_t game = make_loaded_game();
 
@@ -199,6 +272,73 @@ static void test_basic_ai_overwatches_at_investigation_distance(void) {
     MK_TEST_ASSERT(!game.units[0].has_move_target);
 }
 
+static void test_basic_ai_searches_nearby_false_contact_terrain(void) {
+    mk_game_t game = make_loaded_game();
+    size_t terrain_index = test_find_suspected_terrain_index(&game);
+    mk_terrain_zone_t *terrain = &game.map.terrain[terrain_index];
+    mk_vec2_t position = test_rect_center(terrain->bounds_m);
+
+    test_disable_protected_civilians(&game);
+    game.units[0].position_m = position;
+    game.contact_report_count = 1;
+    memset(&game.contact_reports[0], 0, sizeof(game.contact_reports[0]));
+    game.contact_reports[0].id = 1;
+    game.contact_reports[0].kind = MK_CONTACT_REPORT_FALSE_CONTACT;
+    game.contact_reports[0].side = MK_SIDE_NEUTRAL;
+    game.contact_reports[0].attacker_unit_id = game.units[0].id;
+    game.contact_reports[0].terrain_id = terrain->id;
+    game.contact_reports[0].position_m = position;
+    game.contact_reports[0].target_position_m = position;
+    game.contact_reports[0].confidence = 45;
+    game.contact_reports[0].visible = true;
+
+    MK_TEST_ASSERT(mk_ai_issue_basic_orders(&game) == MK_OK);
+    MK_TEST_ASSERT(game.map.terrain[terrain_index].searched);
+    MK_TEST_ASSERT(game.units[0].order == MK_ORDER_INVESTIGATE);
+    MK_TEST_ASSERT(game.units[0].order_source == MK_ORDER_SOURCE_AI);
+    MK_TEST_ASSERT(game.contact_report_count == 2);
+    MK_TEST_ASSERT(game.contact_reports[1].kind == MK_CONTACT_REPORT_SEARCH);
+}
+
+static void test_basic_ai_searches_nearby_semantic_cache(void) {
+    mk_game_t game = make_loaded_game();
+    size_t zone_index = test_find_semantic_zone_kind_index(&game, "cache");
+    mk_gameplay_semantic_zone_t *zone = &game.gameplay_area.semantic_zones[zone_index];
+
+    test_disable_protected_civilians(&game);
+    test_open_breachable_portals(&game);
+    game.units[1].hidden = false;
+    game.units[1].revealed = true;
+    game.units[0].position_m = test_rect_center(zone->bounds_m);
+    strcpy(game.units[0].level_id, zone->level_id);
+    strcpy(game.units[0].topology_node_id, zone->node_id);
+
+    MK_TEST_ASSERT(mk_ai_issue_basic_orders(&game) == MK_OK);
+    MK_TEST_ASSERT(game.gameplay_area.semantic_zones[zone_index].searched);
+    MK_TEST_ASSERT(game.gameplay_area.semantic_zones[zone_index].last_search_outcome == MK_SEARCH_OUTCOME_CACHE_FOUND);
+    MK_TEST_ASSERT(game.units[0].order == MK_ORDER_INVESTIGATE);
+    MK_TEST_ASSERT(game.units[0].order_source == MK_ORDER_SOURCE_AI);
+}
+
+static void test_basic_ai_breaches_nearby_closed_portal(void) {
+    mk_game_t game = make_loaded_game();
+    size_t portal_index = test_find_breachable_portal_index(&game);
+    mk_gameplay_topology_portal_t *portal = &game.gameplay_area.topology_portals[portal_index];
+
+    test_disable_protected_civilians(&game);
+    game.units[1].hidden = false;
+    game.units[1].revealed = true;
+    game.units[0].position_m = test_rect_center(portal->bounds_m);
+    strcpy(game.units[0].level_id, portal->level_id);
+    strcpy(game.units[0].topology_node_id, portal->from_node_id);
+
+    MK_TEST_ASSERT(mk_ai_issue_basic_orders(&game) == MK_OK);
+    MK_TEST_ASSERT(strcmp(game.gameplay_area.topology_portals[portal_index].state, "breached") == 0);
+    MK_TEST_ASSERT(game.gameplay_area.topology_portals[portal_index].breached);
+    MK_TEST_ASSERT(game.units[0].order == MK_ORDER_BREACH);
+    MK_TEST_ASSERT(game.units[0].order_source == MK_ORDER_SOURCE_AI);
+}
+
 static const char *test_order_name(mk_order_t order) {
     switch (order) {
         case MK_ORDER_MOVE:
@@ -213,6 +353,8 @@ static const char *test_order_name(mk_order_t order) {
             return "overwatch";
         case MK_ORDER_HOLD:
             return "hold";
+        case MK_ORDER_BREACH:
+            return "breach";
         default:
             return "other";
     }
@@ -269,6 +411,9 @@ int main(void) {
     test_basic_ai_opfor_withdraws_after_taking_fire();
     test_basic_ai_investigates_suspected_contact();
     test_basic_ai_overwatches_at_investigation_distance();
+    test_basic_ai_searches_nearby_false_contact_terrain();
+    test_basic_ai_searches_nearby_semantic_cache();
+    test_basic_ai_breaches_nearby_closed_portal();
     test_basic_ai_transcript_is_deterministic();
 
     puts("mk_basic_ai_tests: ok");

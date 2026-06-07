@@ -36,6 +36,7 @@ typedef struct {
     uint32_t final_tick;
     int final_score;
     int current_score;
+    int current_interaction_points;
     int current_civilian_risk;
     char current_outcome[32];
     char final_result[32];
@@ -290,7 +291,7 @@ static bool mk_replay_finalize_tick(
 
         if (in_range) {
             printf(
-                "replay tick=%u units=%u objectives=%u contacts=%u score=%d outcome=%s controlled=%u contested=%u civilian_risk=%d\n",
+                "replay tick=%u units=%u objectives=%u contacts=%u score=%d outcome=%s controlled=%u contested=%u interaction=%d civilian_risk=%d\n",
                 state->current_tick,
                 state->current_units,
                 state->current_objectives,
@@ -299,6 +300,7 @@ static bool mk_replay_finalize_tick(
                 state->current_outcome[0] == '\0' ? "unknown" : state->current_outcome,
                 state->current_controlled,
                 state->current_contested,
+                state->current_interaction_points,
                 state->current_civilian_risk
             );
         }
@@ -336,6 +338,7 @@ static bool mk_replay_begin_tick(
     state->current_controlled = 0;
     state->current_contested = 0;
     state->current_score = 0;
+    state->current_interaction_points = 0;
     state->current_civilian_risk = 0;
     state->current_outcome[0] = '\0';
     state->have_tick = true;
@@ -609,6 +612,7 @@ static bool mk_replay_validate_score_event(
     int total;
     uint32_t controlled;
     uint32_t contested;
+    int interaction_points;
     int civilian_risk;
 
     if (!state->have_start) {
@@ -623,6 +627,7 @@ static bool mk_replay_validate_score_event(
         || !mk_replay_read_enum(line, "outcome", outcomes, sizeof(outcomes) / sizeof(outcomes[0]), outcome, sizeof(outcome))
         || !mk_replay_read_field_u32(line, "controlled", &controlled)
         || !mk_replay_read_field_u32(line, "contested", &contested)
+        || !mk_replay_read_field_i32(line, "interaction", &interaction_points)
         || !mk_replay_read_field_i32(line, "civilian_risk", &civilian_risk)
         || civilian_risk < 0) {
         return mk_replay_fail(config, line_number, "score event is missing required fields");
@@ -635,6 +640,7 @@ static bool mk_replay_validate_score_event(
     state->current_score = total;
     state->current_controlled = controlled;
     state->current_contested = contested;
+    state->current_interaction_points = interaction_points;
     state->current_civilian_risk = civilian_risk;
     state->current_scores += 1;
     return true;
@@ -653,7 +659,8 @@ static bool mk_replay_validate_contact_event(
         "civilian_risk",
         "suspected_danger",
         "false_contact",
-        "search"
+        "search",
+        "breach"
     };
     char word[32];
     uint32_t id;

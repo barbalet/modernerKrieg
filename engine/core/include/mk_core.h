@@ -196,15 +196,25 @@ typedef enum {
     MK_CONTACT_REPORT_CIVILIAN_RISK = 2,
     MK_CONTACT_REPORT_SUSPECTED_DANGER = 3,
     MK_CONTACT_REPORT_FALSE_CONTACT = 4,
-    MK_CONTACT_REPORT_SEARCH = 5
+    MK_CONTACT_REPORT_SEARCH = 5,
+    MK_CONTACT_REPORT_BREACH = 6
 } mk_contact_report_kind_t;
 
 typedef enum {
     MK_SEARCH_OUTCOME_CLEAR = 0,
     MK_SEARCH_OUTCOME_CACHE_FOUND = 1,
     MK_SEARCH_OUTCOME_THREAT_REVEALED = 2,
-    MK_SEARCH_OUTCOME_CIVILIAN_FOUND = 3
+    MK_SEARCH_OUTCOME_CIVILIAN_FOUND = 3,
+    MK_SEARCH_OUTCOME_BOOBY_TRAP = 4,
+    MK_SEARCH_OUTCOME_INTELLIGENCE = 5
 } mk_search_outcome_t;
+
+typedef enum {
+    MK_BREACH_OUTCOME_NONE = 0,
+    MK_BREACH_OUTCOME_ALREADY_OPEN = 1,
+    MK_BREACH_OUTCOME_BREACHED = 2,
+    MK_BREACH_OUTCOME_UNSAFE = 3
+} mk_breach_outcome_t;
 
 typedef enum {
     MK_OUTCOME_IN_PROGRESS = 0,
@@ -436,6 +446,9 @@ typedef struct {
     int cover;
     int movement_cost;
     bool blocks_line_of_sight;
+    bool searched;
+    uint32_t searched_tick;
+    mk_search_outcome_t last_search_outcome;
 } mk_terrain_zone_t;
 
 typedef struct {
@@ -529,6 +542,10 @@ typedef struct {
     bool bidirectional;
     bool vertical;
     int movement_cost;
+    bool breached;
+    uint32_t breached_tick;
+    bool searched;
+    uint32_t searched_tick;
 } mk_gameplay_topology_portal_t;
 
 typedef struct {
@@ -542,6 +559,9 @@ typedef struct {
     int pixel_height;
     mk_rect_t bounds_m;
     int priority;
+    bool searched;
+    uint32_t searched_tick;
+    mk_search_outcome_t last_search_outcome;
 } mk_gameplay_semantic_zone_t;
 
 typedef struct {
@@ -731,11 +751,28 @@ typedef struct {
     char topology_node_id[MK_NAME_CAPACITY];
     char level_id[MK_NAME_CAPACITY];
     mk_vec2_t position_m;
+    int score_delta;
     bool resolved;
 } mk_search_result_t;
 
 typedef struct {
+    mk_breach_outcome_t outcome;
+    uint32_t unit_id;
+    uint32_t contact_report_id;
+    char portal_id[MK_NAME_CAPACITY];
+    char previous_state[MK_KIND_CAPACITY];
+    char new_state[MK_KIND_CAPACITY];
+    char from_node_id[MK_NAME_CAPACITY];
+    char to_node_id[MK_NAME_CAPACITY];
+    char level_id[MK_NAME_CAPACITY];
+    mk_vec2_t position_m;
+    int score_delta;
+    bool resolved;
+} mk_breach_result_t;
+
+typedef struct {
     int objective_points;
+    int interaction_points;
     int civilian_risk_penalty;
     int casualty_penalty;
     int time_penalty;
@@ -963,6 +1000,12 @@ mk_result_t mk_game_search_terrain(
     uint32_t unit_id,
     uint32_t terrain_id,
     mk_search_result_t *out_search_result
+);
+mk_result_t mk_game_breach_portal(
+    mk_game_t *game,
+    uint32_t unit_id,
+    const char *portal_id,
+    mk_breach_result_t *out_breach_result
 );
 
 mk_vec2_t mk_vec2(float x, float y);

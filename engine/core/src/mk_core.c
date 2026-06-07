@@ -6,6 +6,9 @@
 #include <stdio.h>
 #include <string.h>
 
+static int mk_search_outcome_score_delta(mk_search_outcome_t outcome);
+static int mk_breach_outcome_score_delta(mk_breach_outcome_t outcome);
+
 static void mk_copy_text(char *destination, size_t capacity, const char *source) {
     const char *text = source == NULL ? "" : source;
     size_t index = 0;
@@ -1109,6 +1112,70 @@ static int mk_weapon_hit_chance(
     chance -= status_penalty;
 
     return mk_clamp_int(chance, 5, 95);
+}
+
+static const mk_gameplay_level_t *mk_game_find_level(const mk_game_t *game, const char *level_id) {
+    size_t index;
+
+    if (game == NULL || level_id == NULL || level_id[0] == '\0') {
+        return NULL;
+    }
+
+    for (index = 0; index < game->gameplay_area.level_count; ++index) {
+        if (strcmp(game->gameplay_area.levels[index].id, level_id) == 0) {
+            return &game->gameplay_area.levels[index];
+        }
+    }
+
+    return NULL;
+}
+
+static const mk_gameplay_topology_node_t *mk_game_find_unit_topology_node(
+    const mk_game_t *game,
+    const mk_unit_t *unit
+) {
+    if (game == NULL || unit == NULL || unit->topology_node_id[0] == '\0') {
+        return NULL;
+    }
+
+    return mk_gameplay_area_find_topology_node(&game->gameplay_area, unit->topology_node_id);
+}
+
+static float mk_game_unit_elevation_m(const mk_game_t *game, const mk_unit_t *unit) {
+    const mk_gameplay_level_t *level;
+
+    if (game == NULL || unit == NULL) {
+        return 0.0f;
+    }
+
+    level = mk_game_find_level(game, unit->level_id);
+    return level != NULL ? level->elevation_m : 0.0f;
+}
+
+static int mk_game_elevation_hit_modifier(
+    const mk_game_t *game,
+    const mk_unit_t *attacker,
+    const mk_unit_t *target
+) {
+    const mk_gameplay_topology_node_t *attacker_node = mk_game_find_unit_topology_node(game, attacker);
+    const mk_gameplay_topology_node_t *target_node = mk_game_find_unit_topology_node(game, target);
+    float elevation_delta = mk_game_unit_elevation_m(game, attacker) - mk_game_unit_elevation_m(game, target);
+    int modifier = 0;
+
+    if (elevation_delta >= 3.0f) {
+        modifier += 10;
+    } else if (elevation_delta <= -3.0f) {
+        modifier -= 8;
+    }
+
+    if (attacker_node != NULL && strcmp(attacker_node->kind, "roof") == 0) {
+        modifier += 5;
+    }
+    if (target_node != NULL && strcmp(target_node->kind, "roof") == 0) {
+        modifier -= 3;
+    }
+
+    return modifier;
 }
 
 static mk_soldier_t *mk_first_live_soldier(mk_unit_t *unit) {
@@ -3179,6 +3246,25 @@ const mk_gameplay_topology_portal_t *mk_gameplay_area_find_topology_portal(
     return NULL;
 }
 
+static mk_gameplay_topology_portal_t *mk_game_find_topology_portal_mutable(
+    mk_game_t *game,
+    const char *portal_id
+) {
+    size_t index;
+
+    if (game == NULL || portal_id == NULL) {
+        return NULL;
+    }
+
+    for (index = 0; index < game->gameplay_area.topology_portal_count; ++index) {
+        if (strcmp(game->gameplay_area.topology_portals[index].id, portal_id) == 0) {
+            return &game->gameplay_area.topology_portals[index];
+        }
+    }
+
+    return NULL;
+}
+
 const mk_gameplay_topology_portal_t *mk_gameplay_area_find_topology_portal_at_world(
     const mk_gameplay_area_t *area,
     const char *level_id,
@@ -3214,6 +3300,25 @@ const mk_gameplay_semantic_zone_t *mk_gameplay_area_find_semantic_zone(
     for (index = 0; index < area->semantic_zone_count; ++index) {
         if (strcmp(area->semantic_zones[index].id, zone_id) == 0) {
             return &area->semantic_zones[index];
+        }
+    }
+
+    return NULL;
+}
+
+static mk_gameplay_semantic_zone_t *mk_game_find_semantic_zone_mutable(
+    mk_game_t *game,
+    const char *zone_id
+) {
+    size_t index;
+
+    if (game == NULL || zone_id == NULL) {
+        return NULL;
+    }
+
+    for (index = 0; index < game->gameplay_area.semantic_zone_count; ++index) {
+        if (strcmp(game->gameplay_area.semantic_zones[index].id, zone_id) == 0) {
+            return &game->gameplay_area.semantic_zones[index];
         }
     }
 
@@ -4182,6 +4287,41 @@ mk_result_t mk_game_update_objective_control(mk_game_t *game) {
     return MK_OK;
 }
 
+static int mk_game_interaction_points(const mk_game_t *game) {
+    int points = 0;
+    size_t index;
+
+    if (game == NULL) {
+        return 0;
+    }
+
+    for (index = 0; index < game->map.terrain_count; ++index) {
+        const mk_terrain_zone_t *terrain = &game->map.terrain[index];
+
+        if (terrain->searched) {
+            points += mk_search_outcome_score_delta(terrain->last_search_outcome);
+        }
+    }
+
+    for (index = 0; index < game->gameplay_area.semantic_zone_count; ++index) {
+        const mk_gameplay_semantic_zone_t *zone = &game->gameplay_area.semantic_zones[index];
+
+        if (zone->searched) {
+            points += mk_search_outcome_score_delta(zone->last_search_outcome);
+        }
+    }
+
+    for (index = 0; index < game->gameplay_area.topology_portal_count; ++index) {
+        const mk_gameplay_topology_portal_t *portal = &game->gameplay_area.topology_portals[index];
+
+        if (portal->breached) {
+            points += mk_breach_outcome_score_delta(MK_BREACH_OUTCOME_BREACHED);
+        }
+    }
+
+    return points;
+}
+
 mk_result_t mk_game_score(const mk_game_t *game, mk_score_t *out_score) {
     mk_score_t score;
     size_t objective_index;
@@ -4215,6 +4355,7 @@ mk_result_t mk_game_score(const mk_game_t *game, mk_score_t *out_score) {
     }
 
     score.civilian_risk = mk_game_total_civilian_risk(game);
+    score.interaction_points = mk_game_interaction_points(game);
     score.player_casualties = mk_game_side_casualties(game, MK_SIDE_PLAYER);
     score.opfor_casualties = mk_game_side_casualties(game, MK_SIDE_OPFOR);
     score.civilian_casualties = mk_game_side_casualties(game, MK_SIDE_CIVILIAN);
@@ -4223,6 +4364,7 @@ mk_result_t mk_game_score(const mk_game_t *game, mk_score_t *out_score) {
         + score.civilian_casualties * mk_game_score_civilian_casualty_weight(game);
     score.time_penalty = (int)game->tick * mk_game_score_time_weight(game);
     score.total_score = score.objective_points
+        + score.interaction_points
         - score.civilian_risk_penalty
         - score.casualty_penalty
         - score.time_penalty;
@@ -4259,13 +4401,14 @@ mk_result_t mk_game_after_action_report(const mk_game_t *game, mk_after_action_r
     (void)snprintf(
         report.summary,
         sizeof(report.summary),
-        "outcome=%s score=%d thresholds(success=%d,partial=%d) objectives=%u contested=%u civilian_risk=%d casualties(player=%d,opfor=%d,civilian=%d) ticks=%u",
+        "outcome=%s score=%d thresholds(success=%d,partial=%d) objectives=%u contested=%u interaction=%d civilian_risk=%d casualties(player=%d,opfor=%d,civilian=%d) ticks=%u",
         mk_outcome_summary_name(report.score.outcome),
         report.score.total_score,
         mk_game_score_success_threshold(game),
         mk_game_score_partial_threshold(game),
         (unsigned)report.score.controlled_objectives,
         (unsigned)report.score.contested_objectives,
+        report.score.interaction_points,
         report.score.civilian_risk,
         report.score.player_casualties,
         report.score.opfor_casualties,
@@ -4949,6 +5092,12 @@ mk_result_t mk_game_unit_fire(
             int roll = (int)(mk_random_u32(game) % 100U);
             int shot_suppression = mk_max_int(1, soldier->weapon.suppression / 2);
 
+            hit_chance = mk_clamp_int(
+                hit_chance + mk_game_elevation_hit_modifier(game, attacker, target),
+                5,
+                95
+            );
+
             fire_result.shots_fired += 1;
             fire_result.suppression_added += shot_suppression;
             target->suppression += shot_suppression;
@@ -5030,6 +5179,65 @@ static void mk_search_result_init(mk_search_result_t *search_result, uint32_t un
     search_result->resolved = true;
 }
 
+static void mk_breach_result_init(mk_breach_result_t *breach_result, uint32_t unit_id, mk_vec2_t position_m) {
+    if (breach_result == NULL) {
+        return;
+    }
+
+    memset(breach_result, 0, sizeof(*breach_result));
+    breach_result->outcome = MK_BREACH_OUTCOME_NONE;
+    breach_result->unit_id = unit_id;
+    breach_result->position_m = position_m;
+    breach_result->resolved = true;
+}
+
+static int mk_search_outcome_score_delta(mk_search_outcome_t outcome) {
+    switch (outcome) {
+        case MK_SEARCH_OUTCOME_CACHE_FOUND:
+            return 75;
+        case MK_SEARCH_OUTCOME_THREAT_REVEALED:
+            return 50;
+        case MK_SEARCH_OUTCOME_CIVILIAN_FOUND:
+            return 25;
+        case MK_SEARCH_OUTCOME_BOOBY_TRAP:
+            return -40;
+        case MK_SEARCH_OUTCOME_INTELLIGENCE:
+            return 40;
+        case MK_SEARCH_OUTCOME_CLEAR:
+        default:
+            return 5;
+    }
+}
+
+static int mk_breach_outcome_score_delta(mk_breach_outcome_t outcome) {
+    switch (outcome) {
+        case MK_BREACH_OUTCOME_BREACHED:
+            return 20;
+        case MK_BREACH_OUTCOME_UNSAFE:
+            return -20;
+        case MK_BREACH_OUTCOME_ALREADY_OPEN:
+        case MK_BREACH_OUTCOME_NONE:
+        default:
+            return 0;
+    }
+}
+
+static mk_terrain_zone_t *mk_game_find_terrain_mutable(mk_game_t *game, uint32_t terrain_id) {
+    size_t index;
+
+    if (game == NULL || terrain_id == 0U) {
+        return NULL;
+    }
+
+    for (index = 0; index < game->map.terrain_count; ++index) {
+        if (game->map.terrain[index].id == terrain_id) {
+            return &game->map.terrain[index];
+        }
+    }
+
+    return NULL;
+}
+
 static uint32_t mk_game_search_reveal_hidden_at(
     mk_game_t *game,
     const mk_unit_t *searcher,
@@ -5072,6 +5280,7 @@ static uint32_t mk_game_record_search_contact(
     mk_vec2_t position_m,
     uint32_t terrain_id,
     uint32_t revealed_unit_id,
+    uint32_t civilian_id,
     mk_search_outcome_t outcome
 ) {
     mk_contact_report_t *report;
@@ -5087,17 +5296,36 @@ static uint32_t mk_game_record_search_contact(
 
     report->attacker_unit_id = searcher->id;
     report->target_unit_id = revealed_unit_id;
+    report->civilian_id = civilian_id;
     report->terrain_id = terrain_id;
     if (revealed_unit_id != 0U) {
         const mk_unit_t *revealed_unit = mk_game_find_unit_const(game, revealed_unit_id);
 
         report->side = revealed_unit != NULL ? revealed_unit->side : MK_SIDE_NEUTRAL;
+    } else if (civilian_id != 0U) {
+        report->side = MK_SIDE_CIVILIAN;
     } else {
         report->side = MK_SIDE_NEUTRAL;
     }
     report->position_m = position_m;
     report->target_position_m = position_m;
-    report->confidence = outcome == MK_SEARCH_OUTCOME_CLEAR ? 60 : 100;
+    switch (outcome) {
+        case MK_SEARCH_OUTCOME_CLEAR:
+            report->confidence = 60;
+            break;
+        case MK_SEARCH_OUTCOME_CIVILIAN_FOUND:
+            report->confidence = 90;
+            break;
+        case MK_SEARCH_OUTCOME_BOOBY_TRAP:
+            report->confidence = 85;
+            break;
+        case MK_SEARCH_OUTCOME_CACHE_FOUND:
+        case MK_SEARCH_OUTCOME_THREAT_REVEALED:
+        case MK_SEARCH_OUTCOME_INTELLIGENCE:
+        default:
+            report->confidence = 100;
+            break;
+    }
     report->visible = true;
     report->resolved = true;
     return report->id;
@@ -5110,10 +5338,10 @@ mk_result_t mk_game_search_semantic_zone(
     mk_search_result_t *out_search_result
 ) {
     mk_unit_t *unit;
-    const mk_gameplay_semantic_zone_t *zone;
+    mk_gameplay_semantic_zone_t *zone;
     mk_vec2_t position;
     uint32_t revealed_unit_id;
-    bool civilian_found = false;
+    uint32_t civilian_id = 0U;
     size_t civilian_index;
 
     if (game == NULL || semantic_zone_id == NULL || out_search_result == NULL) {
@@ -5125,7 +5353,7 @@ mk_result_t mk_game_search_semantic_zone(
         return MK_ERROR_NOT_FOUND;
     }
 
-    zone = mk_gameplay_area_find_semantic_zone(&game->gameplay_area, semantic_zone_id);
+    zone = mk_game_find_semantic_zone_mutable(game, semantic_zone_id);
     if (zone == NULL) {
         return MK_ERROR_NOT_FOUND;
     }
@@ -5136,33 +5364,51 @@ mk_result_t mk_game_search_semantic_zone(
     mk_copy_name(out_search_result->topology_node_id, zone->node_id);
     mk_copy_name(out_search_result->level_id, zone->level_id);
 
-    revealed_unit_id = mk_game_search_reveal_hidden_at(game, unit, zone->node_id, position, 32.0f);
-    if (revealed_unit_id != 0U) {
-        out_search_result->outcome = MK_SEARCH_OUTCOME_THREAT_REVEALED;
-        out_search_result->revealed_unit_id = revealed_unit_id;
-    } else if (strcmp(zone->kind, "cache") == 0) {
-        out_search_result->outcome = MK_SEARCH_OUTCOME_CACHE_FOUND;
+    if (zone->searched) {
+        out_search_result->outcome = zone->last_search_outcome;
+        out_search_result->score_delta = 0;
     } else {
-        for (civilian_index = 0; civilian_index < game->civilian_count; ++civilian_index) {
-            const mk_civilian_t *civilian = &game->civilians[civilian_index];
+        revealed_unit_id = mk_game_search_reveal_hidden_at(game, unit, zone->node_id, position, 32.0f);
+        if (revealed_unit_id != 0U) {
+            out_search_result->outcome = MK_SEARCH_OUTCOME_THREAT_REVEALED;
+            out_search_result->revealed_unit_id = revealed_unit_id;
+        } else if (strcmp(zone->kind, "cache") == 0) {
+            out_search_result->outcome = MK_SEARCH_OUTCOME_CACHE_FOUND;
+        } else if (strcmp(zone->kind, "danger_area") == 0) {
+            out_search_result->outcome = MK_SEARCH_OUTCOME_BOOBY_TRAP;
+        } else {
+            for (civilian_index = 0; civilian_index < game->civilian_count; ++civilian_index) {
+                const mk_civilian_t *civilian = &game->civilians[civilian_index];
 
-            if (civilian->protected_noncombatant
-                && strcmp(civilian->topology_node_id, zone->node_id) == 0) {
-                civilian_found = true;
-                break;
+                if (civilian->protected_noncombatant
+                    && strcmp(civilian->topology_node_id, zone->node_id) == 0) {
+                    civilian_id = civilian->id;
+                    break;
+                }
+            }
+
+            if (civilian_id != 0U) {
+                out_search_result->outcome = MK_SEARCH_OUTCOME_CIVILIAN_FOUND;
+            } else if (strcmp(zone->kind, "search_objective") == 0) {
+                out_search_result->outcome = MK_SEARCH_OUTCOME_INTELLIGENCE;
             }
         }
-        if (civilian_found) {
-            out_search_result->outcome = MK_SEARCH_OUTCOME_CIVILIAN_FOUND;
-        }
+
+        zone->searched = true;
+        zone->searched_tick = game->tick;
+        zone->last_search_outcome = out_search_result->outcome;
+        out_search_result->score_delta = mk_search_outcome_score_delta(out_search_result->outcome);
     }
 
+    unit->order = MK_ORDER_INVESTIGATE;
+    unit->has_move_target = false;
     out_search_result->contact_report_id = mk_game_record_search_contact(
         game,
         unit,
         position,
         0U,
         out_search_result->revealed_unit_id,
+        civilian_id,
         out_search_result->outcome
     );
     return MK_OK;
@@ -5175,10 +5421,9 @@ mk_result_t mk_game_search_terrain(
     mk_search_result_t *out_search_result
 ) {
     mk_unit_t *unit;
-    const mk_terrain_zone_t *terrain = NULL;
+    mk_terrain_zone_t *terrain = NULL;
     mk_vec2_t position;
     uint32_t revealed_unit_id;
-    size_t terrain_index;
 
     if (game == NULL || out_search_result == NULL || terrain_id == 0U) {
         return MK_ERROR_INVALID_ARGUMENT;
@@ -5189,12 +5434,7 @@ mk_result_t mk_game_search_terrain(
         return MK_ERROR_NOT_FOUND;
     }
 
-    for (terrain_index = 0; terrain_index < game->map.terrain_count; ++terrain_index) {
-        if (game->map.terrain[terrain_index].id == terrain_id) {
-            terrain = &game->map.terrain[terrain_index];
-            break;
-        }
-    }
+    terrain = mk_game_find_terrain_mutable(game, terrain_id);
     if (terrain == NULL) {
         return MK_ERROR_NOT_FOUND;
     }
@@ -5203,22 +5443,121 @@ mk_result_t mk_game_search_terrain(
     mk_search_result_init(out_search_result, unit_id, position);
     out_search_result->terrain_id = terrain_id;
 
-    revealed_unit_id = mk_game_search_reveal_hidden_at(game, unit, "", position, 35.0f);
-    if (revealed_unit_id != 0U) {
-        out_search_result->outcome = MK_SEARCH_OUTCOME_THREAT_REVEALED;
-        out_search_result->revealed_unit_id = revealed_unit_id;
-    } else if (terrain->kind == MK_TERRAIN_SUSPECTED_IED) {
-        out_search_result->outcome = MK_SEARCH_OUTCOME_CACHE_FOUND;
+    if (terrain->searched) {
+        out_search_result->outcome = terrain->last_search_outcome;
+        out_search_result->score_delta = 0;
+    } else {
+        revealed_unit_id = mk_game_search_reveal_hidden_at(game, unit, "", position, 35.0f);
+        if (revealed_unit_id != 0U) {
+            out_search_result->outcome = MK_SEARCH_OUTCOME_THREAT_REVEALED;
+            out_search_result->revealed_unit_id = revealed_unit_id;
+        } else if (terrain->kind == MK_TERRAIN_SUSPECTED_IED) {
+            out_search_result->outcome = MK_SEARCH_OUTCOME_CACHE_FOUND;
+        } else if (terrain->kind == MK_TERRAIN_RUBBLE || terrain->kind == MK_TERRAIN_BREACH_POINT) {
+            out_search_result->outcome = MK_SEARCH_OUTCOME_INTELLIGENCE;
+        }
+
+        terrain->searched = true;
+        terrain->searched_tick = game->tick;
+        terrain->last_search_outcome = out_search_result->outcome;
+        out_search_result->score_delta = mk_search_outcome_score_delta(out_search_result->outcome);
     }
 
+    unit->order = MK_ORDER_INVESTIGATE;
+    unit->has_move_target = false;
     out_search_result->contact_report_id = mk_game_record_search_contact(
         game,
         unit,
         position,
         terrain_id,
         out_search_result->revealed_unit_id,
+        0U,
         out_search_result->outcome
     );
+    return MK_OK;
+}
+
+mk_result_t mk_game_breach_portal(
+    mk_game_t *game,
+    uint32_t unit_id,
+    const char *portal_id,
+    mk_breach_result_t *out_breach_result
+) {
+    mk_unit_t *unit;
+    mk_gameplay_topology_portal_t *portal;
+    mk_vec2_t position;
+    bool unit_at_portal;
+
+    if (game == NULL || portal_id == NULL || out_breach_result == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    unit = mk_game_find_unit(game, unit_id);
+    if (unit == NULL) {
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    portal = mk_game_find_topology_portal_mutable(game, portal_id);
+    if (portal == NULL) {
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    position = mk_rect_center(portal->bounds_m);
+    mk_breach_result_init(out_breach_result, unit_id, position);
+    mk_copy_name(out_breach_result->portal_id, portal->id);
+    mk_copy_text(out_breach_result->previous_state, sizeof(out_breach_result->previous_state), portal->state);
+    mk_copy_name(out_breach_result->from_node_id, portal->from_node_id);
+    mk_copy_name(out_breach_result->to_node_id, portal->to_node_id);
+    mk_copy_name(out_breach_result->level_id, portal->level_id);
+
+    unit_at_portal = strcmp(unit->topology_node_id, portal->from_node_id) == 0
+        || strcmp(unit->topology_node_id, portal->to_node_id) == 0
+        || mk_distance(unit->position_m, position) <= 40.0f;
+    if (!unit_at_portal) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    if (strcmp(portal->kind, "window") == 0
+        || strcmp(portal->kind, "roof_edge") == 0
+        || strcmp(portal->state, "unsafe") == 0
+        || strcmp(portal->state, "blocked") == 0) {
+        out_breach_result->outcome = MK_BREACH_OUTCOME_UNSAFE;
+    } else if (strcmp(portal->state, "open") == 0
+        || strcmp(portal->state, "breached") == 0
+        || strcmp(portal->state, "searched") == 0
+        || strcmp(portal->state, "compromised") == 0) {
+        out_breach_result->outcome = MK_BREACH_OUTCOME_ALREADY_OPEN;
+    } else if (strcmp(portal->state, "closed") == 0 || strcmp(portal->state, "locked") == 0) {
+        out_breach_result->outcome = MK_BREACH_OUTCOME_BREACHED;
+        mk_copy_text(portal->state, sizeof(portal->state), "breached");
+        portal->breached = true;
+        portal->breached_tick = game->tick;
+    } else {
+        out_breach_result->outcome = MK_BREACH_OUTCOME_ALREADY_OPEN;
+    }
+
+    portal->searched = true;
+    portal->searched_tick = game->tick;
+    mk_copy_text(out_breach_result->new_state, sizeof(out_breach_result->new_state), portal->state);
+    out_breach_result->score_delta = mk_breach_outcome_score_delta(out_breach_result->outcome);
+
+    unit->order = MK_ORDER_BREACH;
+    unit->has_move_target = false;
+    if (out_breach_result->outcome != MK_BREACH_OUTCOME_NONE) {
+        mk_contact_report_t *report = mk_game_add_contact_report(game, MK_CONTACT_REPORT_BREACH);
+
+        if (report != NULL) {
+            report->attacker_unit_id = unit->id;
+            report->side = unit->side;
+            report->position_m = unit->position_m;
+            report->target_position_m = position;
+            report->confidence = out_breach_result->outcome == MK_BREACH_OUTCOME_UNSAFE ? 75 : 100;
+            report->visible = true;
+            report->resolved = true;
+            out_breach_result->contact_report_id = report->id;
+        }
+    }
+
     return MK_OK;
 }
 
