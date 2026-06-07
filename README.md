@@ -47,6 +47,15 @@ cmake --build --preset strict
 ctest --preset strict
 ```
 
+Run the same portable C verification entry point used by GitHub Actions:
+
+```sh
+bash scripts/run_ci_checks.sh
+```
+
+The script writes a timestamped log to `build/ci-logs/`. On GitHub Actions,
+failed runs upload that log as a downloadable artifact.
+
 Run the current headless smoke scenario:
 
 ```sh

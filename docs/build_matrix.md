@@ -66,16 +66,25 @@ The shared Xcode scheme launches with the five-seed balance arguments enabled, s
 
 ## CI Smoke Checks
 
-A basic CI job should run:
+The GitHub Actions workflow in `.github/workflows/c-engine-ci.yml` runs on
+push, pull request, and manual dispatch. It executes the shared
+`scripts/run_ci_checks.sh` entry point on macOS, Windows, and Linux runners so
+local and remote verification stay aligned.
+
+The CI runner writes a timestamped log under `build/ci-logs/`. Failed workflow
+runs upload that text file as a downloadable artifact named with the runner OS
+and UTC start time, so the log can be handed back for diagnosis.
+
+The shared CI entry point runs:
 
 ```sh
-cmake --preset strict
-cmake --build --preset strict
-ctest --preset strict
-./build/strict/bin/mk_headless_run --steps 3 --quiet
-./build/strict/bin/mk_ai_battle --battles 1 --ticks 5 --quiet
-./build/strict/bin/mk_ai_battle --battles 5 --ticks 160 --seed 84985359904819 --seed-step 101 --quiet --fail-on-stall --expect-settled 5 --expect-max-stalled 0 --expect-min-worst-score 440
-./build/strict/bin/mk_replay_validate --help
+bash scripts/run_ci_checks.sh
 ```
 
-AI-vs-AI checks should keep adding seed-controlled autoplay runs, balance expectations, and replay playback validations, not just process exit codes.
+This expands to default and strict CMake builds, default and strict CTest
+suites, headless smoke output, an AI-vs-AI stall guard, an AddressSanitizer core
+test on macOS/Linux, and whitespace checks against the current commit or local
+diff.
+
+AI-vs-AI checks should keep adding seed-controlled autoplay runs, balance
+expectations, and replay playback validations, not just process exit codes.

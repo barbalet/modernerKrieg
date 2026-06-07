@@ -233,10 +233,10 @@ Implementation approach:
 - Added budget from gameplay-area integration rebaseline: 20 cycles.
 - Planned cycle budget: 100 cycles.
 - Planned cycle shape: 10 milestones x 10 cycles each.
-- Completed cycles in this ledger: 40.
-- Current cycle: 40.
-- Remaining planned cycles: 60.
-- Next cycle batch: cycles 41-50, Scenario Population And Data Expansion.
+- Completed cycles in this ledger: 41.
+- Current cycle: 41.
+- Remaining planned cycles: 59.
+- Next cycle batch: cycles 42-50, Scenario Population And Data Expansion.
 
 Prior implementation work is captured in the current audit and is not counted
 against this rebaselined ledger. When a development batch is completed,
@@ -250,6 +250,7 @@ increment `Completed cycles in this ledger`, advance `Current cycle`, reduce
 | 2026-06-07 | 20 | 20 | 80 | Topology Authoring Model | Added C-validated topology JSON, core topology state and queries, Mosul scenario handoff, debug/replay exposure, and topology validation tests. |
 | 2026-06-07 | 30 | 30 | 70 | Collision, Navigation, LOS, And Cover Products | Added derived tactical point queries, sampled gameplay-area LOS, navigation and cover lookups, game LOS integration, headless tactical-product exposure, and Mosul/core tests. |
 | 2026-06-07 | 40 | 40 | 60 | Topology-Aware Movement | Added deterministic topology route planning, compact per-unit route following, vertical level transitions, route failure reporting, board-view route waypoint overlays, AI withdraw route requests, replay route fields, and heap-backed Mosul scenario validation. |
+| 2026-06-07 | 41 | 41 | 59 | CI Automation Guardrail | Added a per-commit GitHub Actions C-engine workflow, shared local/CI runner script, timestamped failure logs, cross-platform default/strict tests, AI-only smoke checks, and sanitizer coverage on macOS/Linux. |
 
 ## Cycle Delta From Previous Plan
 
@@ -410,6 +411,9 @@ Exit criteria:
 - AI-only battle movement no longer depends on direct-line movement.
 
 ### Cycles 41-50: Scenario Population And Data Expansion
+
+Status: in progress. Cycle 41 completed on 2026-06-07 for CI automation at user
+request; scenario population work resumes at cycle 42.
 
 Goal: make the 2003 battle scenario data-rich enough for a real demo.
 

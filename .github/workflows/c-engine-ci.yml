@@ -1,0 +1,51 @@
+name: C Engine CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable-c:
+    name: Portable C (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Create log timestamp
+        id: timestamp
+        shell: bash
+        run: |
+          echo "value=$(date -u +"%Y%m%dT%H%M%SZ")" >> "$GITHUB_OUTPUT"
+
+      - name: Run portable C checks
+        shell: bash
+        env:
+          MK_CI_TIMESTAMP: ${{ steps.timestamp.outputs.value }}-${{ matrix.os }}
+        run: bash scripts/run_ci_checks.sh
+
+      - name: Upload failure log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: modernerKrieg-ci-${{ matrix.os }}-${{ steps.timestamp.outputs.value }}
+          path: |
+            build/ci-logs/modernerKrieg-ci-${{ steps.timestamp.outputs.value }}-${{ matrix.os }}.txt
+            build/ci-logs/latest-log-path.txt
+          if-no-files-found: warn
+          retention-days: 14
