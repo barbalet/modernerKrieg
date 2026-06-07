@@ -89,6 +89,16 @@ Write an after-action summary into a deterministic AI-only transcript:
   --transcript build/mosul_ai_aar.txt
 ```
 
+Write a versioned replay/event file for deterministic validation:
+
+```sh
+./build/bin/mk_headless_run \
+  --ai-only \
+  --max-ticks 10 \
+  --quiet \
+  --replay build/mosul_ai.mkreplay
+```
+
 Add simple balance expectations to fail a headless run when the expected state is not reached:
 
 ```sh
@@ -138,6 +148,7 @@ The core now supports deterministic board interaction without depending on SDL:
 - pick a unit at a map coordinate
 - select or clear a selected unit
 - issue hold/rally/other orders
+- issue investigate orders toward unresolved suspected or false contacts
 - issue withdraw orders through AI when units are pinned or heavily suppressed
 - issue a move order and advance toward the target on each simulation tick
 - run the same fixed-step loop from the SDL app or a headless command-line runner
@@ -148,10 +159,11 @@ The core now supports deterministic board interaction without depending on SDL:
 - retain contact reports for fire, reveal, and civilian-risk events
 - reveal hidden contacts through proximity and line-of-sight checks
 - retain suspected-danger and false-contact reports with confidence and terrain metadata
+- pick unresolved suspected/false contact reports for player-facing investigate commands
 - track civilian risk and stress from dangerous fire lanes and close armed movement
-- update objective-control state and score outcomes from objective control, civilian risk, casualties, time, and scenario thresholds
+- update objective-control state and score outcomes from objective control, civilian risk, casualties, time, scenario thresholds, and scenario score weights
 - carry scenario briefing and after-action text through data loading, snapshots, and headless output
-- produce deterministic debug/replay transcript lines for headless runs and future replay tooling
+- produce deterministic debug transcript lines and versioned replay/event files for headless runs and future replay tooling
 - track ready, suppressed, pinned, and broken unit states from live strength, training, and suppression
 - slow or halt movement under suppression and apply fire penalties from combat stress
 - represent richer soldier state, including stance, wound state, ammo capacity, stress, exposure, equipment flags, sensor flags, and reload/cooldown timers
@@ -162,12 +174,12 @@ The core now supports deterministic board interaction without depending on SDL:
 - validate map, sprite, and marker manifests without SDL
 - load the 2003 scenario from data with parser-side and core-side validation
 - run a selected scenario through the headless tool with seed, tick-count, quiet, and transcript controls
-- run player and opposing tactical controllers as deterministic AI-only headless runs with move, suppress, hold, civilian-risk restraint, and withdraw choices
+- run player and opposing tactical controllers as deterministic AI-only headless runs with move, investigate, overwatch, suppress, hold, civilian-risk restraint, and withdraw choices
 - hand map, sprite, and marker manifests to the SDL app, which can load PNGs when SDL3_image is available and fall back otherwise
 
-The next implementation push is replay and command facing: versioned replay event files, AI behavior around suspected contacts, investigate/search commands, and score/objective presentation in the SDL shell.
+The next implementation push is replay playback and contact resolution: make investigate/search resolve suspected and false contacts, validate replay files end to end, and continue improving score/objective presentation in the SDL shell.
 
-When the SDL3 app target is available, left-click selects a unit, right-click gives the selected unit a move order, arrow keys pan the board, and plus/minus zoom the board.
+When the SDL3 app target is available, left-click selects a unit, right-click gives the selected unit a move order, right-clicking a suspected/false contact gives an investigate order, arrow keys pan the board, and plus/minus zoom the board.
 
 ## Design Intent
 

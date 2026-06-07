@@ -180,7 +180,23 @@ static void mk_sdl_apply_input(mk_game_t *game, mk_board_view_t *view, const mk_
         }
 
         if (input->order_pressed) {
-            (void)mk_game_issue_selected_move_order(game, map_position);
+            uint32_t contact_report_id = 0;
+
+            if (mk_game_pick_contact_at(game, map_position, MK_UNIT_PICK_RADIUS_M * 1.5f, &contact_report_id) == MK_OK) {
+                size_t report_index;
+                mk_vec2_t investigate_position = map_position;
+
+                for (report_index = 0; report_index < game->contact_report_count; ++report_index) {
+                    if (game->contact_reports[report_index].id == contact_report_id) {
+                        investigate_position = game->contact_reports[report_index].position_m;
+                        break;
+                    }
+                }
+
+                (void)mk_game_issue_selected_investigate_order(game, investigate_position);
+            } else {
+                (void)mk_game_issue_selected_move_order(game, map_position);
+            }
         }
     }
 }
@@ -299,6 +315,7 @@ static float mk_sdl_max_float(float first, float second) {
 static void mk_sdl_update_window_title(SDL_Window *window, const mk_game_t *game) {
     mk_score_t score;
     const char *objective_side = "none";
+    const char *objective_label = "objective";
     char title[160];
 
     if (window == NULL || game == NULL) {
@@ -307,6 +324,7 @@ static void mk_sdl_update_window_title(SDL_Window *window, const mk_game_t *game
 
     if (game->objective_count > 0) {
         objective_side = mk_sdl_side_name(game->objectives[0].controlling_side);
+        objective_label = game->objectives[0].label[0] != '\0' ? game->objectives[0].label : game->objectives[0].name;
     }
 
     if (mk_game_score(game, &score) != MK_OK) {
@@ -316,8 +334,9 @@ static void mk_sdl_update_window_title(SDL_Window *window, const mk_game_t *game
     (void)snprintf(
         title,
         sizeof(title),
-        "modernerKrieg Mosul Demo | score %d | objective %s",
+        "modernerKrieg Mosul Demo | score %d | %s %s",
         score.total_score,
+        objective_label,
         objective_side
     );
     SDL_SetWindowTitle(window, title);

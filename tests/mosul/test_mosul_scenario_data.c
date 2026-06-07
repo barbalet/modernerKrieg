@@ -56,6 +56,11 @@ static void test_default_scenario_data_matches_fixture_shape(void) {
     MK_TEST_ASSERT(loaded.seed == fixture.seed);
     MK_TEST_ASSERT(loaded.score_success_threshold == fixture.score_success_threshold);
     MK_TEST_ASSERT(loaded.score_partial_threshold == fixture.score_partial_threshold);
+    MK_TEST_ASSERT(loaded.score_objective_weight == fixture.score_objective_weight);
+    MK_TEST_ASSERT(loaded.score_civilian_risk_weight == fixture.score_civilian_risk_weight);
+    MK_TEST_ASSERT(loaded.score_player_casualty_weight == fixture.score_player_casualty_weight);
+    MK_TEST_ASSERT(loaded.score_civilian_casualty_weight == fixture.score_civilian_casualty_weight);
+    MK_TEST_ASSERT(loaded.score_time_weight == fixture.score_time_weight);
     MK_TEST_ASSERT(strcmp(loaded.map.name, fixture.map.name) == 0);
     MK_TEST_ASSERT_CLOSE(loaded.map.width_m, fixture.map.width_m);
     MK_TEST_ASSERT_CLOSE(loaded.map.height_m, fixture.map.height_m);
@@ -65,6 +70,7 @@ static void test_default_scenario_data_matches_fixture_shape(void) {
     MK_TEST_ASSERT(loaded.faction_count == fixture.faction_count);
     MK_TEST_ASSERT(loaded.force_count == fixture.force_count);
     MK_TEST_ASSERT(loaded.objective_count == fixture.objective_count);
+    MK_TEST_ASSERT(strcmp(loaded.objectives[0].label, fixture.objectives[0].label) == 0);
     MK_TEST_ASSERT(loaded.civilian_count == fixture.civilian_count);
     MK_TEST_ASSERT(loaded.unit_count == fixture.unit_count);
     MK_TEST_ASSERT(strcmp(loaded.forces[0].command.callsign, fixture.forces[0].command.callsign) == 0);
@@ -88,6 +94,19 @@ static void test_public_default_scenario_uses_data_file(void) {
     MK_TEST_ASSERT(mk_game_load_scenario(&game, &scenario) == MK_OK);
     MK_TEST_ASSERT(strcmp(game.scenario_name, "Market Commercial Streets 2003") == 0);
     MK_TEST_ASSERT(game.unit_count == 3);
+}
+
+static void test_control_smoke_scenario_loads(void) {
+    char path[512];
+    mk_scenario_definition_t scenario;
+    mk_game_t game;
+
+    make_project_path(path, sizeof(path), "game/mosul/scenarios/market_control_smoke_2003.mkscenario");
+    MK_TEST_ASSERT(mk_mosul_load_scenario_file(path, MK_TEST_PROJECT_ROOT, &scenario) == MK_OK);
+    MK_TEST_ASSERT(strcmp(scenario.objectives[0].label, "Market Junction") == 0);
+    MK_TEST_ASSERT(scenario.civilian_count == 0);
+    MK_TEST_ASSERT(scenario.unit_count == 2);
+    MK_TEST_ASSERT(mk_game_load_scenario(&game, &scenario) == MK_OK);
 }
 
 static void test_missing_asset_manifest_is_rejected(void) {
@@ -225,13 +244,31 @@ static void test_invalid_score_thresholds_are_rejected(void) {
     MK_TEST_ASSERT(mk_mosul_load_scenario_file(path, MK_TEST_PROJECT_ROOT, &scenario) == MK_ERROR_INVALID_DATA);
 }
 
+static void test_invalid_score_weight_is_rejected(void) {
+    char path[512];
+    mk_scenario_definition_t scenario;
+
+    make_binary_path(path, sizeof(path), "bad_score_weight.mkscenario");
+    write_text_file(
+        path,
+        "format=modernerKrieg.scenario.v1\n"
+        "name=Bad Score Weight\n"
+        "seed=1\n"
+        "score.objective_weight=-1\n"
+    );
+
+    MK_TEST_ASSERT(mk_mosul_load_scenario_file(path, MK_TEST_PROJECT_ROOT, &scenario) == MK_ERROR_INVALID_DATA);
+}
+
 int main(void) {
     test_default_scenario_data_matches_fixture_shape();
     test_public_default_scenario_uses_data_file();
+    test_control_smoke_scenario_loads();
     test_missing_asset_manifest_is_rejected();
     test_invalid_force_reference_is_rejected();
     test_impossible_objective_bounds_are_rejected();
     test_invalid_score_thresholds_are_rejected();
+    test_invalid_score_weight_is_rejected();
 
     puts("mk_mosul_scenario_data_tests: ok");
     return 0;

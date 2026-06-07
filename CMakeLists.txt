@@ -193,6 +193,23 @@ if(MK_BUILD_TESTS)
       --expect-min-score -10
   )
   add_test(
+    NAME mk_headless_run_replay_output
+    COMMAND ${CMAKE_COMMAND}
+      -DMK_HEADLESS_RUN=$<TARGET_FILE:mk_headless_run>
+      -DMK_REPLAY_PATH=${CMAKE_CURRENT_BINARY_DIR}/mosul_replay.mkreplay
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckHeadlessReplay.cmake
+  )
+  add_test(
+    NAME mk_headless_run_control_balance
+    COMMAND mk_headless_run
+      --scenario game/mosul/scenarios/market_control_smoke_2003.mkscenario
+      --steps 8
+      --quiet
+      --ai-only
+      --expect-objective player
+      --expect-min-score 490
+  )
+  add_test(
     NAME mk_core_no_sdl_headers
     COMMAND ${CMAKE_COMMAND}
       -DMK_PROJECT_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}

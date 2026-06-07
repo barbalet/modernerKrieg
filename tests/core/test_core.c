@@ -215,6 +215,11 @@ static void test_scenario_loading_populates_core_state(void) {
     assert(strstr(game.briefing, "Secure the market junction") != NULL);
     assert(game.score_success_threshold == MK_DEFAULT_SCORE_SUCCESS_THRESHOLD);
     assert(game.score_partial_threshold == MK_DEFAULT_SCORE_PARTIAL_THRESHOLD);
+    assert(game.score_objective_weight == MK_DEFAULT_SCORE_OBJECTIVE_WEIGHT);
+    assert(game.score_civilian_risk_weight == MK_DEFAULT_SCORE_CIVILIAN_RISK_WEIGHT);
+    assert(game.score_player_casualty_weight == MK_DEFAULT_SCORE_PLAYER_CASUALTY_WEIGHT);
+    assert(game.score_civilian_casualty_weight == MK_DEFAULT_SCORE_CIVILIAN_CASUALTY_WEIGHT);
+    assert(game.score_time_weight == MK_DEFAULT_SCORE_TIME_WEIGHT);
     assert(game.rng_state == scenario.seed);
     assert(strcmp(game.map.name, "Market / Commercial Streets") == 0);
     assert(game.map.tile_count == 100);
@@ -226,6 +231,7 @@ static void test_scenario_loading_populates_core_state(void) {
     assert(game.faction_count == 3);
     assert(game.force_count == 3);
     assert(game.objective_count == 1);
+    assert(strcmp(game.objectives[0].label, "Market Junction") == 0);
     assert(game.civilian_count == 1);
     assert(game.unit_count == 3);
     assert(game.controllers[0].kind == MK_CONTROLLER_TACTICAL_AI);
@@ -263,6 +269,11 @@ static void test_snapshot_is_stable_copy(void) {
     assert(strcmp(snapshot.briefing, game.briefing) == 0);
     assert(snapshot.score_success_threshold == game.score_success_threshold);
     assert(snapshot.score_partial_threshold == game.score_partial_threshold);
+    assert(snapshot.score_objective_weight == game.score_objective_weight);
+    assert(snapshot.score_civilian_risk_weight == game.score_civilian_risk_weight);
+    assert(snapshot.score_player_casualty_weight == game.score_player_casualty_weight);
+    assert(snapshot.score_civilian_casualty_weight == game.score_civilian_casualty_weight);
+    assert(snapshot.score_time_weight == game.score_time_weight);
     assert(snapshot.units[0].suppression == 4);
     assert(snapshot.units[0].soldiers[0].suppression == 1);
     assert(snapshot.map.terrain[1].blocks_line_of_sight);
@@ -274,6 +285,7 @@ static void test_snapshot_is_stable_copy(void) {
     assert(snapshot.forces[1].faction_id == 2);
     assert(snapshot.civilians[0].position_m.x == 252.0f);
     assert(strcmp(snapshot.objectives[0].name, "Secure Market Junction") == 0);
+    assert(strcmp(snapshot.objectives[0].label, "Market Junction") == 0);
 
     game.units[0].suppression = 99;
     game.controllers[0].kind = MK_CONTROLLER_HUMAN;
@@ -314,6 +326,43 @@ static void test_pick_select_and_move_order(void) {
     assert(unit->order == MK_ORDER_HOLD);
 }
 
+static void test_pick_contact_and_investigate_order(void) {
+    mk_scenario_definition_t scenario = make_east_mosul_block_scenario_fixture();
+    mk_game_t game;
+    mk_unit_t *unit;
+    uint32_t contact_report_id = 0;
+
+    assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
+    game.contact_report_count = 1;
+    memset(&game.contact_reports[0], 0, sizeof(game.contact_reports[0]));
+    game.contact_reports[0].id = 1;
+    game.contact_reports[0].kind = MK_CONTACT_REPORT_SUSPECTED_DANGER;
+    game.contact_reports[0].side = MK_SIDE_OPFOR;
+    game.contact_reports[0].attacker_unit_id = 1;
+    game.contact_reports[0].target_unit_id = 2;
+    game.contact_reports[0].position_m = make_vec2(220.0f, 246.0f);
+    game.contact_reports[0].target_position_m = game.contact_reports[0].position_m;
+    game.contact_reports[0].confidence = 45;
+    game.contact_reports[0].visible = true;
+
+    assert(mk_game_pick_contact_at(&game, make_vec2(222.0f, 246.0f), 8.0f, &contact_report_id) == MK_OK);
+    assert(contact_report_id == 1);
+    assert(mk_game_pick_contact_at(&game, make_vec2(260.0f, 246.0f), 8.0f, &contact_report_id) == MK_ERROR_NOT_FOUND);
+    assert(contact_report_id == 0);
+
+    assert(mk_game_select_unit(&game, 1) == MK_OK);
+    assert(mk_game_issue_selected_investigate_order(&game, game.contact_reports[0].position_m) == MK_OK);
+    unit = mk_game_find_unit(&game, 1);
+    assert(unit != NULL);
+    assert(unit->order == MK_ORDER_INVESTIGATE);
+    assert(unit->has_move_target);
+
+    mk_game_step(&game);
+    assert_close(unit->position_m.x, 83.6f);
+    assert_close(unit->position_m.y, 246.0f);
+    assert(unit->order == MK_ORDER_INVESTIGATE);
+}
+
 static void test_interaction_errors_are_reported(void) {
     mk_scenario_definition_t scenario = make_east_mosul_block_scenario_fixture();
     mk_game_t game;
@@ -324,8 +373,10 @@ static void test_interaction_errors_are_reported(void) {
     assert(unit_id == 0);
     assert(mk_game_select_unit(&game, 99) == MK_ERROR_NOT_FOUND);
     assert(mk_game_issue_selected_move_order(&game, make_vec2(50.0f, 50.0f)) == MK_ERROR_NOT_FOUND);
+    assert(mk_game_issue_selected_investigate_order(&game, make_vec2(50.0f, 50.0f)) == MK_ERROR_NOT_FOUND);
     assert(mk_game_select_unit(&game, 1) == MK_OK);
     assert(mk_game_issue_selected_move_order(&game, make_vec2(999.0f, 50.0f)) == MK_ERROR_INVALID_DATA);
+    assert(mk_game_issue_selected_investigate_order(&game, make_vec2(999.0f, 50.0f)) == MK_ERROR_INVALID_DATA);
     assert(mk_game_clear_selection(&game) == MK_OK);
     assert(game.selected_unit_id == 0);
 }
@@ -661,6 +712,33 @@ static void test_objective_control_and_scoring(void) {
     assert(score.outcome == MK_OUTCOME_PLAYER_PARTIAL);
 }
 
+static void test_score_uses_scenario_weights(void) {
+    mk_scenario_definition_t scenario = make_east_mosul_block_scenario_fixture();
+    mk_game_t game;
+    mk_score_t score;
+
+    scenario.score_objective_weight = 80;
+    scenario.score_civilian_risk_weight = 5;
+    scenario.score_player_casualty_weight = 40;
+    scenario.score_civilian_casualty_weight = 90;
+    scenario.score_time_weight = 2;
+
+    assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
+    game.units[0].position_m = game.objectives[0].position_m;
+    game.units[1].position_m = make_vec2(420.0f, 230.0f);
+    game.civilians[0].risk = 3;
+    game.units[0].soldiers[0].casualty = true;
+    game.tick = 4;
+    assert(mk_game_update_objective_control(&game) == MK_OK);
+    assert(mk_game_score(&game, &score) == MK_OK);
+
+    assert(score.objective_points == 400);
+    assert(score.civilian_risk_penalty == 15);
+    assert(score.casualty_penalty == 40);
+    assert(score.time_penalty == 8);
+    assert(score.total_score == 337);
+}
+
 static void test_after_action_report_is_stable(void) {
     mk_scenario_definition_t scenario = make_east_mosul_block_scenario_fixture();
     mk_game_t game;
@@ -711,6 +789,10 @@ static void test_invalid_scenario_is_rejected(void) {
     scenario = make_east_mosul_block_scenario_fixture();
     scenario.map.tiles[0].movement_cost = -1;
     assert(mk_game_load_scenario(&game, &scenario) == MK_ERROR_INVALID_DATA);
+
+    scenario = make_east_mosul_block_scenario_fixture();
+    scenario.score_objective_weight = -1;
+    assert(mk_game_load_scenario(&game, &scenario) == MK_ERROR_INVALID_DATA);
 }
 
 int main(void) {
@@ -725,6 +807,7 @@ int main(void) {
     test_scenario_loading_populates_core_state();
     test_snapshot_is_stable_copy();
     test_pick_select_and_move_order();
+    test_pick_contact_and_investigate_order();
     test_interaction_errors_are_reported();
     test_line_of_sight_reports_target_cover();
     test_line_of_sight_reports_blocking_terrain();
@@ -739,6 +822,7 @@ int main(void) {
     test_suppression_status_slows_movement_and_recovers();
     test_broken_unit_halts_movement();
     test_objective_control_and_scoring();
+    test_score_uses_scenario_weights();
     test_after_action_report_is_stable();
     test_invalid_scenario_is_rejected();
 

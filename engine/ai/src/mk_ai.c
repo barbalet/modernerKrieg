@@ -197,7 +197,8 @@ static const mk_unit_t *mk_ai_find_nearest_enemy(const mk_game_t *game, const mk
             || candidate->side == MK_SIDE_CIVILIAN
             || candidate->side == unit->side
             || candidate->soldier_count == 0
-            || candidate->status == MK_UNIT_BROKEN) {
+            || candidate->status == MK_UNIT_BROKEN
+            || (candidate->hidden && !candidate->revealed)) {
             continue;
         }
 
@@ -211,9 +212,39 @@ static const mk_unit_t *mk_ai_find_nearest_enemy(const mk_game_t *game, const mk
     return nearest;
 }
 
+static const mk_contact_report_t *mk_ai_find_best_suspected_contact(const mk_game_t *game, const mk_unit_t *unit) {
+    const mk_contact_report_t *best_report = NULL;
+    int best_confidence = -1;
+    size_t index;
+
+    if (game == NULL || unit == NULL) {
+        return NULL;
+    }
+
+    for (index = 0; index < game->contact_report_count; ++index) {
+        const mk_contact_report_t *report = &game->contact_reports[index];
+
+        if (report->kind != MK_CONTACT_REPORT_SUSPECTED_DANGER
+            || report->resolved
+            || !report->visible
+            || report->side == MK_SIDE_CIVILIAN
+            || report->side == unit->side) {
+            continue;
+        }
+
+        if (best_report == NULL || report->confidence > best_confidence) {
+            best_report = report;
+            best_confidence = report->confidence;
+        }
+    }
+
+    return best_report;
+}
+
 static mk_result_t mk_ai_issue_player_order(mk_game_t *game, const mk_unit_t *unit) {
     mk_vec2_t objective_position;
     const mk_unit_t *enemy = mk_ai_find_nearest_enemy(game, unit);
+    const mk_contact_report_t *suspected_contact = mk_ai_find_best_suspected_contact(game, unit);
     mk_line_of_sight_t line_of_sight;
 
     if (mk_ai_protected_civilian_near_position(game, unit->position_m, 24.0f)) {
@@ -222,6 +253,14 @@ static mk_result_t mk_ai_issue_player_order(mk_game_t *game, const mk_unit_t *un
 
     if (unit->status == MK_UNIT_PINNED || unit->suppression >= 12) {
         return mk_ai_issue_withdraw_order(game, mk_game_find_unit(game, unit->id), enemy);
+    }
+
+    if (suspected_contact != NULL) {
+        if (mk_vec2_distance(unit->position_m, suspected_contact->position_m) <= 80.0f) {
+            return mk_game_issue_order(game, unit->id, MK_ORDER_OVERWATCH);
+        }
+
+        return mk_game_issue_investigate_order(game, unit->id, suspected_contact->position_m);
     }
 
     if (enemy != NULL

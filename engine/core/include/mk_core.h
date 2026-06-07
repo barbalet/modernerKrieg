@@ -27,6 +27,11 @@ extern "C" {
 #define MK_DEFAULT_MOVE_SPEED_M_PER_TICK 6.0f
 #define MK_DEFAULT_SCORE_SUCCESS_THRESHOLD 450
 #define MK_DEFAULT_SCORE_PARTIAL_THRESHOLD 150
+#define MK_DEFAULT_SCORE_OBJECTIVE_WEIGHT 100
+#define MK_DEFAULT_SCORE_CIVILIAN_RISK_WEIGHT 10
+#define MK_DEFAULT_SCORE_PLAYER_CASUALTY_WEIGHT 50
+#define MK_DEFAULT_SCORE_CIVILIAN_CASUALTY_WEIGHT 100
+#define MK_DEFAULT_SCORE_TIME_WEIGHT 1
 
 typedef enum {
     MK_OK = 0,
@@ -75,7 +80,8 @@ typedef enum {
     MK_ORDER_OVERWATCH = 6,
     MK_ORDER_BREACH = 7,
     MK_ORDER_RALLY = 8,
-    MK_ORDER_WITHDRAW = 9
+    MK_ORDER_WITHDRAW = 9,
+    MK_ORDER_INVESTIGATE = 10
 } mk_order_t;
 
 typedef enum {
@@ -330,6 +336,7 @@ typedef struct {
 typedef struct {
     uint32_t id;
     char name[MK_NAME_CAPACITY];
+    char label[MK_NAME_CAPACITY];
     mk_objective_kind_t kind;
     mk_vec2_t position_m;
     float radius_m;
@@ -427,6 +434,11 @@ typedef struct {
     uint64_t seed;
     int score_success_threshold;
     int score_partial_threshold;
+    int score_objective_weight;
+    int score_civilian_risk_weight;
+    int score_player_casualty_weight;
+    int score_civilian_casualty_weight;
+    int score_time_weight;
     mk_map_t map;
     size_t controller_count;
     mk_controller_slot_t controllers[MK_MAX_CONTROLLERS];
@@ -452,6 +464,11 @@ typedef struct {
     uint64_t rng_state;
     int score_success_threshold;
     int score_partial_threshold;
+    int score_objective_weight;
+    int score_civilian_risk_weight;
+    int score_player_casualty_weight;
+    int score_civilian_casualty_weight;
+    int score_time_weight;
     uint32_t selected_unit_id;
     mk_map_t map;
     size_t controller_count;
@@ -480,6 +497,11 @@ typedef struct {
     uint64_t rng_state;
     int score_success_threshold;
     int score_partial_threshold;
+    int score_objective_weight;
+    int score_civilian_risk_weight;
+    int score_player_casualty_weight;
+    int score_civilian_casualty_weight;
+    int score_time_weight;
     uint32_t selected_unit_id;
     mk_map_t map;
     size_t controller_count;
@@ -515,12 +537,21 @@ mk_result_t mk_game_run_fixed_steps(
 mk_result_t mk_game_snapshot(const mk_game_t *game, mk_game_snapshot_t *out_snapshot);
 mk_result_t mk_game_load_scenario(mk_game_t *game, const mk_scenario_definition_t *scenario);
 mk_result_t mk_game_pick_unit_at(const mk_game_t *game, mk_vec2_t position_m, float radius_m, uint32_t *out_unit_id);
+mk_result_t mk_game_pick_contact_at(
+    const mk_game_t *game,
+    mk_vec2_t position_m,
+    float radius_m,
+    uint32_t *out_contact_report_id
+);
 mk_result_t mk_game_select_unit(mk_game_t *game, uint32_t unit_id);
 mk_result_t mk_game_select_unit_at(mk_game_t *game, mk_vec2_t position_m, float radius_m, uint32_t *out_unit_id);
 mk_result_t mk_game_clear_selection(mk_game_t *game);
 mk_result_t mk_game_issue_order(mk_game_t *game, uint32_t unit_id, mk_order_t order);
 mk_result_t mk_game_issue_move_order(mk_game_t *game, uint32_t unit_id, mk_vec2_t target_position_m);
+mk_result_t mk_game_issue_assault_move_order(mk_game_t *game, uint32_t unit_id, mk_vec2_t target_position_m);
+mk_result_t mk_game_issue_investigate_order(mk_game_t *game, uint32_t unit_id, mk_vec2_t target_position_m);
 mk_result_t mk_game_issue_selected_move_order(mk_game_t *game, mk_vec2_t target_position_m);
+mk_result_t mk_game_issue_selected_investigate_order(mk_game_t *game, mk_vec2_t target_position_m);
 mk_result_t mk_game_trace_line_of_sight(
     const mk_game_t *game,
     mk_vec2_t from_m,

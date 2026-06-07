@@ -18,6 +18,8 @@ typedef struct {
     bool quiet;
     bool debug_log;
     FILE *transcript;
+    FILE *replay;
+    size_t replay_last_contact_count;
 } mk_headless_run_observer_t;
 
 static const char *mk_headless_side_name(mk_side_t side) {
@@ -82,6 +84,8 @@ static const char *mk_headless_order_name(mk_order_t order) {
             return "rally";
         case MK_ORDER_WITHDRAW:
             return "withdraw";
+        case MK_ORDER_INVESTIGATE:
+            return "investigate";
         case MK_ORDER_NONE:
         default:
             return "none";
@@ -102,6 +106,20 @@ static const char *mk_headless_contact_kind_name(mk_contact_report_kind_t kind) 
             return "false_contact";
         default:
             return "unknown";
+    }
+}
+
+static const char *mk_headless_outcome_name(mk_outcome_t outcome) {
+    switch (outcome) {
+        case MK_OUTCOME_PLAYER_SUCCESS:
+            return "success";
+        case MK_OUTCOME_PLAYER_PARTIAL:
+            return "partial";
+        case MK_OUTCOME_PLAYER_FAILURE:
+            return "failure";
+        case MK_OUTCOME_IN_PROGRESS:
+        default:
+            return "in_progress";
     }
 }
 
@@ -199,6 +217,141 @@ static void mk_headless_print_debug_tick(FILE *stream, const mk_game_t *game) {
     fprintf(stream, "\n");
 }
 
+static void mk_headless_print_replay_header(FILE *stream, const mk_game_t *game, uint32_t steps, bool ai_only) {
+    if (stream == NULL || game == NULL) {
+        return;
+    }
+
+    fprintf(
+        stream,
+        "mk_replay version=1 scenario=\"%s\" seed=%llu steps=%u ai_only=%d\n",
+        game->scenario_name,
+        (unsigned long long)game->rng_state,
+        steps,
+        ai_only ? 1 : 0
+    );
+    fprintf(
+        stream,
+        "event tick=%u kind=start units=%u objectives=%u contacts=%u\n",
+        game->tick,
+        (unsigned)game->unit_count,
+        (unsigned)game->objective_count,
+        (unsigned)game->contact_report_count
+    );
+}
+
+static void mk_headless_print_replay_tick(
+    FILE *stream,
+    const mk_game_t *game,
+    mk_headless_run_observer_t *observer
+) {
+    mk_score_t score;
+    size_t unit_index;
+    size_t objective_index;
+    size_t contact_index;
+
+    if (stream == NULL || game == NULL || observer == NULL) {
+        return;
+    }
+
+    for (unit_index = 0; unit_index < game->unit_count; ++unit_index) {
+        const mk_unit_t *unit = &game->units[unit_index];
+
+        fprintf(
+            stream,
+            "event tick=%u kind=unit id=%u side=%s order=%s status=%s x=%.2f y=%.2f target_x=%.2f target_y=%.2f has_target=%d hidden=%d revealed=%d\n",
+            game->tick,
+            unit->id,
+            mk_headless_side_name(unit->side),
+            mk_headless_order_name(unit->order),
+            mk_headless_status_name(unit->status),
+            unit->position_m.x,
+            unit->position_m.y,
+            unit->target_position_m.x,
+            unit->target_position_m.y,
+            unit->has_move_target ? 1 : 0,
+            unit->hidden ? 1 : 0,
+            unit->revealed ? 1 : 0
+        );
+    }
+
+    for (objective_index = 0; objective_index < game->objective_count; ++objective_index) {
+        const mk_objective_t *objective = &game->objectives[objective_index];
+
+        fprintf(
+            stream,
+            "event tick=%u kind=objective id=%u label=\"%s\" side=%s value=%d\n",
+            game->tick,
+            objective->id,
+            objective->label,
+            mk_headless_side_name(objective->controlling_side),
+            objective->value
+        );
+    }
+
+    if (mk_game_score(game, &score) != MK_OK) {
+        memset(&score, 0, sizeof(score));
+    }
+    fprintf(
+        stream,
+        "event tick=%u kind=score total=%d outcome=%s controlled=%u contested=%u civilian_risk=%d\n",
+        game->tick,
+        score.total_score,
+        mk_headless_outcome_name(score.outcome),
+        (unsigned)score.controlled_objectives,
+        (unsigned)score.contested_objectives,
+        score.civilian_risk
+    );
+
+    for (contact_index = observer->replay_last_contact_count;
+         contact_index < game->contact_report_count;
+         ++contact_index) {
+        const mk_contact_report_t *report = &game->contact_reports[contact_index];
+
+        fprintf(
+            stream,
+            "event tick=%u kind=contact id=%u contact=%s side=%s observer=%u target=%u civilian=%u terrain=%u confidence=%d resolved=%d x=%.2f y=%.2f target_x=%.2f target_y=%.2f\n",
+            game->tick,
+            report->id,
+            mk_headless_contact_kind_name(report->kind),
+            mk_headless_side_name(report->side),
+            report->attacker_unit_id,
+            report->target_unit_id,
+            report->civilian_id,
+            report->terrain_id,
+            report->confidence,
+            report->resolved ? 1 : 0,
+            report->position_m.x,
+            report->position_m.y,
+            report->target_position_m.x,
+            report->target_position_m.y
+        );
+    }
+
+    observer->replay_last_contact_count = game->contact_report_count;
+}
+
+static void mk_headless_print_replay_end(FILE *stream, const mk_game_t *game, mk_result_t result) {
+    mk_score_t score;
+
+    if (stream == NULL || game == NULL) {
+        return;
+    }
+
+    if (mk_game_score(game, &score) != MK_OK) {
+        memset(&score, 0, sizeof(score));
+    }
+
+    fprintf(
+        stream,
+        "event tick=%u kind=end result=%s score=%d outcome=%s\n",
+        game->tick,
+        mk_result_name(result),
+        score.total_score,
+        mk_headless_outcome_name(score.outcome)
+    );
+}
+
 static mk_result_t mk_headless_observe_tick(const mk_game_t *game, void *user_data) {
     mk_headless_run_observer_t *observer = (mk_headless_run_observer_t *)user_data;
 
@@ -218,6 +371,10 @@ static mk_result_t mk_headless_observe_tick(const mk_game_t *game, void *user_da
         if (observer->debug_log) {
             mk_headless_print_debug_tick(observer->transcript, game);
         }
+    }
+
+    if (observer->replay != NULL) {
+        mk_headless_print_replay_tick(observer->replay, game, observer);
     }
 
     return MK_OK;
@@ -280,7 +437,7 @@ static bool mk_headless_parse_i32(const char *text, int *out_value) {
 static void mk_headless_print_usage(const char *program_name) {
     fprintf(
         stderr,
-        "usage: %s [--scenario PATH] [--project-root PATH] [--steps N|--max-ticks N] [--seed N] [--quiet] [--transcript PATH] [--ai-only] [--aar] [--briefing] [--debug-log] [--expect-objective SIDE] [--expect-min-score N]\n"
+        "usage: %s [--scenario PATH] [--project-root PATH] [--steps N|--max-ticks N] [--seed N] [--quiet] [--transcript PATH] [--replay PATH] [--ai-only] [--aar] [--briefing] [--debug-log] [--expect-objective SIDE] [--expect-min-score N]\n"
         "\n"
         "Runs a MOSUL scenario headlessly for deterministic smoke tests and AI-only runs.\n",
         program_name
@@ -415,6 +572,22 @@ static mk_result_t mk_headless_run_steps(
     return MK_OK;
 }
 
+static void mk_headless_close_outputs(mk_headless_run_observer_t *observer) {
+    if (observer == NULL) {
+        return;
+    }
+
+    if (observer->transcript != NULL) {
+        fclose(observer->transcript);
+        observer->transcript = NULL;
+    }
+
+    if (observer->replay != NULL) {
+        fclose(observer->replay);
+        observer->replay = NULL;
+    }
+}
+
 int main(int argc, char **argv) {
     mk_scenario_definition_t scenario;
     mk_game_t game;
@@ -422,6 +595,7 @@ int main(int argc, char **argv) {
     const char *scenario_path = NULL;
     const char *project_root = MK_PROJECT_SOURCE_DIR;
     const char *transcript_path = NULL;
+    const char *replay_path = NULL;
     uint32_t steps = 10;
     uint64_t seed = 0;
     bool has_seed = false;
@@ -438,6 +612,8 @@ int main(int argc, char **argv) {
     observer.quiet = false;
     observer.debug_log = false;
     observer.transcript = NULL;
+    observer.replay = NULL;
+    observer.replay_last_contact_count = 0;
 
     for (arg_index = 1; arg_index < argc; ++arg_index) {
         const char *argument = argv[arg_index];
@@ -526,6 +702,17 @@ int main(int argc, char **argv) {
             continue;
         }
 
+        if (strcmp(argument, "--replay") == 0) {
+            if (arg_index + 1 >= argc) {
+                mk_headless_print_usage(argv[0]);
+                return 2;
+            }
+
+            replay_path = argv[arg_index + 1];
+            arg_index += 1;
+            continue;
+        }
+
         if (strcmp(argument, "--expect-objective") == 0) {
             if (arg_index + 1 >= argc || !mk_headless_parse_side(argv[arg_index + 1], &expected_objective_side)) {
                 mk_headless_print_usage(argv[0]);
@@ -560,12 +747,19 @@ int main(int argc, char **argv) {
         }
     }
 
+    if (replay_path != NULL) {
+        observer.replay = fopen(replay_path, "w");
+        if (observer.replay == NULL) {
+            fprintf(stderr, "failed to open replay \"%s\"\n", replay_path);
+            mk_headless_close_outputs(&observer);
+            return 1;
+        }
+    }
+
     result = mk_headless_load_scenario(scenario_path, project_root, &scenario);
     if (result != MK_OK) {
         fprintf(stderr, "failed to load Mosul scenario: %s\n", mk_result_name(result));
-        if (observer.transcript != NULL) {
-            fclose(observer.transcript);
-        }
+        mk_headless_close_outputs(&observer);
         return 1;
     }
 
@@ -576,9 +770,7 @@ int main(int argc, char **argv) {
     result = mk_game_load_scenario(&game, &scenario);
     if (result != MK_OK) {
         fprintf(stderr, "failed to load Mosul scenario: %s\n", mk_result_name(result));
-        if (observer.transcript != NULL) {
-            fclose(observer.transcript);
-        }
+        mk_headless_close_outputs(&observer);
         return 1;
     }
 
@@ -596,20 +788,27 @@ int main(int argc, char **argv) {
         }
     }
 
+    if (observer.replay != NULL) {
+        mk_headless_print_replay_header(observer.replay, &game, steps, ai_only);
+        observer.replay_last_contact_count = game.contact_report_count;
+    }
+
     result = mk_headless_run_steps(&game, steps, ai_only, &observer);
     if (result != MK_OK) {
         fprintf(stderr, "headless run stopped: %s\n", mk_result_name(result));
-        if (observer.transcript != NULL) {
-            fclose(observer.transcript);
+        if (observer.replay != NULL) {
+            mk_headless_print_replay_end(observer.replay, &game, result);
         }
+        mk_headless_close_outputs(&observer);
         return 1;
     }
 
     if (expect_objective && !mk_headless_objective_side_present(&game, expected_objective_side)) {
         fprintf(stderr, "expected objective controlled by %s\n", mk_headless_side_name(expected_objective_side));
-        if (observer.transcript != NULL) {
-            fclose(observer.transcript);
+        if (observer.replay != NULL) {
+            mk_headless_print_replay_end(observer.replay, &game, MK_ERROR_INVALID_DATA);
         }
+        mk_headless_close_outputs(&observer);
         return 1;
     }
 
@@ -619,9 +818,10 @@ int main(int argc, char **argv) {
         result = mk_game_score(&game, &score);
         if (result != MK_OK || score.total_score < expected_min_score) {
             fprintf(stderr, "expected score >= %d\n", expected_min_score);
-            if (observer.transcript != NULL) {
-                fclose(observer.transcript);
+            if (observer.replay != NULL) {
+                mk_headless_print_replay_end(observer.replay, &game, result == MK_OK ? MK_ERROR_INVALID_DATA : result);
             }
+            mk_headless_close_outputs(&observer);
             return 1;
         }
     }
@@ -638,8 +838,12 @@ int main(int argc, char **argv) {
         if (print_aar) {
             mk_headless_print_after_action(observer.transcript, &game);
         }
-        fclose(observer.transcript);
     }
 
+    if (observer.replay != NULL) {
+        mk_headless_print_replay_end(observer.replay, &game, MK_OK);
+    }
+
+    mk_headless_close_outputs(&observer);
     return 0;
 }

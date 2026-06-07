@@ -229,6 +229,7 @@ static mk_result_t mk_mosul_add_objectives(mk_scenario_definition_t *scenario) {
         5
     );
 
+    snprintf(objective.label, sizeof(objective.label), "%s", "Market Junction");
     return mk_scenario_add_objective(scenario, &objective, NULL);
 }
 
@@ -400,6 +401,11 @@ mk_result_t mk_mosul_make_market_2003_fixture_scenario(mk_scenario_definition_t 
     out_scenario->seed = UINT64_C(0x4D4B32303033);
     out_scenario->score_success_threshold = MK_DEFAULT_SCORE_SUCCESS_THRESHOLD;
     out_scenario->score_partial_threshold = MK_DEFAULT_SCORE_PARTIAL_THRESHOLD;
+    out_scenario->score_objective_weight = MK_DEFAULT_SCORE_OBJECTIVE_WEIGHT;
+    out_scenario->score_civilian_risk_weight = MK_DEFAULT_SCORE_CIVILIAN_RISK_WEIGHT;
+    out_scenario->score_player_casualty_weight = MK_DEFAULT_SCORE_PLAYER_CASUALTY_WEIGHT;
+    out_scenario->score_civilian_casualty_weight = MK_DEFAULT_SCORE_CIVILIAN_CASUALTY_WEIGHT;
+    out_scenario->score_time_weight = MK_DEFAULT_SCORE_TIME_WEIGHT;
     out_scenario->map = mk_make_map("Market / Commercial Streets", 500.0f, 500.0f);
 
     result = mk_mosul_configure_tiles(out_scenario);

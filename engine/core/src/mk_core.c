@@ -864,6 +864,46 @@ static int mk_game_score_partial_threshold(const mk_game_t *game) {
     return MK_DEFAULT_SCORE_PARTIAL_THRESHOLD;
 }
 
+static int mk_game_score_objective_weight(const mk_game_t *game) {
+    if (game != NULL && game->score_objective_weight > 0) {
+        return game->score_objective_weight;
+    }
+
+    return MK_DEFAULT_SCORE_OBJECTIVE_WEIGHT;
+}
+
+static int mk_game_score_civilian_risk_weight(const mk_game_t *game) {
+    if (game != NULL && game->score_civilian_risk_weight > 0) {
+        return game->score_civilian_risk_weight;
+    }
+
+    return MK_DEFAULT_SCORE_CIVILIAN_RISK_WEIGHT;
+}
+
+static int mk_game_score_player_casualty_weight(const mk_game_t *game) {
+    if (game != NULL && game->score_player_casualty_weight > 0) {
+        return game->score_player_casualty_weight;
+    }
+
+    return MK_DEFAULT_SCORE_PLAYER_CASUALTY_WEIGHT;
+}
+
+static int mk_game_score_civilian_casualty_weight(const mk_game_t *game) {
+    if (game != NULL && game->score_civilian_casualty_weight > 0) {
+        return game->score_civilian_casualty_weight;
+    }
+
+    return MK_DEFAULT_SCORE_CIVILIAN_CASUALTY_WEIGHT;
+}
+
+static int mk_game_score_time_weight(const mk_game_t *game) {
+    if (game != NULL && game->score_time_weight > 0) {
+        return game->score_time_weight;
+    }
+
+    return MK_DEFAULT_SCORE_TIME_WEIGHT;
+}
+
 static void mk_update_unit_movement(mk_unit_t *unit) {
     float dx;
     float dy;
@@ -884,7 +924,10 @@ static void mk_update_unit_movement(mk_unit_t *unit) {
         return;
     }
 
-    if (unit->order != MK_ORDER_MOVE && unit->order != MK_ORDER_ASSAULT_MOVE && unit->order != MK_ORDER_WITHDRAW) {
+    if (unit->order != MK_ORDER_MOVE
+        && unit->order != MK_ORDER_ASSAULT_MOVE
+        && unit->order != MK_ORDER_WITHDRAW
+        && unit->order != MK_ORDER_INVESTIGATE) {
         unit->has_move_target = false;
         return;
     }
@@ -894,6 +937,11 @@ static void mk_update_unit_movement(mk_unit_t *unit) {
     distance_squared = dx * dx + dy * dy;
     speed = (unit->move_speed_m_per_tick > 0.0f ? unit->move_speed_m_per_tick : MK_DEFAULT_MOVE_SPEED_M_PER_TICK)
         * move_multiplier;
+    if (unit->order == MK_ORDER_ASSAULT_MOVE) {
+        speed *= 0.8f;
+    } else if (unit->order == MK_ORDER_INVESTIGATE) {
+        speed *= 0.6f;
+    }
     step_squared = speed * speed;
 
     if (distance_squared <= step_squared || distance_squared <= 0.0001f) {
@@ -1067,6 +1115,11 @@ static bool mk_scenario_is_valid(const mk_scenario_definition_t *scenario) {
 
     if (scenario->score_success_threshold < 0
         || scenario->score_partial_threshold < 0
+        || scenario->score_objective_weight < 0
+        || scenario->score_civilian_risk_weight < 0
+        || scenario->score_player_casualty_weight < 0
+        || scenario->score_civilian_casualty_weight < 0
+        || scenario->score_time_weight < 0
         || (scenario->score_success_threshold > 0
             && scenario->score_partial_threshold > 0
             && scenario->score_success_threshold < scenario->score_partial_threshold)) {
@@ -1407,7 +1460,7 @@ mk_result_t mk_game_score(const mk_game_t *game, mk_score_t *out_score) {
         objective_value = mk_max_int(0, objective->value);
         if (objective->controlling_side == MK_SIDE_PLAYER && !(player_present && opfor_present)) {
             score.controlled_objectives += 1;
-            score.objective_points += objective_value * 100;
+            score.objective_points += objective_value * mk_game_score_objective_weight(game);
         }
     }
 
@@ -1415,9 +1468,10 @@ mk_result_t mk_game_score(const mk_game_t *game, mk_score_t *out_score) {
     score.player_casualties = mk_game_side_casualties(game, MK_SIDE_PLAYER);
     score.opfor_casualties = mk_game_side_casualties(game, MK_SIDE_OPFOR);
     score.civilian_casualties = mk_game_side_casualties(game, MK_SIDE_CIVILIAN);
-    score.civilian_risk_penalty = score.civilian_risk * 10;
-    score.casualty_penalty = score.player_casualties * 50 + score.civilian_casualties * 100;
-    score.time_penalty = (int)game->tick;
+    score.civilian_risk_penalty = score.civilian_risk * mk_game_score_civilian_risk_weight(game);
+    score.casualty_penalty = score.player_casualties * mk_game_score_player_casualty_weight(game)
+        + score.civilian_casualties * mk_game_score_civilian_casualty_weight(game);
+    score.time_penalty = (int)game->tick * mk_game_score_time_weight(game);
     score.total_score = score.objective_points
         - score.civilian_risk_penalty
         - score.casualty_penalty
@@ -1526,6 +1580,11 @@ mk_result_t mk_game_snapshot(const mk_game_t *game, mk_game_snapshot_t *out_snap
     out_snapshot->rng_state = game->rng_state;
     out_snapshot->score_success_threshold = game->score_success_threshold;
     out_snapshot->score_partial_threshold = game->score_partial_threshold;
+    out_snapshot->score_objective_weight = game->score_objective_weight;
+    out_snapshot->score_civilian_risk_weight = game->score_civilian_risk_weight;
+    out_snapshot->score_player_casualty_weight = game->score_player_casualty_weight;
+    out_snapshot->score_civilian_casualty_weight = game->score_civilian_casualty_weight;
+    out_snapshot->score_time_weight = game->score_time_weight;
     out_snapshot->selected_unit_id = game->selected_unit_id;
     out_snapshot->map = game->map;
     out_snapshot->controller_count = game->controller_count;
@@ -1566,6 +1625,11 @@ mk_result_t mk_game_load_scenario(mk_game_t *game, const mk_scenario_definition_
     game->selected_unit_id = 0;
     game->score_success_threshold = scenario->score_success_threshold;
     game->score_partial_threshold = scenario->score_partial_threshold;
+    game->score_objective_weight = scenario->score_objective_weight;
+    game->score_civilian_risk_weight = scenario->score_civilian_risk_weight;
+    game->score_player_casualty_weight = scenario->score_player_casualty_weight;
+    game->score_civilian_casualty_weight = scenario->score_civilian_casualty_weight;
+    game->score_time_weight = scenario->score_time_weight;
     game->map = scenario->map;
     game->controller_count = scenario->controller_count;
     memcpy(game->controllers, scenario->controllers, sizeof(scenario->controllers));
@@ -1619,6 +1683,49 @@ mk_result_t mk_game_pick_unit_at(const mk_game_t *game, mk_vec2_t position_m, fl
     return MK_OK;
 }
 
+mk_result_t mk_game_pick_contact_at(
+    const mk_game_t *game,
+    mk_vec2_t position_m,
+    float radius_m,
+    uint32_t *out_contact_report_id
+) {
+    float pick_radius = radius_m > 0.0f ? radius_m : MK_UNIT_PICK_RADIUS_M;
+    float best_distance_squared = pick_radius * pick_radius;
+    uint32_t best_report_id = 0;
+    size_t index;
+
+    if (game == NULL || out_contact_report_id == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    *out_contact_report_id = 0;
+
+    for (index = 0; index < game->contact_report_count; ++index) {
+        const mk_contact_report_t *report = &game->contact_reports[index];
+        float distance_squared;
+
+        if (report->resolved
+            || !report->visible
+            || (report->kind != MK_CONTACT_REPORT_SUSPECTED_DANGER
+                && report->kind != MK_CONTACT_REPORT_FALSE_CONTACT)) {
+            continue;
+        }
+
+        distance_squared = mk_distance_squared(position_m, report->position_m);
+        if (distance_squared <= best_distance_squared) {
+            best_distance_squared = distance_squared;
+            best_report_id = report->id;
+        }
+    }
+
+    if (best_report_id == 0) {
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    *out_contact_report_id = best_report_id;
+    return MK_OK;
+}
+
 mk_result_t mk_game_select_unit(mk_game_t *game, uint32_t unit_id) {
     if (game == NULL) {
         return MK_ERROR_INVALID_ARGUMENT;
@@ -1665,30 +1772,19 @@ mk_result_t mk_game_clear_selection(mk_game_t *game) {
     return MK_OK;
 }
 
-mk_result_t mk_game_issue_order(mk_game_t *game, uint32_t unit_id, mk_order_t order) {
+static mk_result_t mk_game_issue_position_order(
+    mk_game_t *game,
+    uint32_t unit_id,
+    mk_vec2_t target_position_m,
+    mk_order_t order
+) {
     mk_unit_t *unit;
 
     if (game == NULL) {
         return MK_ERROR_INVALID_ARGUMENT;
     }
 
-    unit = mk_game_find_unit(game, unit_id);
-    if (unit == NULL) {
-        return MK_ERROR_NOT_FOUND;
-    }
-
-    unit->order = order;
-    if (order != MK_ORDER_MOVE && order != MK_ORDER_ASSAULT_MOVE) {
-        unit->has_move_target = false;
-    }
-
-    return MK_OK;
-}
-
-mk_result_t mk_game_issue_move_order(mk_game_t *game, uint32_t unit_id, mk_vec2_t target_position_m) {
-    mk_unit_t *unit;
-
-    if (game == NULL) {
+    if (order != MK_ORDER_MOVE && order != MK_ORDER_ASSAULT_MOVE && order != MK_ORDER_INVESTIGATE) {
         return MK_ERROR_INVALID_ARGUMENT;
     }
 
@@ -1703,9 +1799,41 @@ mk_result_t mk_game_issue_move_order(mk_game_t *game, uint32_t unit_id, mk_vec2_
 
     unit->target_position_m = target_position_m;
     unit->has_move_target = true;
-    unit->order = MK_ORDER_MOVE;
+    unit->order = order;
 
     return MK_OK;
+}
+
+mk_result_t mk_game_issue_order(mk_game_t *game, uint32_t unit_id, mk_order_t order) {
+    mk_unit_t *unit;
+
+    if (game == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    unit = mk_game_find_unit(game, unit_id);
+    if (unit == NULL) {
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    unit->order = order;
+    if (order != MK_ORDER_MOVE && order != MK_ORDER_ASSAULT_MOVE && order != MK_ORDER_INVESTIGATE) {
+        unit->has_move_target = false;
+    }
+
+    return MK_OK;
+}
+
+mk_result_t mk_game_issue_move_order(mk_game_t *game, uint32_t unit_id, mk_vec2_t target_position_m) {
+    return mk_game_issue_position_order(game, unit_id, target_position_m, MK_ORDER_MOVE);
+}
+
+mk_result_t mk_game_issue_assault_move_order(mk_game_t *game, uint32_t unit_id, mk_vec2_t target_position_m) {
+    return mk_game_issue_position_order(game, unit_id, target_position_m, MK_ORDER_ASSAULT_MOVE);
+}
+
+mk_result_t mk_game_issue_investigate_order(mk_game_t *game, uint32_t unit_id, mk_vec2_t target_position_m) {
+    return mk_game_issue_position_order(game, unit_id, target_position_m, MK_ORDER_INVESTIGATE);
 }
 
 mk_result_t mk_game_issue_selected_move_order(mk_game_t *game, mk_vec2_t target_position_m) {
@@ -1718,6 +1846,18 @@ mk_result_t mk_game_issue_selected_move_order(mk_game_t *game, mk_vec2_t target_
     }
 
     return mk_game_issue_move_order(game, game->selected_unit_id, target_position_m);
+}
+
+mk_result_t mk_game_issue_selected_investigate_order(mk_game_t *game, mk_vec2_t target_position_m) {
+    if (game == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (game->selected_unit_id == 0) {
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    return mk_game_issue_investigate_order(game, game->selected_unit_id, target_position_m);
 }
 
 mk_result_t mk_game_trace_line_of_sight(
@@ -2121,6 +2261,7 @@ mk_objective_t mk_make_objective(
 
     memset(&objective, 0, sizeof(objective));
     mk_copy_name(objective.name, name);
+    mk_copy_name(objective.label, name);
     objective.kind = kind;
     objective.position_m = position_m;
     objective.radius_m = radius_m;

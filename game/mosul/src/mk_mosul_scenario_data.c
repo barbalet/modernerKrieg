@@ -790,6 +790,11 @@ static mk_result_t mk_mosul_load_briefing_and_scoring(
 ) {
     int success_threshold = MK_DEFAULT_SCORE_SUCCESS_THRESHOLD;
     int partial_threshold = MK_DEFAULT_SCORE_PARTIAL_THRESHOLD;
+    int objective_weight = MK_DEFAULT_SCORE_OBJECTIVE_WEIGHT;
+    int civilian_risk_weight = MK_DEFAULT_SCORE_CIVILIAN_RISK_WEIGHT;
+    int player_casualty_weight = MK_DEFAULT_SCORE_PLAYER_CASUALTY_WEIGHT;
+    int civilian_casualty_weight = MK_DEFAULT_SCORE_CIVILIAN_CASUALTY_WEIGHT;
+    int time_weight = MK_DEFAULT_SCORE_TIME_WEIGHT;
 
     if (entries == NULL || scenario == NULL) {
         return MK_ERROR_INVALID_ARGUMENT;
@@ -825,13 +830,28 @@ static mk_result_t mk_mosul_load_briefing_and_scoring(
         )
         || !mk_mosul_optional_int(entries, "score.success_threshold", success_threshold, &success_threshold)
         || !mk_mosul_optional_int(entries, "score.partial_threshold", partial_threshold, &partial_threshold)
+        || !mk_mosul_optional_int(entries, "score.objective_weight", objective_weight, &objective_weight)
+        || !mk_mosul_optional_int(entries, "score.civilian_risk_weight", civilian_risk_weight, &civilian_risk_weight)
+        || !mk_mosul_optional_int(entries, "score.player_casualty_weight", player_casualty_weight, &player_casualty_weight)
+        || !mk_mosul_optional_int(entries, "score.civilian_casualty_weight", civilian_casualty_weight, &civilian_casualty_weight)
+        || !mk_mosul_optional_int(entries, "score.time_weight", time_weight, &time_weight)
         || success_threshold < partial_threshold
-        || partial_threshold < 0) {
+        || partial_threshold < 0
+        || objective_weight < 0
+        || civilian_risk_weight < 0
+        || player_casualty_weight < 0
+        || civilian_casualty_weight < 0
+        || time_weight < 0) {
         return MK_ERROR_INVALID_DATA;
     }
 
     scenario->score_success_threshold = success_threshold;
     scenario->score_partial_threshold = partial_threshold;
+    scenario->score_objective_weight = objective_weight;
+    scenario->score_civilian_risk_weight = civilian_risk_weight;
+    scenario->score_player_casualty_weight = player_casualty_weight;
+    scenario->score_civilian_casualty_weight = civilian_casualty_weight;
+    scenario->score_time_weight = time_weight;
     return MK_OK;
 }
 
@@ -1174,6 +1194,7 @@ static mk_result_t mk_mosul_load_objectives(
     for (objective_index = 0; objective_index < objective_count; ++objective_index) {
         char key[128];
         char name[MK_NAME_CAPACITY];
+        char label[MK_NAME_CAPACITY];
         mk_objective_kind_t kind;
         mk_vec2_t position;
         float radius_m = 0.0f;
@@ -1207,6 +1228,11 @@ static mk_result_t mk_mosul_load_objectives(
         }
 
         objective = mk_make_objective(name, kind, position, radius_m, value);
+        mk_mosul_make_indexed_key(key, sizeof(key), "objective", objective_index, "label");
+        if (!mk_mosul_optional_text(entries, key, objective.label, label, sizeof(label))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+        mk_mosul_copy_text(objective.label, sizeof(objective.label), label);
         result = mk_scenario_add_objective(scenario, &objective, NULL);
         if (result != MK_OK) {
             return result;

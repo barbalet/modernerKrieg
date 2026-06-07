@@ -81,6 +81,8 @@ static void test_basic_ai_suppresses_at_close_range(void) {
 
     game.units[0].position_m = mk_test_vec2(250.0f, 230.0f);
     game.units[1].position_m = mk_test_vec2(350.0f, 230.0f);
+    game.units[1].hidden = false;
+    game.units[1].revealed = true;
     game.civilians[0].position_m = mk_test_vec2(252.0f, 180.0f);
     MK_TEST_ASSERT(mk_ai_issue_basic_orders(&game) == MK_OK);
     MK_TEST_ASSERT(game.units[0].order == MK_ORDER_SUPPRESS);
@@ -103,6 +105,8 @@ static void test_basic_ai_player_holds_risky_fire_lane(void) {
 
     game.units[0].position_m = mk_test_vec2(250.0f, 230.0f);
     game.units[1].position_m = mk_test_vec2(350.0f, 230.0f);
+    game.units[1].hidden = false;
+    game.units[1].revealed = true;
     game.civilians[0].position_m = mk_test_vec2(300.0f, 230.0f);
     MK_TEST_ASSERT(mk_ai_issue_basic_orders(&game) == MK_OK);
     MK_TEST_ASSERT(game.units[0].order == MK_ORDER_HOLD);
@@ -113,6 +117,8 @@ static void test_basic_ai_player_holds_risky_fire_lane(void) {
 static void test_basic_ai_withdraws_when_pinned(void) {
     mk_game_t game = make_loaded_game();
 
+    game.units[1].hidden = false;
+    game.units[1].revealed = true;
     game.units[0].suppression = 20;
     MK_TEST_ASSERT(mk_ai_issue_basic_orders(&game) == MK_OK);
     MK_TEST_ASSERT(game.units[0].order == MK_ORDER_WITHDRAW);
@@ -149,6 +155,50 @@ static void test_basic_ai_opfor_withdraws_after_taking_fire(void) {
     MK_TEST_ASSERT(game.units[1].target_position_m.x > game.units[1].position_m.x);
 }
 
+static void test_basic_ai_investigates_suspected_contact(void) {
+    mk_game_t game = make_loaded_game();
+
+    game.contact_report_count = 1;
+    memset(&game.contact_reports[0], 0, sizeof(game.contact_reports[0]));
+    game.contact_reports[0].id = 1;
+    game.contact_reports[0].kind = MK_CONTACT_REPORT_SUSPECTED_DANGER;
+    game.contact_reports[0].side = MK_SIDE_OPFOR;
+    game.contact_reports[0].attacker_unit_id = game.units[0].id;
+    game.contact_reports[0].target_unit_id = game.units[1].id;
+    game.contact_reports[0].position_m = mk_test_vec2(220.0f, 246.0f);
+    game.contact_reports[0].target_position_m = game.contact_reports[0].position_m;
+    game.contact_reports[0].confidence = 55;
+    game.contact_reports[0].visible = true;
+
+    MK_TEST_ASSERT(mk_ai_issue_basic_orders(&game) == MK_OK);
+    MK_TEST_ASSERT(game.units[0].order == MK_ORDER_INVESTIGATE);
+    MK_TEST_ASSERT(game.units[0].order_source == MK_ORDER_SOURCE_AI);
+    MK_TEST_ASSERT(game.units[0].has_move_target);
+    MK_TEST_ASSERT_CLOSE(game.units[0].target_position_m.x, 220.0f);
+    MK_TEST_ASSERT_CLOSE(game.units[0].target_position_m.y, 246.0f);
+}
+
+static void test_basic_ai_overwatches_near_suspected_contact(void) {
+    mk_game_t game = make_loaded_game();
+
+    game.contact_report_count = 1;
+    memset(&game.contact_reports[0], 0, sizeof(game.contact_reports[0]));
+    game.contact_reports[0].id = 1;
+    game.contact_reports[0].kind = MK_CONTACT_REPORT_SUSPECTED_DANGER;
+    game.contact_reports[0].side = MK_SIDE_OPFOR;
+    game.contact_reports[0].attacker_unit_id = game.units[0].id;
+    game.contact_reports[0].target_unit_id = game.units[1].id;
+    game.contact_reports[0].position_m = mk_test_vec2(128.0f, 246.0f);
+    game.contact_reports[0].target_position_m = game.contact_reports[0].position_m;
+    game.contact_reports[0].confidence = 55;
+    game.contact_reports[0].visible = true;
+
+    MK_TEST_ASSERT(mk_ai_issue_basic_orders(&game) == MK_OK);
+    MK_TEST_ASSERT(game.units[0].order == MK_ORDER_OVERWATCH);
+    MK_TEST_ASSERT(game.units[0].order_source == MK_ORDER_SOURCE_AI);
+    MK_TEST_ASSERT(!game.units[0].has_move_target);
+}
+
 static const char *test_order_name(mk_order_t order) {
     switch (order) {
         case MK_ORDER_MOVE:
@@ -157,6 +207,10 @@ static const char *test_order_name(mk_order_t order) {
             return "suppress";
         case MK_ORDER_WITHDRAW:
             return "withdraw";
+        case MK_ORDER_INVESTIGATE:
+            return "investigate";
+        case MK_ORDER_OVERWATCH:
+            return "overwatch";
         case MK_ORDER_HOLD:
             return "hold";
         default:
@@ -213,6 +267,8 @@ int main(void) {
     test_basic_ai_withdraws_when_pinned();
     test_basic_ai_opfor_withdraws_after_reveal();
     test_basic_ai_opfor_withdraws_after_taking_fire();
+    test_basic_ai_investigates_suspected_contact();
+    test_basic_ai_overwatches_near_suspected_contact();
     test_basic_ai_transcript_is_deterministic();
 
     puts("mk_basic_ai_tests: ok");
