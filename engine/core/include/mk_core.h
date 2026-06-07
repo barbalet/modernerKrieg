@@ -29,6 +29,8 @@ extern "C" {
 #define MK_MAX_GAMEPLAY_TOPOLOGY_NODES 64
 #define MK_MAX_GAMEPLAY_TOPOLOGY_PORTALS 128
 #define MK_MAX_GAMEPLAY_SEMANTIC_ZONES 64
+#define MK_GAMEPLAY_BLOCKED_NAVIGATION_COST 100000
+#define MK_GAMEPLAY_LOS_MAX_SAMPLES 512
 #define MK_SCENARIO_TEXT_CAPACITY 256
 #define MK_AFTER_ACTION_SUMMARY_CAPACITY 256
 #define MK_UNIT_PICK_RADIUS_M 8.0f
@@ -423,6 +425,48 @@ typedef struct {
 } mk_gameplay_semantic_zone_t;
 
 typedef struct {
+    bool in_bounds;
+    char level_id[MK_NAME_CAPACITY];
+    mk_vec2_t position_m;
+    mk_ivec2_t pixel;
+    float elevation_m;
+    char feature_id[MK_NAME_CAPACITY];
+    char feature_kind[MK_KIND_CAPACITY];
+    char node_id[MK_NAME_CAPACITY];
+    char node_kind[MK_KIND_CAPACITY];
+    char portal_id[MK_NAME_CAPACITY];
+    char portal_kind[MK_KIND_CAPACITY];
+    char portal_state[MK_KIND_CAPACITY];
+    char semantic_zone_id[MK_NAME_CAPACITY];
+    char semantic_zone_kind[MK_KIND_CAPACITY];
+    int navigation_cost;
+    int cover;
+    bool blocks_los;
+    bool blocks_movement;
+    bool interior;
+    bool rooftop;
+    bool vertical_connector;
+    bool restricted_fire_lane;
+    bool civilian_shelter;
+    bool danger_area;
+} mk_gameplay_tactical_query_t;
+
+typedef struct {
+    bool visible;
+    float distance_m;
+    char level_id[MK_NAME_CAPACITY];
+    size_t sample_count;
+    int cover;
+    bool blocked_by_feature;
+    char blocking_feature_id[MK_NAME_CAPACITY];
+    char blocking_feature_kind[MK_KIND_CAPACITY];
+    mk_vec2_t blocking_position_m;
+    char cover_feature_id[MK_NAME_CAPACITY];
+    char cover_node_id[MK_NAME_CAPACITY];
+    char cover_zone_id[MK_NAME_CAPACITY];
+} mk_gameplay_los_trace_t;
+
+typedef struct {
     bool loaded;
     int schema_version;
     char id[MK_NAME_CAPACITY];
@@ -481,6 +525,13 @@ typedef struct {
     uint32_t blocking_terrain_id;
     uint32_t cover_terrain_id;
     mk_terrain_kind_t cover_terrain_kind;
+    bool blocked_by_gameplay_area;
+    char level_id[MK_NAME_CAPACITY];
+    char blocking_feature_id[MK_NAME_CAPACITY];
+    char blocking_feature_kind[MK_KIND_CAPACITY];
+    char cover_feature_id[MK_NAME_CAPACITY];
+    char cover_node_id[MK_NAME_CAPACITY];
+    char cover_zone_id[MK_NAME_CAPACITY];
 } mk_line_of_sight_t;
 
 typedef struct {
@@ -756,6 +807,11 @@ const mk_gameplay_topology_portal_t *mk_gameplay_area_find_topology_portal(
     const mk_gameplay_area_t *area,
     const char *portal_id
 );
+const mk_gameplay_topology_portal_t *mk_gameplay_area_find_topology_portal_at_world(
+    const mk_gameplay_area_t *area,
+    const char *level_id,
+    mk_vec2_t position_m
+);
 const mk_gameplay_semantic_zone_t *mk_gameplay_area_find_semantic_zone(
     const mk_gameplay_area_t *area,
     const char *zone_id
@@ -769,6 +825,31 @@ mk_result_t mk_gameplay_area_topology_debug_dump(
     const mk_gameplay_area_t *area,
     char *out_text,
     size_t capacity
+);
+mk_result_t mk_gameplay_area_query_tactical_at(
+    const mk_gameplay_area_t *area,
+    const char *level_id,
+    mk_vec2_t position_m,
+    mk_gameplay_tactical_query_t *out_query
+);
+mk_result_t mk_gameplay_area_navigation_cost_at(
+    const mk_gameplay_area_t *area,
+    const char *level_id,
+    mk_vec2_t position_m,
+    int *out_navigation_cost
+);
+mk_result_t mk_gameplay_area_cover_at(
+    const mk_gameplay_area_t *area,
+    const char *level_id,
+    mk_vec2_t position_m,
+    int *out_cover
+);
+mk_result_t mk_gameplay_area_trace_line_of_sight(
+    const mk_gameplay_area_t *area,
+    const char *level_id,
+    mk_vec2_t from_m,
+    mk_vec2_t to_m,
+    mk_gameplay_los_trace_t *out_trace
 );
 bool mk_gameplay_area_feature_contains_pixel(
     const mk_gameplay_feature_t *feature,

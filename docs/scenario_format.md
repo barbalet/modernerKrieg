@@ -68,6 +68,12 @@ asset.topology_manifest=assets/mosul/manifests/market_commercial_streets_2003_to
 
 The building-level manifest owns levels, wall/opening rectangles, and building regions. The topology manifest owns tactical nodes, portals between nodes, vertical connectors, portal state, and semantic zones such as civilian shelters, evacuation exits, caches, overwatch roofs, search objectives, restricted fire lanes, and danger areas. Both are loaded into the C core gameplay-area state before scenario validation finishes.
 
+The core derives tactical products from those two manifests at query time:
+movement blocking, sampled LOS blocking, navigation cost, cover value, portal
+state, topology node context, and semantic-zone context. Scenario files should
+therefore reference stable gameplay-area ids instead of duplicating collision or
+cover rules in scenario-specific keys.
+
 ## Interaction Terrain
 
 Terrain zones can carry first-pass interaction affordances before final interaction art and rules are complete. Frontends project these zones through the marker manifest:

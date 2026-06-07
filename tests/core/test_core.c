@@ -230,6 +230,11 @@ static void test_gameplay_area_coordinate_and_blocker_queries(void) {
     const mk_gameplay_topology_node_t *node;
     const mk_gameplay_topology_portal_t *portal;
     const mk_gameplay_semantic_zone_t *zone;
+    mk_gameplay_tactical_query_t tactical_query;
+    mk_gameplay_los_trace_t gameplay_los;
+    mk_line_of_sight_t line_of_sight;
+    int navigation_cost;
+    int cover;
     char topology_dump[1024];
     mk_scenario_definition_t scenario;
     mk_game_t game;
@@ -291,6 +296,66 @@ static void test_gameplay_area_coordinate_and_blocker_queries(void) {
     assert(mk_gameplay_area_blocks_movement_at(&area, "ground", mk_vec2(10.1f, 25.1f)));
     assert(!mk_gameplay_area_blocks_movement_at(&area, "missing", mk_vec2(10.1f, 20.1f)));
 
+    assert(mk_gameplay_area_query_tactical_at(&area, "ground", mk_vec2(10.1f, 20.1f), &tactical_query) == MK_OK);
+    assert(tactical_query.in_bounds);
+    assert(tactical_query.blocks_los);
+    assert(tactical_query.blocks_movement);
+    assert(tactical_query.navigation_cost == MK_GAMEPLAY_BLOCKED_NAVIGATION_COST);
+    assert(tactical_query.cover == 4);
+    assert(strcmp(tactical_query.feature_id, "west_wall") == 0);
+    assert(strcmp(tactical_query.node_id, "shop") == 0);
+    assert(tactical_query.interior);
+
+    assert(mk_gameplay_area_query_tactical_at(&area, "ground", mk_vec2(10.1f, 22.1f), &tactical_query) == MK_OK);
+    assert(!tactical_query.blocks_los);
+    assert(!tactical_query.blocks_movement);
+    assert(tactical_query.navigation_cost > 1);
+    assert(tactical_query.navigation_cost < MK_GAMEPLAY_BLOCKED_NAVIGATION_COST);
+    assert(strcmp(tactical_query.feature_id, "west_door") == 0);
+    assert(strcmp(tactical_query.portal_id, "street_to_shop") == 0);
+
+    assert(mk_gameplay_area_query_tactical_at(&area, "ground", mk_vec2(10.1f, 25.1f), &tactical_query) == MK_OK);
+    assert(!tactical_query.blocks_los);
+    assert(tactical_query.blocks_movement);
+    assert(tactical_query.cover == 3);
+    assert(strcmp(tactical_query.feature_id, "west_window") == 0);
+
+    assert(mk_gameplay_area_navigation_cost_at(&area, "ground", mk_vec2(10.1f, 22.1f), &navigation_cost) == MK_OK);
+    assert(navigation_cost > 1);
+    assert(navigation_cost < MK_GAMEPLAY_BLOCKED_NAVIGATION_COST);
+    assert(mk_gameplay_area_cover_at(&area, "ground", mk_vec2(10.1f, 20.1f), &cover) == MK_OK);
+    assert(cover == 4);
+
+    assert(mk_gameplay_area_trace_line_of_sight(
+        &area,
+        "ground",
+        mk_vec2(5.0f, 20.5f),
+        mk_vec2(15.0f, 20.5f),
+        &gameplay_los
+    ) == MK_OK);
+    assert(!gameplay_los.visible);
+    assert(gameplay_los.blocked_by_feature);
+    assert(strcmp(gameplay_los.blocking_feature_id, "west_wall") == 0);
+
+    assert(mk_gameplay_area_trace_line_of_sight(
+        &area,
+        "ground",
+        mk_vec2(5.0f, 22.5f),
+        mk_vec2(15.0f, 22.5f),
+        &gameplay_los
+    ) == MK_OK);
+    assert(gameplay_los.visible);
+    assert(gameplay_los.cover >= 2);
+
+    assert(mk_gameplay_area_trace_line_of_sight(
+        &area,
+        "ground",
+        mk_vec2(5.0f, 25.5f),
+        mk_vec2(15.0f, 25.5f),
+        &gameplay_los
+    ) == MK_OK);
+    assert(gameplay_los.visible);
+
     memset(&scenario, 0, sizeof(scenario));
     strcpy(scenario.name, "Gameplay Area Scenario");
     scenario.seed = 7;
@@ -299,6 +364,10 @@ static void test_gameplay_area_coordinate_and_blocker_queries(void) {
     assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
     assert(mk_gameplay_area_is_loaded(&game.gameplay_area));
     assert(game.gameplay_area.level_count == 1);
+    assert(mk_game_trace_line_of_sight(&game, mk_vec2(5.0f, 20.5f), mk_vec2(15.0f, 20.5f), &line_of_sight) == MK_OK);
+    assert(!line_of_sight.visible);
+    assert(line_of_sight.blocked_by_gameplay_area);
+    assert(strcmp(line_of_sight.blocking_feature_id, "west_wall") == 0);
     assert(mk_game_snapshot(&game, &snapshot) == MK_OK);
     assert(mk_gameplay_area_is_loaded(&snapshot.gameplay_area));
     assert(strcmp(snapshot.gameplay_area.features[1].id, "west_door") == 0);

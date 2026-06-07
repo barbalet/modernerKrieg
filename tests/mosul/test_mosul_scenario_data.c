@@ -53,7 +53,15 @@ static void test_default_scenario_data_matches_fixture_shape(void) {
     mk_vec2_t wall_sample;
     mk_vec2_t door_sample;
     mk_vec2_t window_sample;
+    mk_vec2_t wall_los_start;
+    mk_vec2_t wall_los_end;
+    mk_vec2_t door_los_start;
+    mk_vec2_t door_los_end;
     mk_ivec2_t wall_pixel;
+    mk_gameplay_tactical_query_t tactical_query;
+    mk_gameplay_los_trace_t gameplay_los;
+    int navigation_cost;
+    int cover;
     char topology_dump[2048];
 
     load_default_data_scenario(&loaded);
@@ -157,6 +165,79 @@ static void test_default_scenario_data_matches_fixture_shape(void) {
     MK_TEST_ASSERT(!mk_gameplay_area_blocks_movement_at(&loaded.gameplay_area, "level_01_ground", door_sample));
     MK_TEST_ASSERT(!mk_gameplay_area_blocks_los_at(&loaded.gameplay_area, "level_01_ground", window_sample));
     MK_TEST_ASSERT(mk_gameplay_area_blocks_movement_at(&loaded.gameplay_area, "level_01_ground", window_sample));
+
+    MK_TEST_ASSERT(mk_gameplay_area_query_tactical_at(
+        &loaded.gameplay_area,
+        "level_01_ground",
+        wall_sample,
+        &tactical_query
+    ) == MK_OK);
+    MK_TEST_ASSERT(tactical_query.blocks_los);
+    MK_TEST_ASSERT(tactical_query.blocks_movement);
+    MK_TEST_ASSERT(tactical_query.navigation_cost == MK_GAMEPLAY_BLOCKED_NAVIGATION_COST);
+    MK_TEST_ASSERT(tactical_query.cover >= 4);
+    MK_TEST_ASSERT(strcmp(tactical_query.feature_id, "souq_west_outer_wall_ground") == 0);
+
+    MK_TEST_ASSERT(mk_gameplay_area_query_tactical_at(
+        &loaded.gameplay_area,
+        "level_01_ground",
+        door_sample,
+        &tactical_query
+    ) == MK_OK);
+    MK_TEST_ASSERT(!tactical_query.blocks_los);
+    MK_TEST_ASSERT(!tactical_query.blocks_movement);
+    MK_TEST_ASSERT(strcmp(tactical_query.feature_id, "souq_west_door_ground") == 0);
+    MK_TEST_ASSERT(strcmp(tactical_query.portal_id, "street_to_souq_west_door") == 0);
+
+    MK_TEST_ASSERT(mk_gameplay_area_query_tactical_at(
+        &loaded.gameplay_area,
+        "level_01_ground",
+        window_sample,
+        &tactical_query
+    ) == MK_OK);
+    MK_TEST_ASSERT(!tactical_query.blocks_los);
+    MK_TEST_ASSERT(tactical_query.blocks_movement);
+    MK_TEST_ASSERT(tactical_query.cover >= 3);
+    MK_TEST_ASSERT(strcmp(tactical_query.feature_id, "souq_east_window_ground") == 0);
+
+    MK_TEST_ASSERT(mk_gameplay_area_navigation_cost_at(
+        &loaded.gameplay_area,
+        "level_01_ground",
+        door_sample,
+        &navigation_cost
+    ) == MK_OK);
+    MK_TEST_ASSERT(navigation_cost > 1);
+    MK_TEST_ASSERT(navigation_cost < MK_GAMEPLAY_BLOCKED_NAVIGATION_COST);
+    MK_TEST_ASSERT(mk_gameplay_area_cover_at(
+        &loaded.gameplay_area,
+        "level_01_ground",
+        wall_sample,
+        &cover
+    ) == MK_OK);
+    MK_TEST_ASSERT(cover >= 4);
+
+    MK_TEST_ASSERT(mk_gameplay_area_pixel_to_world(&loaded.gameplay_area, mk_ivec2(700, 1500), &wall_los_start) == MK_OK);
+    MK_TEST_ASSERT(mk_gameplay_area_pixel_to_world(&loaded.gameplay_area, mk_ivec2(1000, 1500), &wall_los_end) == MK_OK);
+    MK_TEST_ASSERT(mk_gameplay_area_trace_line_of_sight(
+        &loaded.gameplay_area,
+        "level_01_ground",
+        wall_los_start,
+        wall_los_end,
+        &gameplay_los
+    ) == MK_OK);
+    MK_TEST_ASSERT(!gameplay_los.visible);
+    MK_TEST_ASSERT(strcmp(gameplay_los.blocking_feature_id, "souq_west_outer_wall_ground") == 0);
+
+    MK_TEST_ASSERT(mk_gameplay_area_pixel_to_world(&loaded.gameplay_area, mk_ivec2(700, 2200), &door_los_start) == MK_OK);
+    MK_TEST_ASSERT(mk_gameplay_area_pixel_to_world(&loaded.gameplay_area, mk_ivec2(1000, 2200), &door_los_end) == MK_OK);
+    MK_TEST_ASSERT(mk_gameplay_area_trace_line_of_sight(
+        &loaded.gameplay_area,
+        "level_01_ground",
+        door_los_start,
+        door_los_end,
+        &gameplay_los
+    ) == MK_OK);
+    MK_TEST_ASSERT(gameplay_los.visible);
 }
 
 static void test_public_default_scenario_uses_data_file(void) {

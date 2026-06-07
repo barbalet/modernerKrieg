@@ -269,7 +269,7 @@ static void mk_headless_print_replay_header(FILE *stream, const mk_game_t *game,
     if (mk_gameplay_area_is_loaded(&game->gameplay_area)) {
         fprintf(
             stream,
-            "event tick=%u kind=gameplay_area id=\"%s\" map=\"%s\" levels=%u features=%u regions=%u topology_id=\"%s\" topology_nodes=%u topology_portals=%u semantic_zones=%u pixel_width=%d pixel_height=%d ppm=%.2f\n",
+            "event tick=%u kind=gameplay_area id=\"%s\" map=\"%s\" levels=%u features=%u regions=%u topology_id=\"%s\" topology_nodes=%u topology_portals=%u semantic_zones=%u tactical_products=derived collision=features navigation=topology los=sampled cover=derived pixel_width=%d pixel_height=%d ppm=%.2f\n",
             game->tick,
             game->gameplay_area.id,
             game->gameplay_area.map_id,
@@ -572,6 +572,11 @@ static void mk_headless_print_header(FILE *stream, const mk_game_t *game, uint32
                 (unsigned)game->gameplay_area.topology_node_count,
                 (unsigned)game->gameplay_area.topology_portal_count,
                 (unsigned)game->gameplay_area.semantic_zone_count
+            );
+            fprintf(
+                stream,
+                "tactical_products: collision=features navigation=topology los=sampled(max=%u) cover=derived\n",
+                (unsigned)MK_GAMEPLAY_LOS_MAX_SAMPLES
             );
         }
     } else {

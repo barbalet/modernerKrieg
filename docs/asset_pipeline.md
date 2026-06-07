@@ -64,6 +64,28 @@ Validation rejects duplicate ids, missing level/region/feature references,
 orphan building regions, one-way portal mistakes, impossible vertical links,
 invalid semantic zones, and unreachable enterable graph fragments.
 
+## Derived Tactical Products
+
+The first collision, navigation, line-of-sight, and cover products are derived
+inside the portable C core from the validated building-level and topology
+manifests. There is no separate generated tactical-product file yet.
+
+Current derived products include:
+
+- movement blockers from walls, windows, roof edges, blocked buildings, and
+  closed/locked/blocked/unsafe portals
+- LOS blockers from wall-like features, with doors, windows, and breach holes
+  overriding blockers where the manifest allows sight
+- navigation cost hints from topology node kind, portal movement cost, rubble,
+  crowd, danger, and restricted-fire semantic zones
+- cover hints from walls, windows, doors, breach holes, roof edges, interiors,
+  shelters, caches, and rooftop zones
+- sampled gameplay-area LOS traces with feature ids for the first blocking
+  feature
+
+These derived products are exposed through C queries so native frontends,
+headless runs, AI, and tests see the same tactical interpretation.
+
 ## Sprite Manifests
 
 Sprite manifests describe source sheets, source-angle sprites, generated runtime sprites, and runtime sprite IDs. They record:

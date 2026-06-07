@@ -902,6 +902,176 @@ static void mk_apply_blocking_terrain(
     }
 }
 
+static int mk_gameplay_area_feature_cover_value(const mk_gameplay_feature_t *feature) {
+    if (feature == NULL) {
+        return 0;
+    }
+
+    if (strcmp(feature->kind, "wall") == 0) {
+        return 4;
+    }
+
+    if (strcmp(feature->kind, "window") == 0) {
+        return 3;
+    }
+
+    if (strcmp(feature->kind, "roof_edge") == 0) {
+        return 3;
+    }
+
+    if (strcmp(feature->kind, "door") == 0 || strcmp(feature->kind, "breach_hole") == 0) {
+        return 2;
+    }
+
+    if (strcmp(feature->kind, "stair") == 0) {
+        return 1;
+    }
+
+    return 0;
+}
+
+static int mk_gameplay_area_feature_navigation_modifier(const mk_gameplay_feature_t *feature) {
+    if (feature == NULL) {
+        return 0;
+    }
+
+    if (strcmp(feature->kind, "breach_hole") == 0) {
+        return 2;
+    }
+
+    if (strcmp(feature->kind, "door") == 0 || strcmp(feature->kind, "stair") == 0) {
+        return 1;
+    }
+
+    return 0;
+}
+
+static int mk_gameplay_area_node_navigation_cost(const mk_gameplay_topology_node_t *node) {
+    if (node == NULL) {
+        return 2;
+    }
+
+    if (!node->enterable || strcmp(node->kind, "blocked_building") == 0) {
+        return MK_GAMEPLAY_BLOCKED_NAVIGATION_COST;
+    }
+
+    if (strcmp(node->kind, "street") == 0) {
+        return 1;
+    }
+
+    if (strcmp(node->kind, "alley") == 0 || strcmp(node->kind, "courtyard") == 0 || strcmp(node->kind, "shelter") == 0) {
+        return 2;
+    }
+
+    if (strcmp(node->kind, "roof") == 0 || strcmp(node->kind, "stairwell") == 0) {
+        return 3;
+    }
+
+    if (strcmp(node->kind, "shop") == 0
+        || strcmp(node->kind, "workshop") == 0
+        || strcmp(node->kind, "garage") == 0
+        || strcmp(node->kind, "office") == 0
+        || strcmp(node->kind, "mosque") == 0
+        || strcmp(node->kind, "cache") == 0) {
+        return 3;
+    }
+
+    return 2;
+}
+
+static int mk_gameplay_area_node_cover_value(const mk_gameplay_topology_node_t *node) {
+    if (node == NULL || !node->enterable) {
+        return 0;
+    }
+
+    if (strcmp(node->kind, "roof") == 0) {
+        return 2;
+    }
+
+    if (strcmp(node->kind, "shop") == 0
+        || strcmp(node->kind, "workshop") == 0
+        || strcmp(node->kind, "garage") == 0
+        || strcmp(node->kind, "office") == 0
+        || strcmp(node->kind, "mosque") == 0
+        || strcmp(node->kind, "shelter") == 0
+        || strcmp(node->kind, "cache") == 0) {
+        return 2;
+    }
+
+    if (strcmp(node->kind, "courtyard") == 0 || strcmp(node->kind, "alley") == 0 || strcmp(node->kind, "stairwell") == 0) {
+        return 1;
+    }
+
+    return 0;
+}
+
+static bool mk_gameplay_area_node_is_interior(const mk_gameplay_topology_node_t *node) {
+    if (node == NULL) {
+        return false;
+    }
+
+    return node->region_id[0] != '\0'
+        || strcmp(node->kind, "shop") == 0
+        || strcmp(node->kind, "workshop") == 0
+        || strcmp(node->kind, "garage") == 0
+        || strcmp(node->kind, "office") == 0
+        || strcmp(node->kind, "mosque") == 0
+        || strcmp(node->kind, "shelter") == 0
+        || strcmp(node->kind, "cache") == 0
+        || strcmp(node->kind, "stairwell") == 0;
+}
+
+static bool mk_gameplay_area_portal_blocks_movement(const mk_gameplay_topology_portal_t *portal) {
+    if (portal == NULL) {
+        return false;
+    }
+
+    return strcmp(portal->state, "closed") == 0
+        || strcmp(portal->state, "locked") == 0
+        || strcmp(portal->state, "blocked") == 0
+        || strcmp(portal->state, "unsafe") == 0
+        || strcmp(portal->kind, "window") == 0
+        || strcmp(portal->kind, "roof_edge") == 0;
+}
+
+static int mk_gameplay_area_zone_navigation_modifier(const mk_gameplay_semantic_zone_t *zone) {
+    if (zone == NULL) {
+        return 0;
+    }
+
+    if (strcmp(zone->kind, "market_crowd") == 0) {
+        return 3;
+    }
+
+    if (strcmp(zone->kind, "restricted_fire_lane") == 0 || strcmp(zone->kind, "danger_area") == 0) {
+        return 2;
+    }
+
+    if (strcmp(zone->kind, "cache") == 0
+        || strcmp(zone->kind, "search_objective") == 0
+        || strcmp(zone->kind, "overwatch_roof") == 0) {
+        return 1;
+    }
+
+    return 0;
+}
+
+static int mk_gameplay_area_zone_cover_value(const mk_gameplay_semantic_zone_t *zone) {
+    if (zone == NULL) {
+        return 0;
+    }
+
+    if (strcmp(zone->kind, "civilian_shelter") == 0 || strcmp(zone->kind, "cache") == 0) {
+        return 2;
+    }
+
+    if (strcmp(zone->kind, "market_crowd") == 0 || strcmp(zone->kind, "overwatch_roof") == 0) {
+        return 1;
+    }
+
+    return 0;
+}
+
 static int mk_training_hit_chance(mk_training_t training) {
     switch (training) {
         case MK_TRAINING_ELITE:
@@ -2097,6 +2267,28 @@ const mk_gameplay_topology_portal_t *mk_gameplay_area_find_topology_portal(
     return NULL;
 }
 
+const mk_gameplay_topology_portal_t *mk_gameplay_area_find_topology_portal_at_world(
+    const mk_gameplay_area_t *area,
+    const char *level_id,
+    mk_vec2_t position_m
+) {
+    size_t index;
+
+    if (area == NULL || level_id == NULL || !area->topology_loaded) {
+        return NULL;
+    }
+
+    for (index = 0; index < area->topology_portal_count; ++index) {
+        const mk_gameplay_topology_portal_t *portal = &area->topology_portals[index];
+
+        if (strcmp(portal->level_id, level_id) == 0 && mk_rect_contains_point(portal->bounds_m, position_m)) {
+            return portal;
+        }
+    }
+
+    return NULL;
+}
+
 const mk_gameplay_semantic_zone_t *mk_gameplay_area_find_semantic_zone(
     const mk_gameplay_area_t *area,
     const char *zone_id
@@ -2114,6 +2306,32 @@ const mk_gameplay_semantic_zone_t *mk_gameplay_area_find_semantic_zone(
     }
 
     return NULL;
+}
+
+static const mk_gameplay_semantic_zone_t *mk_gameplay_area_find_best_semantic_zone_at_world(
+    const mk_gameplay_area_t *area,
+    mk_vec2_t position_m
+) {
+    const mk_gameplay_semantic_zone_t *best_zone = NULL;
+    size_t index;
+
+    if (area == NULL || !area->topology_loaded) {
+        return NULL;
+    }
+
+    for (index = 0; index < area->semantic_zone_count; ++index) {
+        const mk_gameplay_semantic_zone_t *zone = &area->semantic_zones[index];
+
+        if (!mk_rect_contains_point(zone->bounds_m, position_m)) {
+            continue;
+        }
+
+        if (best_zone == NULL || zone->priority > best_zone->priority) {
+            best_zone = zone;
+        }
+    }
+
+    return best_zone;
 }
 
 const mk_gameplay_semantic_zone_t *mk_gameplay_area_find_semantic_zone_at_world(
@@ -2218,58 +2436,281 @@ mk_result_t mk_gameplay_area_topology_debug_dump(
     return MK_OK;
 }
 
+mk_result_t mk_gameplay_area_query_tactical_at(
+    const mk_gameplay_area_t *area,
+    const char *level_id,
+    mk_vec2_t position_m,
+    mk_gameplay_tactical_query_t *out_query
+) {
+    const mk_gameplay_level_t *level;
+    const mk_gameplay_feature_t *active_feature = NULL;
+    const mk_gameplay_topology_node_t *node = NULL;
+    const mk_gameplay_topology_portal_t *portal = NULL;
+    const mk_gameplay_semantic_zone_t *zone = NULL;
+    mk_gameplay_tactical_query_t query;
+    mk_ivec2_t pixel;
+    bool los_blocked_by_feature = false;
+    bool los_allowed_by_feature = false;
+    bool movement_blocked_by_feature = false;
+    bool movement_allowed_by_feature = false;
+    int feature_cover = 0;
+    int active_feature_cover = 0;
+    int navigation_cost = 1;
+    size_t index;
+
+    if (area == NULL || level_id == NULL || out_query == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (!area->loaded || mk_gameplay_area_world_to_pixel(area, position_m, &pixel) != MK_OK) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    level = mk_gameplay_area_find_level(area, level_id);
+    if (level == NULL) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    memset(&query, 0, sizeof(query));
+    query.in_bounds = true;
+    mk_copy_name(query.level_id, level_id);
+    query.position_m = position_m;
+    query.pixel = pixel;
+    query.elevation_m = level->elevation_m;
+
+    for (index = 0; index < area->feature_count; ++index) {
+        const mk_gameplay_feature_t *feature = &area->features[index];
+        int cover;
+
+        if (strcmp(feature->level_id, level_id) != 0 || !mk_gameplay_area_feature_contains_pixel(feature, pixel)) {
+            continue;
+        }
+
+        if (feature->blocks_los) {
+            los_blocked_by_feature = true;
+        }
+
+        if (feature->allows_los) {
+            los_allowed_by_feature = true;
+        }
+
+        if (feature->blocks_movement) {
+            movement_blocked_by_feature = true;
+        }
+
+        if (feature->allows_movement) {
+            movement_allowed_by_feature = true;
+        }
+
+        cover = mk_gameplay_area_feature_cover_value(feature);
+        if (active_feature == NULL
+            || feature->allows_los
+            || feature->allows_movement
+            || cover > feature_cover) {
+            active_feature = feature;
+            active_feature_cover = cover;
+        }
+
+        if (cover > feature_cover) {
+            feature_cover = cover;
+        }
+    }
+
+    query.blocks_los = (level->blocks_los_default || los_blocked_by_feature) && !los_allowed_by_feature;
+    query.blocks_movement = (level->blocks_movement_default || movement_blocked_by_feature) && !movement_allowed_by_feature;
+
+    if (active_feature != NULL) {
+        mk_copy_name(query.feature_id, active_feature->id);
+        mk_copy_text(query.feature_kind, sizeof(query.feature_kind), active_feature->kind);
+    }
+
+    node = mk_gameplay_area_find_topology_node_at_world(area, level_id, position_m);
+    if (node != NULL) {
+        mk_copy_name(query.node_id, node->id);
+        mk_copy_text(query.node_kind, sizeof(query.node_kind), node->kind);
+        query.interior = mk_gameplay_area_node_is_interior(node);
+        query.rooftop = strcmp(node->kind, "roof") == 0;
+        if (!node->enterable) {
+            query.blocks_movement = true;
+        }
+        navigation_cost = mk_gameplay_area_node_navigation_cost(node);
+        query.cover = mk_max_int(query.cover, mk_gameplay_area_node_cover_value(node));
+    }
+
+    portal = mk_gameplay_area_find_topology_portal_at_world(area, level_id, position_m);
+    if (portal != NULL) {
+        mk_copy_name(query.portal_id, portal->id);
+        mk_copy_text(query.portal_kind, sizeof(query.portal_kind), portal->kind);
+        mk_copy_text(query.portal_state, sizeof(query.portal_state), portal->state);
+        query.vertical_connector = portal->vertical;
+        if (mk_gameplay_area_portal_blocks_movement(portal)) {
+            query.blocks_movement = true;
+        } else {
+            navigation_cost += portal->movement_cost;
+        }
+    }
+
+    zone = mk_gameplay_area_find_best_semantic_zone_at_world(area, position_m);
+    if (zone != NULL) {
+        mk_copy_name(query.semantic_zone_id, zone->id);
+        mk_copy_text(query.semantic_zone_kind, sizeof(query.semantic_zone_kind), zone->kind);
+        query.restricted_fire_lane = strcmp(zone->kind, "restricted_fire_lane") == 0;
+        query.civilian_shelter = strcmp(zone->kind, "civilian_shelter") == 0;
+        query.danger_area = strcmp(zone->kind, "danger_area") == 0;
+        navigation_cost += mk_gameplay_area_zone_navigation_modifier(zone);
+        query.cover = mk_max_int(query.cover, mk_gameplay_area_zone_cover_value(zone));
+    }
+
+    query.cover = mk_max_int(query.cover, active_feature_cover);
+    if (active_feature != NULL) {
+        navigation_cost += mk_gameplay_area_feature_navigation_modifier(active_feature);
+    }
+
+    if (query.blocks_movement || navigation_cost >= MK_GAMEPLAY_BLOCKED_NAVIGATION_COST) {
+        query.navigation_cost = MK_GAMEPLAY_BLOCKED_NAVIGATION_COST;
+    } else {
+        query.navigation_cost = mk_max_int(1, navigation_cost);
+    }
+
+    *out_query = query;
+    return MK_OK;
+}
+
+mk_result_t mk_gameplay_area_navigation_cost_at(
+    const mk_gameplay_area_t *area,
+    const char *level_id,
+    mk_vec2_t position_m,
+    int *out_navigation_cost
+) {
+    mk_gameplay_tactical_query_t query;
+    mk_result_t result;
+
+    if (out_navigation_cost == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    result = mk_gameplay_area_query_tactical_at(area, level_id, position_m, &query);
+    if (result != MK_OK) {
+        return result;
+    }
+
+    *out_navigation_cost = query.navigation_cost;
+    return MK_OK;
+}
+
+mk_result_t mk_gameplay_area_cover_at(
+    const mk_gameplay_area_t *area,
+    const char *level_id,
+    mk_vec2_t position_m,
+    int *out_cover
+) {
+    mk_gameplay_tactical_query_t query;
+    mk_result_t result;
+
+    if (out_cover == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    result = mk_gameplay_area_query_tactical_at(area, level_id, position_m, &query);
+    if (result != MK_OK) {
+        return result;
+    }
+
+    *out_cover = query.cover;
+    return MK_OK;
+}
+
+mk_result_t mk_gameplay_area_trace_line_of_sight(
+    const mk_gameplay_area_t *area,
+    const char *level_id,
+    mk_vec2_t from_m,
+    mk_vec2_t to_m,
+    mk_gameplay_los_trace_t *out_trace
+) {
+    mk_gameplay_los_trace_t trace;
+    mk_gameplay_tactical_query_t target_query;
+    float distance_m;
+    size_t sample_count;
+    size_t sample_index;
+
+    if (area == NULL || level_id == NULL || out_trace == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (!area->loaded
+        || mk_gameplay_area_find_level(area, level_id) == NULL
+        || from_m.x < 0.0f
+        || from_m.y < 0.0f
+        || to_m.x < 0.0f
+        || to_m.y < 0.0f
+        || from_m.x > area->world_width_m
+        || from_m.y > area->world_height_m
+        || to_m.x > area->world_width_m
+        || to_m.y > area->world_height_m) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    memset(&trace, 0, sizeof(trace));
+    trace.visible = true;
+    trace.distance_m = mk_distance(from_m, to_m);
+    mk_copy_name(trace.level_id, level_id);
+
+    if (mk_gameplay_area_query_tactical_at(area, level_id, to_m, &target_query) == MK_OK) {
+        trace.cover = target_query.cover;
+        mk_copy_name(trace.cover_feature_id, target_query.feature_id);
+        mk_copy_name(trace.cover_node_id, target_query.node_id);
+        mk_copy_name(trace.cover_zone_id, target_query.semantic_zone_id);
+    }
+
+    distance_m = trace.distance_m;
+    sample_count = (size_t)(distance_m * 2.0f) + 1;
+    if (sample_count < 1) {
+        sample_count = 1;
+    }
+    if (sample_count > MK_GAMEPLAY_LOS_MAX_SAMPLES) {
+        sample_count = MK_GAMEPLAY_LOS_MAX_SAMPLES;
+    }
+    trace.sample_count = sample_count;
+
+    for (sample_index = 1; sample_index < sample_count; ++sample_index) {
+        float t = (float)sample_index / (float)sample_count;
+        mk_vec2_t sample;
+        mk_gameplay_tactical_query_t query;
+
+        sample.x = from_m.x + (to_m.x - from_m.x) * t;
+        sample.y = from_m.y + (to_m.y - from_m.y) * t;
+
+        if (mk_gameplay_area_query_tactical_at(area, level_id, sample, &query) != MK_OK) {
+            continue;
+        }
+
+        if (query.blocks_los) {
+            trace.visible = false;
+            trace.blocked_by_feature = query.feature_id[0] != '\0';
+            mk_copy_name(trace.blocking_feature_id, query.feature_id);
+            mk_copy_text(trace.blocking_feature_kind, sizeof(trace.blocking_feature_kind), query.feature_kind);
+            trace.blocking_position_m = sample;
+            break;
+        }
+    }
+
+    *out_trace = trace;
+    return MK_OK;
+}
+
 static bool mk_gameplay_area_blocks_at(
     const mk_gameplay_area_t *area,
     const char *level_id,
     mk_vec2_t position_m,
     bool check_line_of_sight
 ) {
-    const mk_gameplay_level_t *level;
-    mk_ivec2_t pixel;
-    bool blocked;
-    size_t index;
+    mk_gameplay_tactical_query_t query;
 
-    if (area == NULL || level_id == NULL || !area->loaded) {
+    if (mk_gameplay_area_query_tactical_at(area, level_id, position_m, &query) != MK_OK) {
         return false;
     }
 
-    if (mk_gameplay_area_world_to_pixel(area, position_m, &pixel) != MK_OK) {
-        return false;
-    }
-
-    level = mk_gameplay_area_find_level(area, level_id);
-    if (level == NULL) {
-        return false;
-    }
-
-    blocked = check_line_of_sight ? level->blocks_los_default : level->blocks_movement_default;
-    for (index = 0; index < area->feature_count; ++index) {
-        const mk_gameplay_feature_t *feature = &area->features[index];
-
-        if (strcmp(feature->level_id, level_id) != 0 || !mk_gameplay_area_feature_contains_pixel(feature, pixel)) {
-            continue;
-        }
-
-        if (check_line_of_sight) {
-            if (feature->allows_los) {
-                return false;
-            }
-
-            if (feature->blocks_los) {
-                blocked = true;
-            }
-        } else {
-            if (feature->allows_movement) {
-                return false;
-            }
-
-            if (feature->blocks_movement) {
-                blocked = true;
-            }
-        }
-    }
-
-    return blocked;
+    return check_line_of_sight ? query.blocks_los : query.blocks_movement;
 }
 
 bool mk_gameplay_area_blocks_los_at(
@@ -2947,6 +3388,40 @@ mk_result_t mk_game_trace_line_of_sight(
 
     mk_apply_target_cover(&game->map, to_m, &line_of_sight);
     mk_apply_blocking_terrain(&game->map, from_m, to_m, &line_of_sight);
+    if (mk_gameplay_area_is_loaded(&game->gameplay_area) && game->gameplay_area.level_count > 0) {
+        mk_gameplay_los_trace_t gameplay_trace;
+        const char *level_id = game->gameplay_area.levels[0].id;
+
+        if (mk_gameplay_area_trace_line_of_sight(
+                &game->gameplay_area,
+                level_id,
+                from_m,
+                to_m,
+                &gameplay_trace
+            ) == MK_OK) {
+            mk_copy_name(line_of_sight.level_id, gameplay_trace.level_id);
+
+            if (gameplay_trace.cover > line_of_sight.cover) {
+                line_of_sight.cover = gameplay_trace.cover;
+                line_of_sight.cover_terrain_id = 0;
+                line_of_sight.cover_terrain_kind = MK_TERRAIN_OPEN;
+                mk_copy_name(line_of_sight.cover_feature_id, gameplay_trace.cover_feature_id);
+                mk_copy_name(line_of_sight.cover_node_id, gameplay_trace.cover_node_id);
+                mk_copy_name(line_of_sight.cover_zone_id, gameplay_trace.cover_zone_id);
+            }
+
+            if (!gameplay_trace.visible) {
+                line_of_sight.visible = false;
+                line_of_sight.blocked_by_gameplay_area = true;
+                mk_copy_name(line_of_sight.blocking_feature_id, gameplay_trace.blocking_feature_id);
+                mk_copy_text(
+                    line_of_sight.blocking_feature_kind,
+                    sizeof(line_of_sight.blocking_feature_kind),
+                    gameplay_trace.blocking_feature_kind
+                );
+            }
+        }
+    }
 
     *out_line_of_sight = line_of_sight;
     return MK_OK;
