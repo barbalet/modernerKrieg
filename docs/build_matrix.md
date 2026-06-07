@@ -64,27 +64,18 @@ The shared Xcode scheme launches with the five-seed balance arguments enabled, s
 - Windows: use a C compiler supported by CMake, such as MSVC. The native Windows frontend should link the same portable C libraries when it is added.
 - Linux: install CMake and a C compiler for headless/autoplay validation. A Linux presentation layer is not part of the current native frontend pivot.
 
-## CI Smoke Checks
+## GitHub Actions Checks
 
 The GitHub Actions workflow in `.github/workflows/c-engine-ci.yml` runs on
-push, pull request, and manual dispatch. It executes the shared
-`scripts/run_ci_checks.sh` entry point on macOS, Windows, and Linux runners so
-local and remote verification stay aligned.
+push, pull request, and manual dispatch. Per-commit verification is expected to
+happen there, not as a required local pre-commit step.
 
-The CI runner writes a timestamped log under `build/ci-logs/`. Failed workflow
+The workflow writes a timestamped log under `build/ci-logs/`. Failed workflow
 runs upload that text file as a downloadable artifact named with the runner OS
-and UTC start time, so the log can be handed back for diagnosis.
-
-The shared CI entry point runs:
-
-```sh
-bash scripts/run_ci_checks.sh
-```
-
-This expands to default and strict CMake builds, default and strict CTest
-suites, headless smoke output, an AI-vs-AI stall guard, an AddressSanitizer core
-test on macOS/Linux, and whitespace checks against the current commit or local
-diff.
+and UTC start time, so the log can be handed back for diagnosis. The workflow
+runs default and strict CMake builds, default and strict CTest suites, headless
+smoke output, an AI-vs-AI stall guard, an AddressSanitizer core test on
+macOS/Linux, and whitespace checks against the checked commit.
 
 AI-vs-AI checks should keep adding seed-controlled autoplay runs, balance
 expectations, and replay playback validations, not just process exit codes.
