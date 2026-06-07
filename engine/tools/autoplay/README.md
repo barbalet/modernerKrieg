@@ -4,9 +4,9 @@ This directory contains command-line tools for headless game runs.
 
 The first tool, `mk_headless_run`, loads a MOSUL scenario and advances it for a fixed number of deterministic ticks.
 
-The `mk_ai_battle` tool runs repeated MOSUL AI-vs-AI battles with both tactical sides controlled by AI. It is available from CMake and from the checked-in `modernerKriegAIBattles.xcodeproj` command-line project.
+The `mk_ai_battle` tool runs repeated MOSUL AI-vs-AI battles with both tactical sides controlled by AI. It is available from CMake and from the checked-in `modernerKriegAIBattles.xcodeproj` command-line project. It can sweep deterministic seed ranges and fail a batch when settlement, stall, or score expectations are not met.
 
-The `mk_replay_validate` tool validates the first line-oriented `.mkreplay` event format and can assert final replay result/outcome fields.
+The `mk_replay_validate` tool validates the first line-oriented `.mkreplay` event format, can assert final replay result/outcome fields, and can print a compact tick-by-tick playback summary from the validated event stream.
 
 Useful options:
 
@@ -33,7 +33,11 @@ The first replay format is line-oriented text headed by `mk_replay version=1`. V
 mk_replay_validate --expect-result MK_OK --expect-outcome failure build/mosul_ai.mkreplay
 ```
 
-Future cycles should extend this into richer AI-vs-AI autoplay with controller assignment, replay playback, score-threshold checks, and batch balance summaries.
+Play back a selected tick range with:
+
+```sh
+mk_replay_validate --playback --from-tick 2 --to-tick 10 build/mosul_ai.mkreplay
+```
 
 `mk_ai_battle` useful options:
 
@@ -42,6 +46,17 @@ Future cycles should extend this into richer AI-vs-AI autoplay with controller a
 - `--ticks N` or `--max-ticks N`: cap each battle.
 - `--summary-every N`: print progress every `N` ticks.
 - `--watchdog N`: report a stall when battle state does not change for `N` ticks.
+- `--seed N`: set the first battle seed.
+- `--seed-step N`: advance explicit seeds as `seed + (battle_index - 1) * seed_step`.
 - `--fail-on-stall`: return a failure code when the watchdog trips.
+- `--expect-settled N`: fail unless at least `N` battles reach success or partial outcome.
+- `--expect-max-stalled N`: fail unless no more than `N` battles trip the watchdog.
+- `--expect-min-worst-score N`: fail unless the lowest final score across the batch is at least `N`.
 - `--keep-running-after-outcome`: continue ticking after success or partial outcome for soak testing.
 - `--verbose`: include per-unit order and position lines.
+
+Example seed-sweep balance check:
+
+```sh
+mk_ai_battle --battles 5 --ticks 160 --seed 84985359904819 --seed-step 101 --quiet --fail-on-stall --expect-settled 5 --expect-max-stalled 0 --expect-min-worst-score 440
+```

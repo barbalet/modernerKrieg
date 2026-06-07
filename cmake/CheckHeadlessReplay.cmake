@@ -50,6 +50,28 @@ if(NOT validate_result EQUAL 0)
   message(FATAL_ERROR "mk_replay_validate rejected generated replay: ${validate_error}\n${validate_output}")
 endif()
 
+execute_process(
+  COMMAND "${MK_REPLAY_VALIDATE}" --playback --from-tick 2 --to-tick 3 --expect-result MK_OK --expect-outcome failure "${MK_REPLAY_PATH}"
+  RESULT_VARIABLE playback_result
+  OUTPUT_VARIABLE playback_output
+  ERROR_VARIABLE playback_error
+)
+
+if(NOT playback_result EQUAL 0)
+  message(FATAL_ERROR "mk_replay_validate failed replay playback: ${playback_error}\n${playback_output}")
+endif()
+
+foreach(required_playback
+    "replay tick=2"
+    "replay tick=3"
+    "score=-3"
+    "outcome=failure")
+  string(FIND "${playback_output}" "${required_playback}" found_playback)
+  if(found_playback EQUAL -1)
+    message(FATAL_ERROR "missing replay playback output: ${required_playback}\n${playback_output}")
+  endif()
+endforeach()
+
 set(invalid_replay_path "${MK_REPLAY_PATH}.invalid")
 file(WRITE "${invalid_replay_path}"
   "mk_replay version=1 scenario=\"Invalid\" seed=1 steps=1 ai_only=1\n"

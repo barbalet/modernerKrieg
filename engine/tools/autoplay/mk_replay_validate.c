@@ -9,6 +9,11 @@ typedef struct {
     const char *path;
     const char *expect_result;
     const char *expect_outcome;
+    uint32_t from_tick;
+    uint32_t to_tick;
+    bool has_from_tick;
+    bool has_to_tick;
+    bool playback;
     bool quiet;
 } mk_replay_validate_config_t;
 
@@ -21,10 +26,16 @@ typedef struct {
     uint32_t current_units;
     uint32_t current_objectives;
     uint32_t current_scores;
+    uint32_t current_contacts;
+    uint32_t current_controlled;
+    uint32_t current_contested;
     uint32_t last_contact_id;
     uint32_t total_contacts;
     uint32_t final_tick;
     int final_score;
+    int current_score;
+    int current_civilian_risk;
+    char current_outcome[32];
     char final_result[32];
     char final_outcome[32];
     bool have_header;
@@ -36,9 +47,9 @@ typedef struct {
 static void mk_replay_print_usage(const char *program_name) {
     fprintf(
         stderr,
-        "usage: %s [--quiet] [--expect-result RESULT] [--expect-outcome OUTCOME] REPLAY_PATH\n"
+        "usage: %s [--quiet] [--playback] [--from-tick N] [--to-tick N] [--expect-result RESULT] [--expect-outcome OUTCOME] REPLAY_PATH\n"
         "\n"
-        "Validates a modernerKrieg text replay/event file.\n",
+        "Validates a modernerKrieg text replay/event file and can print a compact per-tick playback summary.\n",
         program_name
     );
 }
@@ -260,6 +271,32 @@ static bool mk_replay_finalize_tick(
         return mk_replay_fail(config, line_number, "tick does not contain exactly one score record");
     }
 
+    if (config != NULL && config->playback && !config->quiet) {
+        bool in_range = true;
+
+        if (config->has_from_tick && state->current_tick < config->from_tick) {
+            in_range = false;
+        }
+        if (config->has_to_tick && state->current_tick > config->to_tick) {
+            in_range = false;
+        }
+
+        if (in_range) {
+            printf(
+                "replay tick=%u units=%u objectives=%u contacts=%u score=%d outcome=%s controlled=%u contested=%u civilian_risk=%d\n",
+                state->current_tick,
+                state->current_units,
+                state->current_objectives,
+                state->current_contacts,
+                state->current_score,
+                state->current_outcome[0] == '\0' ? "unknown" : state->current_outcome,
+                state->current_controlled,
+                state->current_contested,
+                state->current_civilian_risk
+            );
+        }
+    }
+
     return true;
 }
 
@@ -287,6 +324,12 @@ static bool mk_replay_begin_tick(
     state->current_units = 0;
     state->current_objectives = 0;
     state->current_scores = 0;
+    state->current_contacts = 0;
+    state->current_controlled = 0;
+    state->current_contested = 0;
+    state->current_score = 0;
+    state->current_civilian_risk = 0;
+    state->current_outcome[0] = '\0';
     state->have_tick = true;
     return true;
 }
@@ -450,6 +493,14 @@ static bool mk_replay_validate_score_event(
         return mk_replay_fail(config, line_number, "score event is missing required fields");
     }
 
+    if (!mk_replay_copy_text(state->current_outcome, sizeof(state->current_outcome), outcome)) {
+        return mk_replay_fail(config, line_number, "score outcome is too long");
+    }
+
+    state->current_score = total;
+    state->current_controlled = controlled;
+    state->current_contested = contested;
+    state->current_civilian_risk = civilian_risk;
     state->current_scores += 1;
     return true;
 }
@@ -498,6 +549,7 @@ static bool mk_replay_validate_contact_event(
 
     state->last_contact_id = id;
     state->total_contacts += 1;
+    state->current_contacts += 1;
     return true;
 }
 
@@ -709,6 +761,33 @@ static bool mk_replay_parse_arguments(int argc, char **argv, mk_replay_validate_
             continue;
         }
 
+        if (strcmp(argument, "--playback") == 0) {
+            config->playback = true;
+            continue;
+        }
+
+        if (strcmp(argument, "--from-tick") == 0) {
+            if (arg_index + 1 >= argc || !mk_replay_parse_u32(argv[arg_index + 1], &config->from_tick)) {
+                return false;
+            }
+
+            config->has_from_tick = true;
+            config->playback = true;
+            arg_index += 1;
+            continue;
+        }
+
+        if (strcmp(argument, "--to-tick") == 0) {
+            if (arg_index + 1 >= argc || !mk_replay_parse_u32(argv[arg_index + 1], &config->to_tick)) {
+                return false;
+            }
+
+            config->has_to_tick = true;
+            config->playback = true;
+            arg_index += 1;
+            continue;
+        }
+
         if (strcmp(argument, "--expect-result") == 0) {
             if (arg_index + 1 >= argc) {
                 return false;
@@ -734,6 +813,10 @@ static bool mk_replay_parse_arguments(int argc, char **argv, mk_replay_validate_
         }
 
         config->path = argument;
+    }
+
+    if (config->has_from_tick && config->has_to_tick && config->from_tick > config->to_tick) {
+        return false;
     }
 
     return config->path != NULL;

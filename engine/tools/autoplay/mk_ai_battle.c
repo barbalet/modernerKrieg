@@ -22,7 +22,14 @@ typedef struct {
     uint32_t summary_every;
     uint32_t watchdog_ticks;
     uint64_t seed;
+    uint64_t seed_step;
+    uint32_t expected_settled;
+    uint32_t expected_max_stalled;
+    int expected_min_worst_score;
     bool has_seed;
+    bool has_expected_settled;
+    bool has_expected_max_stalled;
+    bool has_expected_min_worst_score;
     bool forever;
     bool quiet;
     bool verbose;
@@ -146,12 +153,31 @@ static bool mk_ai_battle_parse_u64(const char *text, uint64_t *out_value) {
     return true;
 }
 
+static bool mk_ai_battle_parse_i32(const char *text, int *out_value) {
+    char *end = NULL;
+    long parsed;
+
+    if (text == NULL || out_value == NULL || text[0] == '\0') {
+        return false;
+    }
+
+    errno = 0;
+    parsed = strtol(text, &end, 10);
+    if (errno != 0 || end == text || *end != '\0' || parsed < INT32_MIN || parsed > INT32_MAX) {
+        return false;
+    }
+
+    *out_value = (int)parsed;
+    return true;
+}
+
 static void mk_ai_battle_print_usage(const char *program_name) {
     fprintf(
         stderr,
-        "usage: %s [--scenario PATH] [--project-root PATH] [--battles N|--forever] [--ticks N|--max-ticks N] [--seed N] [--summary-every N] [--watchdog N] [--fail-on-stall] [--keep-running-after-outcome] [--quiet] [--verbose]\n"
+        "usage: %s [--scenario PATH] [--project-root PATH] [--battles N|--forever] [--ticks N|--max-ticks N] [--seed N] [--seed-step N] [--summary-every N] [--watchdog N] [--fail-on-stall] [--expect-settled N] [--expect-max-stalled N] [--expect-min-worst-score N] [--keep-running-after-outcome] [--quiet] [--verbose]\n"
         "\n"
-        "Runs deterministic MOSUL AI-vs-AI battles with both tactical sides controlled by AI.\n",
+        "Runs deterministic MOSUL AI-vs-AI battles with both tactical sides controlled by AI.\n"
+        "Explicit seeds sweep as seed + (battle_index - 1) * seed_step.\n",
         program_name
     );
 }
@@ -425,7 +451,7 @@ static mk_result_t mk_ai_battle_run_one(
     }
 
     if (config->has_seed) {
-        scenario.seed = config->seed + (uint64_t)(battle_index - 1U);
+        scenario.seed = config->seed + ((uint64_t)(battle_index - 1U) * config->seed_step);
     } else {
         scenario.seed += (uint64_t)(battle_index - 1U) * UINT64_C(0x9E3779B97F4A7C15);
     }
@@ -539,6 +565,49 @@ static mk_result_t mk_ai_battle_run_one(
     return MK_OK;
 }
 
+static bool mk_ai_battle_check_expectations(
+    const mk_ai_battle_config_t *config,
+    const mk_ai_battle_totals_t *totals
+) {
+    bool passed = true;
+
+    if (config == NULL || totals == NULL) {
+        return false;
+    }
+
+    if (config->has_expected_settled && totals->settled_battles < config->expected_settled) {
+        fprintf(
+            stderr,
+            "ai_battle expectation failed: settled=%u expected_at_least=%u\n",
+            totals->settled_battles,
+            config->expected_settled
+        );
+        passed = false;
+    }
+
+    if (config->has_expected_max_stalled && totals->stalled_battles > config->expected_max_stalled) {
+        fprintf(
+            stderr,
+            "ai_battle expectation failed: stalled=%u expected_at_most=%u\n",
+            totals->stalled_battles,
+            config->expected_max_stalled
+        );
+        passed = false;
+    }
+
+    if (config->has_expected_min_worst_score && totals->worst_score < config->expected_min_worst_score) {
+        fprintf(
+            stderr,
+            "ai_battle expectation failed: worst_score=%d expected_at_least=%d\n",
+            totals->worst_score,
+            config->expected_min_worst_score
+        );
+        passed = false;
+    }
+
+    return passed;
+}
+
 static bool mk_ai_battle_parse_arguments(int argc, char **argv, mk_ai_battle_config_t *config) {
     int arg_index;
 
@@ -552,6 +621,7 @@ static bool mk_ai_battle_parse_arguments(int argc, char **argv, mk_ai_battle_con
     config->max_ticks = 120;
     config->summary_every = 10;
     config->watchdog_ticks = 40;
+    config->seed_step = 1;
 
     for (arg_index = 1; arg_index < argc; ++arg_index) {
         const char *argument = argv[arg_index];
@@ -643,10 +713,48 @@ static bool mk_ai_battle_parse_arguments(int argc, char **argv, mk_ai_battle_con
             continue;
         }
 
+        if (strcmp(argument, "--seed-step") == 0) {
+            if (arg_index + 1 >= argc || !mk_ai_battle_parse_u64(argv[arg_index + 1], &config->seed_step)) {
+                return false;
+            }
+            arg_index += 1;
+            continue;
+        }
+
+        if (strcmp(argument, "--expect-settled") == 0) {
+            if (arg_index + 1 >= argc
+                || !mk_ai_battle_parse_u32(argv[arg_index + 1], &config->expected_settled)) {
+                return false;
+            }
+            config->has_expected_settled = true;
+            arg_index += 1;
+            continue;
+        }
+
+        if (strcmp(argument, "--expect-max-stalled") == 0) {
+            if (arg_index + 1 >= argc
+                || !mk_ai_battle_parse_u32(argv[arg_index + 1], &config->expected_max_stalled)) {
+                return false;
+            }
+            config->has_expected_max_stalled = true;
+            arg_index += 1;
+            continue;
+        }
+
+        if (strcmp(argument, "--expect-min-worst-score") == 0) {
+            if (arg_index + 1 >= argc
+                || !mk_ai_battle_parse_i32(argv[arg_index + 1], &config->expected_min_worst_score)) {
+                return false;
+            }
+            config->has_expected_min_worst_score = true;
+            arg_index += 1;
+            continue;
+        }
+
         return false;
     }
 
-    return config->battles > 0 && config->max_ticks > 0;
+    return config->battles > 0 && config->max_ticks > 0 && config->seed_step > 0;
 }
 
 int main(int argc, char **argv) {
@@ -675,14 +783,19 @@ int main(int argc, char **argv) {
 
     if (!config.quiet) {
         printf(
-            "ai_battle_totals battles=%u failed=%u settled=%u stalled=%u best_score=%d worst_score=%d\n",
+            "ai_battle_totals battles=%u failed=%u settled=%u stalled=%u best_score=%d worst_score=%d seed_step=%llu\n",
             totals.battles_run,
             totals.failed_battles,
             totals.settled_battles,
             totals.stalled_battles,
             totals.best_score,
-            totals.worst_score
+            totals.worst_score,
+            (unsigned long long)config.seed_step
         );
+    }
+
+    if (!mk_ai_battle_check_expectations(&config, &totals)) {
+        return 1;
     }
 
     return totals.failed_battles == 0 ? 0 : 1;

@@ -11,7 +11,7 @@ The project starts fresh as an SDL3 + CMake codebase. `derZweiteWeltkrieg` remai
 - `engine/assets/` contains manifest parsing and validation for map, sprite, and marker metadata.
 - `engine/ai/` contains controller policies that emit normal core orders.
 - `engine/platform/sdl3/` contains the optional SDL3 app shell.
-- `engine/tools/autoplay/` contains the deterministic headless run tool.
+- `engine/tools/autoplay/` contains deterministic headless run, replay validation/playback, and AI-vs-AI battle tools.
 - `game/mosul/` contains Mosul-specific scenario/content code built above the reusable core.
 - `tests/autoplay/` contains fixed-step/headless runner tests.
 - `tests/core/` contains headless C tests.
@@ -82,6 +82,21 @@ Run repeated AI-vs-AI battles with progress/watchdog output:
 ./build/bin/mk_ai_battle --battles 5 --ticks 160 --summary-every 10 --watchdog 40
 ```
 
+Run a quiet AI-vs-AI seed sweep that fails on stalls or weak batch results:
+
+```sh
+./build/bin/mk_ai_battle \
+  --battles 5 \
+  --ticks 160 \
+  --seed 84985359904819 \
+  --seed-step 101 \
+  --quiet \
+  --fail-on-stall \
+  --expect-settled 5 \
+  --expect-max-stalled 0 \
+  --expect-min-worst-score 440
+```
+
 Write an after-action summary into a deterministic AI-only transcript:
 
 ```sh
@@ -109,6 +124,12 @@ Validate a replay/event file:
 
 ```sh
 ./build/bin/mk_replay_validate --expect-result MK_OK build/mosul_ai.mkreplay
+```
+
+Play back a concise replay timeline for a tick range:
+
+```sh
+./build/bin/mk_replay_validate --playback --from-tick 2 --to-tick 10 build/mosul_ai.mkreplay
 ```
 
 Add simple balance expectations to fail a headless run when the expected state is not reached:
@@ -154,7 +175,7 @@ The checked-in Xcode command-line project is:
 modernerKriegAIBattles.xcodeproj
 ```
 
-Open it in Xcode and run the shared `mk_ai_battle` scheme to build the portable C core, asset parser, AI, renderer helper, Mosul scenario loader, and AI battle runner without SDL. The scheme runs five AI-vs-AI battles by default and prints regular battle summaries plus watchdog stall reports.
+Open it in Xcode and run the shared `mk_ai_battle` scheme to build the portable C core, asset parser, AI, renderer helper, Mosul scenario loader, and AI battle runner without SDL. The scheme runs the five-seed AI-vs-AI balance check by default, prints regular battle summaries plus watchdog stall reports, and exits nonzero when settlement, stall, or worst-score expectations are not met.
 Battles stop once they reach a success or partial outcome; pass `--keep-running-after-outcome` for longer soak runs that should keep checking for late tactical stalls.
 
 You can also build it from Terminal:
@@ -207,7 +228,8 @@ The core now supports deterministic board interaction without depending on SDL:
 - track civilian risk and stress from dangerous fire lanes and close armed movement
 - update objective-control state and score outcomes from objective control, civilian risk, casualties, time, scenario thresholds, and scenario score weights
 - carry scenario briefing and after-action text through data loading, snapshots, and headless output
-- produce deterministic debug transcript lines plus versioned replay/event files that can be validated by `mk_replay_validate`
+- produce deterministic debug transcript lines plus versioned replay/event files that can be validated and played back by `mk_replay_validate`
+- run AI-only seed sweeps with settlement, stall, and score expectations for balance checks
 - track ready, suppressed, pinned, and broken unit states from live strength, training, and suppression
 - slow or halt movement under suppression and apply fire penalties from combat stress
 - represent richer soldier state, including stance, wound state, ammo capacity, stress, exposure, equipment flags, sensor flags, and reload/cooldown timers
@@ -221,7 +243,7 @@ The core now supports deterministic board interaction without depending on SDL:
 - run player and opposing tactical controllers as deterministic AI-only headless runs with move, investigate, overwatch, suppress, hold, civilian-risk restraint, and withdraw choices
 - hand map, sprite, and marker manifests to the SDL app, which can load PNGs when SDL3_image is available, draw a compact score/objective/risk HUD, render order-status glyphs, and fall back otherwise
 
-The next implementation push is replay playback, broader AI-only seed sweeps, and scenario data for search/cache/breach or rooftop access points once the art pass identifies locations.
+The next implementation push is scenario interaction data for search/cache/breach or rooftop access points, player-facing briefing/AAR presentation, and a macOS-first smoke-tested package.
 
 When the SDL3 app target is available, left-click selects a unit, right-click gives the selected unit a move order, right-clicking a suspected/false contact gives an investigate order, arrow keys pan the board, and plus/minus zoom the board.
 

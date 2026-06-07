@@ -197,6 +197,20 @@ if(MK_BUILD_TESTS)
   add_test(NAME mk_headless_run_smoke COMMAND mk_headless_run --steps 3 --quiet)
   add_test(NAME mk_headless_run_ai_smoke COMMAND mk_headless_run --steps 3 --quiet --ai-only)
   add_test(NAME mk_ai_battle_smoke COMMAND mk_ai_battle --battles 1 --ticks 5 --quiet)
+  add_test(
+    NAME mk_ai_battle_seed_sweep_balance
+    COMMAND mk_ai_battle
+      --battles 5
+      --ticks 160
+      --seed 84985359904819
+      --seed-step 101
+      --watchdog 40
+      --fail-on-stall
+      --quiet
+      --expect-settled 5
+      --expect-max-stalled 0
+      --expect-min-worst-score 440
+  )
   add_test(NAME mk_replay_validate_usage COMMAND mk_replay_validate --help)
   add_test(
     NAME mk_headless_run_debug_balance

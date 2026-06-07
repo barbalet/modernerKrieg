@@ -60,6 +60,14 @@
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
+            argument = "--seed 84985359904819"
+            isEnabled = "YES">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "--seed-step 101"
+            isEnabled = "YES">
+         </CommandLineArgument>
+         <CommandLineArgument
             argument = "--summary-every 10"
             isEnabled = "YES">
          </CommandLineArgument>
@@ -69,6 +77,18 @@
          </CommandLineArgument>
          <CommandLineArgument
             argument = "--fail-on-stall"
+            isEnabled = "YES">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "--expect-settled 5"
+            isEnabled = "YES">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "--expect-max-stalled 0"
+            isEnabled = "YES">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "--expect-min-worst-score 440"
             isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>
