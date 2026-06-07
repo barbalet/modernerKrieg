@@ -233,10 +233,10 @@ Implementation approach:
 - Added budget from gameplay-area integration rebaseline: 20 cycles.
 - Planned cycle budget: 100 cycles.
 - Planned cycle shape: 10 milestones x 10 cycles each.
-- Completed cycles in this ledger: 10.
-- Current cycle: 10.
-- Remaining planned cycles: 90.
-- Next cycle batch: cycles 11-20, Topology Authoring Model.
+- Completed cycles in this ledger: 20.
+- Current cycle: 20.
+- Remaining planned cycles: 80.
+- Next cycle batch: cycles 21-30, Collision, Navigation, LOS, And Cover Products.
 
 Prior implementation work is captured in the current audit and is not counted
 against this rebaselined ledger. When a development batch is completed,
@@ -247,6 +247,7 @@ increment `Completed cycles in this ledger`, advance `Current cycle`, reduce
 | --- | ---: | ---: | ---: | --- | --- |
 | 2026-06-07 | 0 | 0 | 100 | Rebaseline | Updated from 80 to 100 cycles after the multi-level JSON gameplay area landed on main. |
 | 2026-06-07 | 10 | 10 | 90 | Gameplay Area Adoption And Validation | Added core gameplay-area state, Mosul JSON-to-core handoff, world/pixel and blocker queries, replay/debug exposure, and validation tests. |
+| 2026-06-07 | 20 | 20 | 80 | Topology Authoring Model | Added C-validated topology JSON, core topology state and queries, Mosul scenario handoff, debug/replay exposure, and topology validation tests. |
 
 ## Cycle Delta From Previous Plan
 
@@ -304,6 +305,8 @@ Exit criteria:
 - Headless output can name the gameplay-area manifest and current level stack.
 
 ### Cycles 11-20: Topology Authoring Model
+
+Status: completed on 2026-06-07.
 
 Goal: fill the gap between rectangle features and a real urban tactical graph.
 

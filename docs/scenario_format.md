@@ -16,7 +16,7 @@ Scenario files live in `game/mosul/scenarios/`. The default demo scenario is:
 game/mosul/scenarios/market_commercial_streets_2003.mkscenario
 ```
 
-Asset references inside a scenario must be repo-relative paths under `assets/mosul/`. The loader validates referenced map and sprite manifests before the scenario reaches the core. The optional `asset.building_level_manifest` reference validates the JSON floor stack, runtime PNG paths, wall/opening records, building regions, and map dimensions.
+Asset references inside a scenario must be repo-relative paths under `assets/mosul/`. The loader validates referenced map and sprite manifests before the scenario reaches the core. The optional `asset.building_level_manifest` reference validates the JSON floor stack, runtime PNG paths, wall/opening records, building regions, and map dimensions. The optional `asset.topology_manifest` reference validates the tactical topology graph tied to that building-level manifest; Market / Commercial Streets scenarios require both JSON references.
 
 ## Sections
 
@@ -25,7 +25,7 @@ The current loader supports:
 - scenario metadata: `name`, `seed`, and optional `briefing`
 - score metadata: optional `score.success_threshold`, `score.partial_threshold`, and score weight fields
 - after-action copy: optional `after_action.success`, `after_action.partial`, and `after_action.failure`
-- asset references: `asset.map_manifest`, `asset.sprite_manifest`, and optional `asset.building_level_manifest`
+- asset references: `asset.map_manifest`, `asset.sprite_manifest`, optional `asset.building_level_manifest`, and optional `asset.topology_manifest`
 - map metadata and tile grid
 - `tile_range.*` records for compact tile overrides
 - `terrain.*` records for line-of-sight and cover zones
@@ -44,6 +44,7 @@ The loader rejects:
 
 - missing or unsupported `format`
 - missing referenced map or sprite manifests
+- missing required Market / Commercial Streets building-level or topology manifests
 - unsafe asset paths
 - unknown enum values
 - invalid controller, faction, force, weapon, or soldier references
@@ -51,9 +52,21 @@ The loader rejects:
 - invalid score thresholds, such as a success threshold below the partial threshold
 - invalid score weights, such as negative objective, risk, casualty, or time weights
 - out-of-bounds map tiles, terrain, civilians, objectives, and units
+- invalid topology ids, levels, building regions, portals, vertical links, one-way portals, unreachable enterable nodes, or semantic zones
 - scenarios that the portable C core refuses to load
 
-CTest covers the default 2003 data file, fixture parity, objective labels, briefing/after-action text, score thresholds and weights, hidden-contact fields, interaction terrain zones, missing asset references, invalid force references, invalid threshold ordering, impossible objective bounds, the compact AI-only control smoke scenario, and a contested civilian-risk smoke scenario.
+CTest covers the default 2003 data file, fixture parity, gameplay-area topology handoff, objective labels, briefing/after-action text, score thresholds and weights, hidden-contact fields, interaction terrain zones, missing asset references, missing Market topology, invalid force references, invalid threshold ordering, impossible objective bounds, the compact AI-only control smoke scenario, and a contested civilian-risk smoke scenario.
+
+## Gameplay Area And Topology
+
+The Market / Commercial Streets scenario uses two JSON manifests in addition to the compact map and sprite manifests:
+
+```text
+asset.building_level_manifest=assets/mosul/manifests/market_commercial_streets_2003_building_levels.json
+asset.topology_manifest=assets/mosul/manifests/market_commercial_streets_2003_topology.json
+```
+
+The building-level manifest owns levels, wall/opening rectangles, and building regions. The topology manifest owns tactical nodes, portals between nodes, vertical connectors, portal state, and semantic zones such as civilian shelters, evacuation exits, caches, overwatch roofs, search objectives, restricted fire lanes, and danger areas. Both are loaded into the C core gameplay-area state before scenario validation finishes.
 
 ## Interaction Terrain
 

@@ -269,13 +269,17 @@ static void mk_headless_print_replay_header(FILE *stream, const mk_game_t *game,
     if (mk_gameplay_area_is_loaded(&game->gameplay_area)) {
         fprintf(
             stream,
-            "event tick=%u kind=gameplay_area id=\"%s\" map=\"%s\" levels=%u features=%u regions=%u pixel_width=%d pixel_height=%d ppm=%.2f\n",
+            "event tick=%u kind=gameplay_area id=\"%s\" map=\"%s\" levels=%u features=%u regions=%u topology_id=\"%s\" topology_nodes=%u topology_portals=%u semantic_zones=%u pixel_width=%d pixel_height=%d ppm=%.2f\n",
             game->tick,
             game->gameplay_area.id,
             game->gameplay_area.map_id,
             (unsigned)game->gameplay_area.level_count,
             (unsigned)game->gameplay_area.feature_count,
             (unsigned)game->gameplay_area.region_count,
+            game->gameplay_area.topology_id,
+            (unsigned)game->gameplay_area.topology_node_count,
+            (unsigned)game->gameplay_area.topology_portal_count,
+            (unsigned)game->gameplay_area.semantic_zone_count,
             game->gameplay_area.pixel_width,
             game->gameplay_area.pixel_height,
             game->gameplay_area.pixels_per_meter
@@ -560,6 +564,16 @@ static void mk_headless_print_header(FILE *stream, const mk_game_t *game, uint32
             game->gameplay_area.pixel_height,
             game->gameplay_area.pixels_per_meter
         );
+        if (mk_gameplay_area_topology_is_loaded(&game->gameplay_area)) {
+            fprintf(
+                stream,
+                "topology: id=\"%s\" nodes=%u portals=%u zones=%u\n",
+                game->gameplay_area.topology_id,
+                (unsigned)game->gameplay_area.topology_node_count,
+                (unsigned)game->gameplay_area.topology_portal_count,
+                (unsigned)game->gameplay_area.semantic_zone_count
+            );
+        }
     } else {
         fprintf(stream, "gameplay_area: none\n");
     }

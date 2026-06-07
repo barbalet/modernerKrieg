@@ -817,6 +817,108 @@ static mk_result_t mk_mosul_apply_building_level_manifest(
     return mk_scenario_set_gameplay_area(scenario, &area);
 }
 
+static mk_result_t mk_mosul_apply_topology_manifest(
+    const mk_asset_building_level_manifest_t *building_manifest,
+    const mk_asset_topology_manifest_t *topology_manifest,
+    mk_scenario_definition_t *scenario
+) {
+    mk_gameplay_area_t area;
+    size_t index;
+
+    if (building_manifest == NULL || topology_manifest == NULL || scenario == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (!mk_gameplay_area_is_loaded(&scenario->gameplay_area)
+        || topology_manifest->node_count > MK_MAX_GAMEPLAY_TOPOLOGY_NODES
+        || topology_manifest->portal_count > MK_MAX_GAMEPLAY_TOPOLOGY_PORTALS
+        || topology_manifest->zone_count > MK_MAX_GAMEPLAY_SEMANTIC_ZONES) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    area = scenario->gameplay_area;
+    area.topology_loaded = true;
+    area.topology_schema_version = topology_manifest->schema_version;
+    mk_mosul_copy_text(area.topology_id, sizeof(area.topology_id), topology_manifest->id);
+
+    area.topology_node_count = topology_manifest->node_count;
+    for (index = 0; index < topology_manifest->node_count; ++index) {
+        const mk_asset_topology_node_t *source = &topology_manifest->nodes[index];
+        mk_gameplay_topology_node_t *node = &area.topology_nodes[index];
+
+        mk_mosul_copy_text(node->id, sizeof(node->id), source->id);
+        mk_mosul_copy_text(node->kind, sizeof(node->kind), source->kind);
+        mk_mosul_copy_text(node->level_id, sizeof(node->level_id), source->level_id);
+        mk_mosul_copy_text(node->region_id, sizeof(node->region_id), source->region_id);
+        mk_mosul_copy_text(node->label, sizeof(node->label), source->label);
+        node->pixel_x = source->x;
+        node->pixel_y = source->y;
+        node->pixel_width = source->width;
+        node->pixel_height = source->height;
+        node->bounds_m = mk_mosul_pixel_rect_to_world(
+            building_manifest,
+            source->x,
+            source->y,
+            source->width,
+            source->height
+        );
+        node->enterable = source->enterable;
+    }
+
+    area.topology_portal_count = topology_manifest->portal_count;
+    for (index = 0; index < topology_manifest->portal_count; ++index) {
+        const mk_asset_topology_portal_t *source = &topology_manifest->portals[index];
+        mk_gameplay_topology_portal_t *portal = &area.topology_portals[index];
+
+        mk_mosul_copy_text(portal->id, sizeof(portal->id), source->id);
+        mk_mosul_copy_text(portal->kind, sizeof(portal->kind), source->kind);
+        mk_mosul_copy_text(portal->state, sizeof(portal->state), source->state);
+        mk_mosul_copy_text(portal->from_node_id, sizeof(portal->from_node_id), source->from_node_id);
+        mk_mosul_copy_text(portal->to_node_id, sizeof(portal->to_node_id), source->to_node_id);
+        mk_mosul_copy_text(portal->level_id, sizeof(portal->level_id), source->level_id);
+        mk_mosul_copy_text(portal->feature_id, sizeof(portal->feature_id), source->feature_id);
+        portal->pixel_x = source->x;
+        portal->pixel_y = source->y;
+        portal->pixel_width = source->width;
+        portal->pixel_height = source->height;
+        portal->bounds_m = mk_mosul_pixel_rect_to_world(
+            building_manifest,
+            source->x,
+            source->y,
+            source->width,
+            source->height
+        );
+        portal->bidirectional = source->bidirectional;
+        portal->vertical = source->vertical;
+        portal->movement_cost = source->movement_cost;
+    }
+
+    area.semantic_zone_count = topology_manifest->zone_count;
+    for (index = 0; index < topology_manifest->zone_count; ++index) {
+        const mk_asset_semantic_zone_t *source = &topology_manifest->zones[index];
+        mk_gameplay_semantic_zone_t *zone = &area.semantic_zones[index];
+
+        mk_mosul_copy_text(zone->id, sizeof(zone->id), source->id);
+        mk_mosul_copy_text(zone->kind, sizeof(zone->kind), source->kind);
+        mk_mosul_copy_text(zone->node_id, sizeof(zone->node_id), source->node_id);
+        mk_mosul_copy_text(zone->level_id, sizeof(zone->level_id), source->level_id);
+        zone->pixel_x = source->x;
+        zone->pixel_y = source->y;
+        zone->pixel_width = source->width;
+        zone->pixel_height = source->height;
+        zone->bounds_m = mk_mosul_pixel_rect_to_world(
+            building_manifest,
+            source->x,
+            source->y,
+            source->width,
+            source->height
+        );
+        zone->priority = source->priority;
+    }
+
+    return mk_scenario_set_gameplay_area(scenario, &area);
+}
+
 static mk_result_t mk_mosul_validate_asset_references(
     const mk_mosul_scenario_entry_list_t *entries,
     const char *project_root,
@@ -825,12 +927,15 @@ static mk_result_t mk_mosul_validate_asset_references(
     char map_manifest_relative[256];
     char sprite_manifest_relative[256];
     const char *building_level_manifest_relative;
+    const char *topology_manifest_relative;
     char map_manifest_path[MK_MOSUL_SCENARIO_PATH_CAPACITY];
     char sprite_manifest_path[MK_MOSUL_SCENARIO_PATH_CAPACITY];
     char building_level_manifest_path[MK_MOSUL_SCENARIO_PATH_CAPACITY];
+    char topology_manifest_path[MK_MOSUL_SCENARIO_PATH_CAPACITY];
     mk_asset_map_manifest_t map_manifest;
     mk_asset_sprite_manifest_t sprite_manifest;
     mk_asset_building_level_manifest_t building_level_manifest;
+    mk_asset_topology_manifest_t topology_manifest;
     const mk_map_t *map = scenario != NULL ? &scenario->map : NULL;
 
     if (!mk_mosul_required_text(entries, "asset.map_manifest", map_manifest_relative, sizeof(map_manifest_relative))
@@ -855,6 +960,11 @@ static mk_result_t mk_mosul_validate_asset_references(
         return MK_ERROR_INVALID_DATA;
     }
 
+    topology_manifest_relative = mk_mosul_entry_value(entries, "asset.topology_manifest");
+    if (topology_manifest_relative == NULL && strcmp(map_manifest.id, "market_commercial_streets_2003") == 0) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
     if (building_level_manifest_relative != NULL) {
         if (!mk_mosul_asset_path_is_safe(building_level_manifest_relative)
             || !mk_mosul_make_project_path(
@@ -867,6 +977,24 @@ static mk_result_t mk_mosul_validate_asset_references(
                 building_level_manifest_path,
                 project_root,
                 &building_level_manifest
+            ) != MK_OK) {
+            return MK_ERROR_INVALID_DATA;
+        }
+    }
+
+    if (topology_manifest_relative != NULL) {
+        if (building_level_manifest_relative == NULL
+            || !mk_mosul_asset_path_is_safe(topology_manifest_relative)
+            || !mk_mosul_make_project_path(
+                project_root,
+                topology_manifest_relative,
+                topology_manifest_path,
+                sizeof(topology_manifest_path)
+            )
+            || mk_asset_load_topology_manifest(
+                topology_manifest_path,
+                &building_level_manifest,
+                &topology_manifest
             ) != MK_OK) {
             return MK_ERROR_INVALID_DATA;
         }
@@ -888,6 +1016,11 @@ static mk_result_t mk_mosul_validate_asset_references(
 
     if (building_level_manifest_relative != NULL
         && mk_mosul_apply_building_level_manifest(&building_level_manifest, scenario) != MK_OK) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    if (topology_manifest_relative != NULL
+        && mk_mosul_apply_topology_manifest(&building_level_manifest, &topology_manifest, scenario) != MK_OK) {
         return MK_ERROR_INVALID_DATA;
     }
 

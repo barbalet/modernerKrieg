@@ -1,6 +1,7 @@
 #include "mk_core.h"
 
 #include <math.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -299,7 +300,154 @@ static bool mk_gameplay_area_ids_are_unique(const mk_gameplay_area_t *area) {
         }
     }
 
+    for (index = 0; index < area->topology_node_count; ++index) {
+        size_t other_index;
+
+        for (other_index = index + 1; other_index < area->topology_node_count; ++other_index) {
+            if (strcmp(area->topology_nodes[index].id, area->topology_nodes[other_index].id) == 0) {
+                return false;
+            }
+        }
+    }
+
+    for (index = 0; index < area->topology_portal_count; ++index) {
+        size_t other_index;
+
+        for (other_index = index + 1; other_index < area->topology_portal_count; ++other_index) {
+            if (strcmp(area->topology_portals[index].id, area->topology_portals[other_index].id) == 0) {
+                return false;
+            }
+        }
+    }
+
+    for (index = 0; index < area->semantic_zone_count; ++index) {
+        size_t other_index;
+
+        for (other_index = index + 1; other_index < area->semantic_zone_count; ++other_index) {
+            if (strcmp(area->semantic_zones[index].id, area->semantic_zones[other_index].id) == 0) {
+                return false;
+            }
+        }
+    }
+
     return true;
+}
+
+static bool mk_gameplay_area_topology_node_index(
+    const mk_gameplay_area_t *area,
+    const char *node_id,
+    size_t *out_index
+) {
+    size_t index;
+
+    if (area == NULL || node_id == NULL) {
+        return false;
+    }
+
+    for (index = 0; index < area->topology_node_count; ++index) {
+        if (strcmp(area->topology_nodes[index].id, node_id) == 0) {
+            if (out_index != NULL) {
+                *out_index = index;
+            }
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool mk_gameplay_area_region_has_topology_node(
+    const mk_gameplay_area_t *area,
+    const char *region_id
+) {
+    size_t index;
+
+    if (area == NULL || region_id == NULL || region_id[0] == '\0') {
+        return false;
+    }
+
+    for (index = 0; index < area->topology_node_count; ++index) {
+        if (strcmp(area->topology_nodes[index].region_id, region_id) == 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static size_t mk_gameplay_area_topology_unreachable_count(const mk_gameplay_area_t *area) {
+    bool visited[MK_MAX_GAMEPLAY_TOPOLOGY_NODES];
+    size_t queue[MK_MAX_GAMEPLAY_TOPOLOGY_NODES];
+    size_t start_index = (size_t)-1;
+    size_t queue_read = 0;
+    size_t queue_write = 0;
+    size_t unreachable = 0;
+    size_t index;
+
+    if (area == NULL || !area->topology_loaded || area->topology_node_count == 0) {
+        return 0;
+    }
+
+    memset(visited, 0, sizeof(visited));
+    for (index = 0; index < area->topology_node_count; ++index) {
+        if (area->topology_nodes[index].enterable) {
+            start_index = index;
+            break;
+        }
+    }
+
+    if (start_index == (size_t)-1) {
+        return 0;
+    }
+
+    visited[start_index] = true;
+    queue[queue_write] = start_index;
+    queue_write += 1;
+
+    while (queue_read < queue_write) {
+        size_t current_index = queue[queue_read];
+        queue_read += 1;
+
+        for (index = 0; index < area->topology_portal_count; ++index) {
+            const mk_gameplay_topology_portal_t *portal = &area->topology_portals[index];
+            size_t from_index;
+            size_t to_index;
+            size_t next_index;
+
+            if (!portal->bidirectional
+                || strcmp(portal->state, "blocked") == 0
+                || strcmp(portal->state, "locked") == 0
+                || strcmp(portal->state, "unsafe") == 0
+                || !mk_gameplay_area_topology_node_index(area, portal->from_node_id, &from_index)
+                || !mk_gameplay_area_topology_node_index(area, portal->to_node_id, &to_index)) {
+                continue;
+            }
+
+            if (from_index == current_index) {
+                next_index = to_index;
+            } else if (to_index == current_index) {
+                next_index = from_index;
+            } else {
+                continue;
+            }
+
+            if (!area->topology_nodes[next_index].enterable || visited[next_index]) {
+                continue;
+            }
+
+            visited[next_index] = true;
+            queue[queue_write] = next_index;
+            queue_write += 1;
+        }
+    }
+
+    for (index = 0; index < area->topology_node_count; ++index) {
+        if (area->topology_nodes[index].enterable && !visited[index]) {
+            unreachable += 1;
+        }
+    }
+
+    return unreachable;
 }
 
 static bool mk_gameplay_area_is_valid(const mk_gameplay_area_t *area) {
@@ -413,6 +561,171 @@ static bool mk_gameplay_area_is_valid(const mk_gameplay_area_t *area) {
             || !mk_float_close(region->bounds_m.y, expected_bounds.y)
             || !mk_float_close(region->bounds_m.width, expected_bounds.width)
             || !mk_float_close(region->bounds_m.height, expected_bounds.height)) {
+            return false;
+        }
+    }
+
+    if (area->topology_loaded) {
+        if (area->topology_schema_version <= 0
+            || !mk_text_is_present(area->topology_id)
+            || area->topology_node_count == 0
+            || area->topology_node_count > MK_MAX_GAMEPLAY_TOPOLOGY_NODES
+            || area->topology_portal_count > MK_MAX_GAMEPLAY_TOPOLOGY_PORTALS
+            || area->semantic_zone_count > MK_MAX_GAMEPLAY_SEMANTIC_ZONES) {
+            return false;
+        }
+
+        for (index = 0; index < area->topology_node_count; ++index) {
+            const mk_gameplay_topology_node_t *node = &area->topology_nodes[index];
+            mk_rect_t expected_bounds;
+
+            if (!mk_text_is_present(node->id)
+                || !mk_text_is_present(node->kind)
+                || !mk_text_is_present(node->level_id)
+                || !mk_text_is_present(node->label)
+                || mk_gameplay_area_find_level(area, node->level_id) == NULL
+                || (node->region_id[0] != '\0' && mk_gameplay_area_find_region(area, node->region_id) == NULL)
+                || !mk_gameplay_area_pixel_rect_is_valid(
+                    node->pixel_x,
+                    node->pixel_y,
+                    node->pixel_width,
+                    node->pixel_height,
+                    area->pixel_width,
+                    area->pixel_height
+                )
+                || !mk_gameplay_area_rect_fits_world(area, node->bounds_m)) {
+                return false;
+            }
+
+            expected_bounds = mk_gameplay_area_pixel_rect_to_world(
+                area,
+                node->pixel_x,
+                node->pixel_y,
+                node->pixel_width,
+                node->pixel_height
+            );
+            if (!mk_float_close(node->bounds_m.x, expected_bounds.x)
+                || !mk_float_close(node->bounds_m.y, expected_bounds.y)
+                || !mk_float_close(node->bounds_m.width, expected_bounds.width)
+                || !mk_float_close(node->bounds_m.height, expected_bounds.height)) {
+                return false;
+            }
+        }
+
+        for (index = 0; index < area->region_count; ++index) {
+            if (!mk_gameplay_area_region_has_topology_node(area, area->regions[index].id)) {
+                return false;
+            }
+        }
+
+        for (index = 0; index < area->topology_portal_count; ++index) {
+            const mk_gameplay_topology_portal_t *portal = &area->topology_portals[index];
+            const mk_gameplay_topology_node_t *from_node;
+            const mk_gameplay_topology_node_t *to_node;
+            const mk_gameplay_feature_t *feature;
+            mk_rect_t expected_bounds;
+
+            if (!mk_text_is_present(portal->id)
+                || !mk_text_is_present(portal->kind)
+                || !mk_text_is_present(portal->state)
+                || !mk_text_is_present(portal->from_node_id)
+                || !mk_text_is_present(portal->to_node_id)
+                || !mk_text_is_present(portal->level_id)
+                || !portal->bidirectional
+                || portal->movement_cost <= 0
+                || mk_gameplay_area_find_level(area, portal->level_id) == NULL
+                || !mk_gameplay_area_pixel_rect_is_valid(
+                    portal->pixel_x,
+                    portal->pixel_y,
+                    portal->pixel_width,
+                    portal->pixel_height,
+                    area->pixel_width,
+                    area->pixel_height
+                )
+                || !mk_gameplay_area_rect_fits_world(area, portal->bounds_m)) {
+                return false;
+            }
+
+            from_node = mk_gameplay_area_find_topology_node(area, portal->from_node_id);
+            to_node = mk_gameplay_area_find_topology_node(area, portal->to_node_id);
+            if (from_node == NULL || to_node == NULL || strcmp(from_node->id, to_node->id) == 0) {
+                return false;
+            }
+
+            if (portal->vertical) {
+                if (strcmp(from_node->level_id, to_node->level_id) == 0) {
+                    return false;
+                }
+            } else if (strcmp(from_node->level_id, to_node->level_id) != 0) {
+                return false;
+            }
+
+            if (portal->feature_id[0] != '\0') {
+                feature = mk_gameplay_area_find_feature(area, portal->feature_id);
+                if (feature == NULL || strcmp(feature->level_id, portal->level_id) != 0) {
+                    return false;
+                }
+            }
+
+            expected_bounds = mk_gameplay_area_pixel_rect_to_world(
+                area,
+                portal->pixel_x,
+                portal->pixel_y,
+                portal->pixel_width,
+                portal->pixel_height
+            );
+            if (!mk_float_close(portal->bounds_m.x, expected_bounds.x)
+                || !mk_float_close(portal->bounds_m.y, expected_bounds.y)
+                || !mk_float_close(portal->bounds_m.width, expected_bounds.width)
+                || !mk_float_close(portal->bounds_m.height, expected_bounds.height)) {
+                return false;
+            }
+        }
+
+        for (index = 0; index < area->semantic_zone_count; ++index) {
+            const mk_gameplay_semantic_zone_t *zone = &area->semantic_zones[index];
+            const mk_gameplay_topology_node_t *node;
+            mk_rect_t expected_bounds;
+
+            if (!mk_text_is_present(zone->id)
+                || !mk_text_is_present(zone->kind)
+                || !mk_text_is_present(zone->node_id)
+                || !mk_text_is_present(zone->level_id)
+                || zone->priority < 0
+                || mk_gameplay_area_find_level(area, zone->level_id) == NULL
+                || !mk_gameplay_area_pixel_rect_is_valid(
+                    zone->pixel_x,
+                    zone->pixel_y,
+                    zone->pixel_width,
+                    zone->pixel_height,
+                    area->pixel_width,
+                    area->pixel_height
+                )
+                || !mk_gameplay_area_rect_fits_world(area, zone->bounds_m)) {
+                return false;
+            }
+
+            node = mk_gameplay_area_find_topology_node(area, zone->node_id);
+            if (node == NULL || strcmp(node->level_id, zone->level_id) != 0) {
+                return false;
+            }
+
+            expected_bounds = mk_gameplay_area_pixel_rect_to_world(
+                area,
+                zone->pixel_x,
+                zone->pixel_y,
+                zone->pixel_width,
+                zone->pixel_height
+            );
+            if (!mk_float_close(zone->bounds_m.x, expected_bounds.x)
+                || !mk_float_close(zone->bounds_m.y, expected_bounds.y)
+                || !mk_float_close(zone->bounds_m.width, expected_bounds.width)
+                || !mk_float_close(zone->bounds_m.height, expected_bounds.height)) {
+                return false;
+            }
+        }
+
+        if (mk_gameplay_area_topology_unreachable_count(area) > 0) {
             return false;
         }
     }
@@ -1718,6 +2031,191 @@ const mk_gameplay_region_t *mk_gameplay_area_find_region_at_world(
     }
 
     return NULL;
+}
+
+bool mk_gameplay_area_topology_is_loaded(const mk_gameplay_area_t *area) {
+    return area != NULL && area->loaded && area->topology_loaded;
+}
+
+const mk_gameplay_topology_node_t *mk_gameplay_area_find_topology_node(
+    const mk_gameplay_area_t *area,
+    const char *node_id
+) {
+    size_t index;
+
+    if (area == NULL || node_id == NULL) {
+        return NULL;
+    }
+
+    for (index = 0; index < area->topology_node_count; ++index) {
+        if (strcmp(area->topology_nodes[index].id, node_id) == 0) {
+            return &area->topology_nodes[index];
+        }
+    }
+
+    return NULL;
+}
+
+const mk_gameplay_topology_node_t *mk_gameplay_area_find_topology_node_at_world(
+    const mk_gameplay_area_t *area,
+    const char *level_id,
+    mk_vec2_t position_m
+) {
+    size_t index;
+
+    if (area == NULL || level_id == NULL || !area->topology_loaded) {
+        return NULL;
+    }
+
+    for (index = 0; index < area->topology_node_count; ++index) {
+        const mk_gameplay_topology_node_t *node = &area->topology_nodes[index];
+
+        if (strcmp(node->level_id, level_id) == 0 && mk_rect_contains_point(node->bounds_m, position_m)) {
+            return node;
+        }
+    }
+
+    return NULL;
+}
+
+const mk_gameplay_topology_portal_t *mk_gameplay_area_find_topology_portal(
+    const mk_gameplay_area_t *area,
+    const char *portal_id
+) {
+    size_t index;
+
+    if (area == NULL || portal_id == NULL) {
+        return NULL;
+    }
+
+    for (index = 0; index < area->topology_portal_count; ++index) {
+        if (strcmp(area->topology_portals[index].id, portal_id) == 0) {
+            return &area->topology_portals[index];
+        }
+    }
+
+    return NULL;
+}
+
+const mk_gameplay_semantic_zone_t *mk_gameplay_area_find_semantic_zone(
+    const mk_gameplay_area_t *area,
+    const char *zone_id
+) {
+    size_t index;
+
+    if (area == NULL || zone_id == NULL) {
+        return NULL;
+    }
+
+    for (index = 0; index < area->semantic_zone_count; ++index) {
+        if (strcmp(area->semantic_zones[index].id, zone_id) == 0) {
+            return &area->semantic_zones[index];
+        }
+    }
+
+    return NULL;
+}
+
+const mk_gameplay_semantic_zone_t *mk_gameplay_area_find_semantic_zone_at_world(
+    const mk_gameplay_area_t *area,
+    const char *kind,
+    mk_vec2_t position_m
+) {
+    size_t index;
+
+    if (area == NULL || !area->topology_loaded) {
+        return NULL;
+    }
+
+    for (index = 0; index < area->semantic_zone_count; ++index) {
+        const mk_gameplay_semantic_zone_t *zone = &area->semantic_zones[index];
+
+        if ((kind == NULL || strcmp(zone->kind, kind) == 0)
+            && mk_rect_contains_point(zone->bounds_m, position_m)) {
+            return zone;
+        }
+    }
+
+    return NULL;
+}
+
+static bool mk_gameplay_area_debug_append(char *out_text, size_t capacity, size_t *in_out_length, const char *format, ...) {
+    va_list args;
+    int written;
+    size_t remaining;
+
+    if (out_text == NULL || capacity == 0 || in_out_length == NULL || *in_out_length >= capacity) {
+        return false;
+    }
+
+    remaining = capacity - *in_out_length;
+    va_start(args, format);
+    written = vsnprintf(out_text + *in_out_length, remaining, format, args);
+    va_end(args);
+
+    if (written < 0 || (size_t)written >= remaining) {
+        out_text[capacity - 1] = '\0';
+        return false;
+    }
+
+    *in_out_length += (size_t)written;
+    return true;
+}
+
+mk_result_t mk_gameplay_area_topology_debug_dump(
+    const mk_gameplay_area_t *area,
+    char *out_text,
+    size_t capacity
+) {
+    size_t length = 0;
+    size_t index;
+    size_t unreachable;
+
+    if (area == NULL || out_text == NULL || capacity == 0) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    out_text[0] = '\0';
+    if (!area->loaded || !area->topology_loaded) {
+        return mk_gameplay_area_debug_append(out_text, capacity, &length, "topology=none\n")
+            ? MK_OK
+            : MK_ERROR_CAPACITY;
+    }
+
+    unreachable = mk_gameplay_area_topology_unreachable_count(area);
+    if (!mk_gameplay_area_debug_append(
+            out_text,
+            capacity,
+            &length,
+            "topology id=\"%s\" nodes=%u portals=%u zones=%u unreachable=%u\n",
+            area->topology_id,
+            (unsigned)area->topology_node_count,
+            (unsigned)area->topology_portal_count,
+            (unsigned)area->semantic_zone_count,
+            (unsigned)unreachable
+        )) {
+        return MK_ERROR_CAPACITY;
+    }
+
+    for (index = 0; index < area->topology_node_count; ++index) {
+        const mk_gameplay_topology_node_t *node = &area->topology_nodes[index];
+
+        if (!mk_gameplay_area_debug_append(
+                out_text,
+                capacity,
+                &length,
+                "node id=\"%s\" kind=%s level=%s region=\"%s\" enterable=%d\n",
+                node->id,
+                node->kind,
+                node->level_id,
+                node->region_id,
+                node->enterable ? 1 : 0
+            )) {
+            return MK_ERROR_CAPACITY;
+        }
+    }
+
+    return MK_OK;
 }
 
 static bool mk_gameplay_area_blocks_at(

@@ -101,6 +101,63 @@ static mk_gameplay_area_t make_test_gameplay_area(void) {
     area.regions[0].bounds_m = make_rect(8.0f, 18.0f, 12.0f, 12.0f);
     strcpy(area.regions[0].roof_level_id, "ground");
 
+    area.topology_loaded = true;
+    area.topology_schema_version = 1;
+    strcpy(area.topology_id, "test_topology");
+    area.topology_node_count = 2;
+    strcpy(area.topology_nodes[0].id, "street");
+    strcpy(area.topology_nodes[0].kind, "street");
+    strcpy(area.topology_nodes[0].level_id, "ground");
+    strcpy(area.topology_nodes[0].region_id, "");
+    strcpy(area.topology_nodes[0].label, "Street");
+    area.topology_nodes[0].pixel_x = 0;
+    area.topology_nodes[0].pixel_y = 0;
+    area.topology_nodes[0].pixel_width = 80;
+    area.topology_nodes[0].pixel_height = 80;
+    area.topology_nodes[0].bounds_m = make_rect(0.0f, 0.0f, 8.0f, 8.0f);
+    area.topology_nodes[0].enterable = true;
+
+    strcpy(area.topology_nodes[1].id, "shop");
+    strcpy(area.topology_nodes[1].kind, "shop");
+    strcpy(area.topology_nodes[1].level_id, "ground");
+    strcpy(area.topology_nodes[1].region_id, "shop_row");
+    strcpy(area.topology_nodes[1].label, "Shop");
+    area.topology_nodes[1].pixel_x = 80;
+    area.topology_nodes[1].pixel_y = 180;
+    area.topology_nodes[1].pixel_width = 120;
+    area.topology_nodes[1].pixel_height = 120;
+    area.topology_nodes[1].bounds_m = make_rect(8.0f, 18.0f, 12.0f, 12.0f);
+    area.topology_nodes[1].enterable = true;
+
+    area.topology_portal_count = 1;
+    strcpy(area.topology_portals[0].id, "street_to_shop");
+    strcpy(area.topology_portals[0].kind, "door");
+    strcpy(area.topology_portals[0].state, "open");
+    strcpy(area.topology_portals[0].from_node_id, "street");
+    strcpy(area.topology_portals[0].to_node_id, "shop");
+    strcpy(area.topology_portals[0].level_id, "ground");
+    strcpy(area.topology_portals[0].feature_id, "west_door");
+    area.topology_portals[0].pixel_x = 100;
+    area.topology_portals[0].pixel_y = 220;
+    area.topology_portals[0].pixel_width = 20;
+    area.topology_portals[0].pixel_height = 10;
+    area.topology_portals[0].bounds_m = make_rect(10.0f, 22.0f, 2.0f, 1.0f);
+    area.topology_portals[0].bidirectional = true;
+    area.topology_portals[0].vertical = false;
+    area.topology_portals[0].movement_cost = 1;
+
+    area.semantic_zone_count = 1;
+    strcpy(area.semantic_zones[0].id, "shop_shelter");
+    strcpy(area.semantic_zones[0].kind, "civilian_shelter");
+    strcpy(area.semantic_zones[0].node_id, "shop");
+    strcpy(area.semantic_zones[0].level_id, "ground");
+    area.semantic_zones[0].pixel_x = 90;
+    area.semantic_zones[0].pixel_y = 190;
+    area.semantic_zones[0].pixel_width = 60;
+    area.semantic_zones[0].pixel_height = 60;
+    area.semantic_zones[0].bounds_m = make_rect(9.0f, 19.0f, 6.0f, 6.0f);
+    area.semantic_zones[0].priority = 2;
+
     return area;
 }
 
@@ -170,6 +227,10 @@ static void test_gameplay_area_coordinate_and_blocker_queries(void) {
     const mk_gameplay_level_t *level;
     const mk_gameplay_feature_t *feature;
     const mk_gameplay_region_t *region;
+    const mk_gameplay_topology_node_t *node;
+    const mk_gameplay_topology_portal_t *portal;
+    const mk_gameplay_semantic_zone_t *zone;
+    char topology_dump[1024];
     mk_scenario_definition_t scenario;
     mk_game_t game;
     mk_game_snapshot_t snapshot;
@@ -206,6 +267,22 @@ static void test_gameplay_area_coordinate_and_blocker_queries(void) {
     assert(region->storeys == 1);
     assert(mk_gameplay_area_find_region_at_world(&area, mk_vec2(12.0f, 20.0f)) == region);
 
+    assert(mk_gameplay_area_topology_is_loaded(&area));
+    node = mk_gameplay_area_find_topology_node(&area, "shop");
+    assert(node != NULL);
+    assert(strcmp(node->region_id, "shop_row") == 0);
+    assert(mk_gameplay_area_find_topology_node_at_world(&area, "ground", mk_vec2(9.0f, 19.0f)) == node);
+    portal = mk_gameplay_area_find_topology_portal(&area, "street_to_shop");
+    assert(portal != NULL);
+    assert(strcmp(portal->feature_id, "west_door") == 0);
+    zone = mk_gameplay_area_find_semantic_zone(&area, "shop_shelter");
+    assert(zone != NULL);
+    assert(zone->priority == 2);
+    assert(mk_gameplay_area_find_semantic_zone_at_world(&area, "civilian_shelter", mk_vec2(10.0f, 20.0f)) == zone);
+    assert(mk_gameplay_area_topology_debug_dump(&area, topology_dump, sizeof(topology_dump)) == MK_OK);
+    assert(strstr(topology_dump, "topology id=\"test_topology\"") != NULL);
+    assert(strstr(topology_dump, "unreachable=0") != NULL);
+
     assert(mk_gameplay_area_blocks_los_at(&area, "ground", mk_vec2(10.1f, 20.1f)));
     assert(mk_gameplay_area_blocks_movement_at(&area, "ground", mk_vec2(10.1f, 20.1f)));
     assert(!mk_gameplay_area_blocks_los_at(&area, "ground", mk_vec2(10.1f, 22.1f)));
@@ -227,6 +304,10 @@ static void test_gameplay_area_coordinate_and_blocker_queries(void) {
     assert(strcmp(snapshot.gameplay_area.features[1].id, "west_door") == 0);
 
     area.world_width_m = 101.0f;
+    assert(mk_scenario_set_gameplay_area(&scenario, &area) == MK_ERROR_INVALID_DATA);
+
+    area = make_test_gameplay_area();
+    area.topology_portals[0].vertical = true;
     assert(mk_scenario_set_gameplay_area(&scenario, &area) == MK_ERROR_INVALID_DATA);
 }
 

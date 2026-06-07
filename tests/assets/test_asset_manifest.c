@@ -45,6 +45,39 @@ static bool file_exists(const char *path) {
     return true;
 }
 
+static void write_project_file_with_replacement(
+    const char *source_relative_path,
+    const char *output_path,
+    const char *needle,
+    const char *replacement
+) {
+    char source_path[512];
+    char text[65536];
+    FILE *source;
+    FILE *output;
+    size_t read_count;
+    char *found;
+
+    make_project_path(source_path, sizeof(source_path), source_relative_path);
+    source = fopen(source_path, "rb");
+    MK_TEST_ASSERT(source != NULL);
+    read_count = fread(text, 1, sizeof(text) - 1, source);
+    MK_TEST_ASSERT(ferror(source) == 0);
+    MK_TEST_ASSERT(fclose(source) == 0);
+    MK_TEST_ASSERT(read_count < sizeof(text) - 1);
+    text[read_count] = '\0';
+
+    found = strstr(text, needle);
+    MK_TEST_ASSERT(found != NULL);
+
+    output = fopen(output_path, "wb");
+    MK_TEST_ASSERT(output != NULL);
+    MK_TEST_ASSERT(fwrite(text, 1, (size_t)(found - text), output) == (size_t)(found - text));
+    MK_TEST_ASSERT(fputs(replacement, output) >= 0);
+    MK_TEST_ASSERT(fputs(found + strlen(needle), output) >= 0);
+    MK_TEST_ASSERT(fclose(output) == 0);
+}
+
 static void test_map_manifest_loads_market_layers(void) {
     char path[512];
     char runtime_path[512];
@@ -136,6 +169,56 @@ static void test_building_level_manifest_loads_multistorey_stack(void) {
     MK_TEST_ASSERT(region != NULL);
     MK_TEST_ASSERT(region->storeys == 1);
     MK_TEST_ASSERT(strcmp(region->roof_level_id, "level_02_roofs_and_second_floor") == 0);
+}
+
+static void test_topology_manifest_loads_market_graph(void) {
+    char building_path[512];
+    char topology_path[512];
+    mk_asset_building_level_manifest_t building_manifest;
+    mk_asset_topology_manifest_t topology_manifest;
+    const mk_asset_topology_node_t *node;
+    const mk_asset_topology_portal_t *portal;
+    const mk_asset_semantic_zone_t *zone;
+
+    make_project_path(
+        building_path,
+        sizeof(building_path),
+        "assets/mosul/manifests/market_commercial_streets_2003_building_levels.json"
+    );
+    make_project_path(
+        topology_path,
+        sizeof(topology_path),
+        "assets/mosul/manifests/market_commercial_streets_2003_topology.json"
+    );
+
+    MK_TEST_ASSERT(mk_asset_load_building_level_manifest(building_path, MK_TEST_PROJECT_ROOT, &building_manifest) == MK_OK);
+    MK_TEST_ASSERT(mk_asset_load_topology_manifest(topology_path, &building_manifest, &topology_manifest) == MK_OK);
+    MK_TEST_ASSERT(topology_manifest.schema_version == 1);
+    MK_TEST_ASSERT(strcmp(topology_manifest.id, "market_commercial_streets_2003_topology") == 0);
+    MK_TEST_ASSERT(strcmp(topology_manifest.gameplay_area_id, building_manifest.id) == 0);
+    MK_TEST_ASSERT(topology_manifest.node_count == 14);
+    MK_TEST_ASSERT(topology_manifest.portal_count == 15);
+    MK_TEST_ASSERT(topology_manifest.zone_count == 10);
+
+    node = mk_asset_find_topology_node(&topology_manifest, "hotel_roof_access");
+    MK_TEST_ASSERT(node != NULL);
+    MK_TEST_ASSERT(strcmp(node->kind, "roof") == 0);
+    MK_TEST_ASSERT(strcmp(node->level_id, "level_04_roof_access") == 0);
+    MK_TEST_ASSERT(strcmp(node->region_id, "three_storey_hotel_east") == 0);
+    MK_TEST_ASSERT(node->enterable);
+
+    portal = mk_asset_find_topology_portal(&topology_manifest, "hotel_stair_ground_to_second");
+    MK_TEST_ASSERT(portal != NULL);
+    MK_TEST_ASSERT(strcmp(portal->kind, "stair") == 0);
+    MK_TEST_ASSERT(portal->vertical);
+    MK_TEST_ASSERT(portal->bidirectional);
+    MK_TEST_ASSERT(strcmp(portal->feature_id, "hotel_stairwell_ground") == 0);
+
+    zone = mk_asset_find_semantic_zone(&topology_manifest, "market_restricted_fire_lane");
+    MK_TEST_ASSERT(zone != NULL);
+    MK_TEST_ASSERT(strcmp(zone->kind, "restricted_fire_lane") == 0);
+    MK_TEST_ASSERT(strcmp(zone->node_id, "street_market_junction") == 0);
+    MK_TEST_ASSERT(zone->priority == 5);
 }
 
 static void test_sprite_manifest_loads_first_frames(void) {
@@ -453,9 +536,33 @@ static void test_building_level_manifest_rejects_missing_level_png(void) {
     MK_TEST_ASSERT(mk_asset_load_building_level_manifest(path, MK_TEST_PROJECT_ROOT, &manifest) == MK_ERROR_INVALID_DATA);
 }
 
+static void test_topology_manifest_rejects_one_way_portal(void) {
+    char building_path[512];
+    char bad_topology_path[512];
+    mk_asset_building_level_manifest_t building_manifest;
+    mk_asset_topology_manifest_t topology_manifest;
+
+    make_project_path(
+        building_path,
+        sizeof(building_path),
+        "assets/mosul/manifests/market_commercial_streets_2003_building_levels.json"
+    );
+    make_binary_path(bad_topology_path, sizeof(bad_topology_path), "bad_one_way_topology.json");
+    write_project_file_with_replacement(
+        "assets/mosul/manifests/market_commercial_streets_2003_topology.json",
+        bad_topology_path,
+        "\"bidirectional\": true",
+        "\"bidirectional\": false"
+    );
+
+    MK_TEST_ASSERT(mk_asset_load_building_level_manifest(building_path, MK_TEST_PROJECT_ROOT, &building_manifest) == MK_OK);
+    MK_TEST_ASSERT(mk_asset_load_topology_manifest(bad_topology_path, &building_manifest, &topology_manifest) == MK_ERROR_INVALID_DATA);
+}
+
 int main(void) {
     test_map_manifest_loads_market_layers();
     test_building_level_manifest_loads_multistorey_stack();
+    test_topology_manifest_loads_market_graph();
     test_sprite_manifest_loads_first_frames();
     test_sprite_render_manifest_loads_all_runtime_facings();
     test_marker_manifest_loads_tactical_markers();
@@ -464,6 +571,7 @@ int main(void) {
     test_marker_manifest_rejects_bad_color();
     test_sprite_render_manifest_rejects_missing_runtime_png();
     test_building_level_manifest_rejects_missing_level_png();
+    test_topology_manifest_rejects_one_way_portal();
 
     puts("mk_asset_manifest_tests: ok");
     return 0;

@@ -26,6 +26,9 @@ extern "C" {
 #define MK_MAX_GAMEPLAY_AREA_LEVELS 8
 #define MK_MAX_GAMEPLAY_AREA_FEATURES 128
 #define MK_MAX_GAMEPLAY_AREA_REGIONS 64
+#define MK_MAX_GAMEPLAY_TOPOLOGY_NODES 64
+#define MK_MAX_GAMEPLAY_TOPOLOGY_PORTALS 128
+#define MK_MAX_GAMEPLAY_SEMANTIC_ZONES 64
 #define MK_SCENARIO_TEXT_CAPACITY 256
 #define MK_AFTER_ACTION_SUMMARY_CAPACITY 256
 #define MK_UNIT_PICK_RADIUS_M 8.0f
@@ -375,6 +378,51 @@ typedef struct {
 } mk_gameplay_region_t;
 
 typedef struct {
+    char id[MK_NAME_CAPACITY];
+    char kind[MK_KIND_CAPACITY];
+    char level_id[MK_NAME_CAPACITY];
+    char region_id[MK_NAME_CAPACITY];
+    char label[MK_NAME_CAPACITY];
+    int pixel_x;
+    int pixel_y;
+    int pixel_width;
+    int pixel_height;
+    mk_rect_t bounds_m;
+    bool enterable;
+} mk_gameplay_topology_node_t;
+
+typedef struct {
+    char id[MK_NAME_CAPACITY];
+    char kind[MK_KIND_CAPACITY];
+    char state[MK_KIND_CAPACITY];
+    char from_node_id[MK_NAME_CAPACITY];
+    char to_node_id[MK_NAME_CAPACITY];
+    char level_id[MK_NAME_CAPACITY];
+    char feature_id[MK_NAME_CAPACITY];
+    int pixel_x;
+    int pixel_y;
+    int pixel_width;
+    int pixel_height;
+    mk_rect_t bounds_m;
+    bool bidirectional;
+    bool vertical;
+    int movement_cost;
+} mk_gameplay_topology_portal_t;
+
+typedef struct {
+    char id[MK_NAME_CAPACITY];
+    char kind[MK_KIND_CAPACITY];
+    char node_id[MK_NAME_CAPACITY];
+    char level_id[MK_NAME_CAPACITY];
+    int pixel_x;
+    int pixel_y;
+    int pixel_width;
+    int pixel_height;
+    mk_rect_t bounds_m;
+    int priority;
+} mk_gameplay_semantic_zone_t;
+
+typedef struct {
     bool loaded;
     int schema_version;
     char id[MK_NAME_CAPACITY];
@@ -393,6 +441,15 @@ typedef struct {
     mk_gameplay_feature_t features[MK_MAX_GAMEPLAY_AREA_FEATURES];
     size_t region_count;
     mk_gameplay_region_t regions[MK_MAX_GAMEPLAY_AREA_REGIONS];
+    bool topology_loaded;
+    int topology_schema_version;
+    char topology_id[MK_NAME_CAPACITY];
+    size_t topology_node_count;
+    mk_gameplay_topology_node_t topology_nodes[MK_MAX_GAMEPLAY_TOPOLOGY_NODES];
+    size_t topology_portal_count;
+    mk_gameplay_topology_portal_t topology_portals[MK_MAX_GAMEPLAY_TOPOLOGY_PORTALS];
+    size_t semantic_zone_count;
+    mk_gameplay_semantic_zone_t semantic_zones[MK_MAX_GAMEPLAY_SEMANTIC_ZONES];
 } mk_gameplay_area_t;
 
 typedef struct {
@@ -684,6 +741,34 @@ const mk_gameplay_region_t *mk_gameplay_area_find_region(
 const mk_gameplay_region_t *mk_gameplay_area_find_region_at_world(
     const mk_gameplay_area_t *area,
     mk_vec2_t position_m
+);
+bool mk_gameplay_area_topology_is_loaded(const mk_gameplay_area_t *area);
+const mk_gameplay_topology_node_t *mk_gameplay_area_find_topology_node(
+    const mk_gameplay_area_t *area,
+    const char *node_id
+);
+const mk_gameplay_topology_node_t *mk_gameplay_area_find_topology_node_at_world(
+    const mk_gameplay_area_t *area,
+    const char *level_id,
+    mk_vec2_t position_m
+);
+const mk_gameplay_topology_portal_t *mk_gameplay_area_find_topology_portal(
+    const mk_gameplay_area_t *area,
+    const char *portal_id
+);
+const mk_gameplay_semantic_zone_t *mk_gameplay_area_find_semantic_zone(
+    const mk_gameplay_area_t *area,
+    const char *zone_id
+);
+const mk_gameplay_semantic_zone_t *mk_gameplay_area_find_semantic_zone_at_world(
+    const mk_gameplay_area_t *area,
+    const char *kind,
+    mk_vec2_t position_m
+);
+mk_result_t mk_gameplay_area_topology_debug_dump(
+    const mk_gameplay_area_t *area,
+    char *out_text,
+    size_t capacity
 );
 bool mk_gameplay_area_feature_contains_pixel(
     const mk_gameplay_feature_t *feature,

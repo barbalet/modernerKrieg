@@ -47,10 +47,14 @@ static void test_default_scenario_data_matches_fixture_shape(void) {
     const mk_gameplay_feature_t *wall;
     const mk_gameplay_feature_t *door;
     const mk_gameplay_feature_t *window;
+    const mk_gameplay_topology_node_t *node;
+    const mk_gameplay_topology_portal_t *portal;
+    const mk_gameplay_semantic_zone_t *zone;
     mk_vec2_t wall_sample;
     mk_vec2_t door_sample;
     mk_vec2_t window_sample;
     mk_ivec2_t wall_pixel;
+    char topology_dump[2048];
 
     load_default_data_scenario(&loaded);
     MK_TEST_ASSERT(mk_mosul_make_market_2003_fixture_scenario(&fixture) == MK_OK);
@@ -108,6 +112,30 @@ static void test_default_scenario_data_matches_fixture_shape(void) {
     MK_TEST_ASSERT(loaded.gameplay_area.level_count == 4);
     MK_TEST_ASSERT(loaded.gameplay_area.feature_count == 25);
     MK_TEST_ASSERT(loaded.gameplay_area.region_count == 8);
+    MK_TEST_ASSERT(mk_gameplay_area_topology_is_loaded(&loaded.gameplay_area));
+    MK_TEST_ASSERT(strcmp(loaded.gameplay_area.topology_id, "market_commercial_streets_2003_topology") == 0);
+    MK_TEST_ASSERT(loaded.gameplay_area.topology_node_count == 14);
+    MK_TEST_ASSERT(loaded.gameplay_area.topology_portal_count == 15);
+    MK_TEST_ASSERT(loaded.gameplay_area.semantic_zone_count == 10);
+
+    node = mk_gameplay_area_find_topology_node(&loaded.gameplay_area, "hotel_roof_access");
+    MK_TEST_ASSERT(node != NULL);
+    MK_TEST_ASSERT(strcmp(node->kind, "roof") == 0);
+    MK_TEST_ASSERT(strcmp(node->level_id, "level_04_roof_access") == 0);
+
+    portal = mk_gameplay_area_find_topology_portal(&loaded.gameplay_area, "hotel_stair_ground_to_second");
+    MK_TEST_ASSERT(portal != NULL);
+    MK_TEST_ASSERT(portal->vertical);
+    MK_TEST_ASSERT(portal->bidirectional);
+
+    zone = mk_gameplay_area_find_semantic_zone(&loaded.gameplay_area, "market_restricted_fire_lane");
+    MK_TEST_ASSERT(zone != NULL);
+    MK_TEST_ASSERT(strcmp(zone->kind, "restricted_fire_lane") == 0);
+    MK_TEST_ASSERT(zone->priority == 5);
+    MK_TEST_ASSERT(mk_gameplay_area_find_semantic_zone_at_world(&loaded.gameplay_area, "restricted_fire_lane", mk_vec2(180.0f, 145.0f)) == zone);
+    MK_TEST_ASSERT(mk_gameplay_area_topology_debug_dump(&loaded.gameplay_area, topology_dump, sizeof(topology_dump)) == MK_OK);
+    MK_TEST_ASSERT(strstr(topology_dump, "topology id=\"market_commercial_streets_2003_topology\"") != NULL);
+    MK_TEST_ASSERT(strstr(topology_dump, "unreachable=0") != NULL);
 
     wall = mk_gameplay_area_find_feature(&loaded.gameplay_area, "souq_west_outer_wall_ground");
     door = mk_gameplay_area_find_feature(&loaded.gameplay_area, "souq_west_door_ground");
@@ -141,6 +169,7 @@ static void test_public_default_scenario_uses_data_file(void) {
     MK_TEST_ASSERT(game.unit_count == 3);
     MK_TEST_ASSERT(mk_gameplay_area_is_loaded(&game.gameplay_area));
     MK_TEST_ASSERT(game.gameplay_area.level_count == 4);
+    MK_TEST_ASSERT(mk_gameplay_area_topology_is_loaded(&game.gameplay_area));
 }
 
 static void test_control_smoke_scenario_loads(void) {
@@ -207,6 +236,32 @@ static void test_market_scenario_requires_building_level_manifest(void) {
         "seed=1\n"
         "asset.map_manifest=assets/mosul/manifests/market_commercial_streets_2003.mapmanifest\n"
         "asset.sprite_manifest=assets/mosul/manifests/mosul_2003_sprites.spritemanifest\n"
+        "map.name=Market / Commercial Streets\n"
+        "map.width_m=500\n"
+        "map.height_m=500\n"
+        "map.tile_columns=10\n"
+        "map.tile_rows=10\n"
+        "map.tile_width_m=50\n"
+        "map.tile_height_m=50\n"
+        "map.default_terrain=open\n"
+    );
+
+    MK_TEST_ASSERT(mk_mosul_load_scenario_file(path, MK_TEST_PROJECT_ROOT, &scenario) == MK_ERROR_INVALID_DATA);
+}
+
+static void test_market_scenario_requires_topology_manifest(void) {
+    char path[512];
+    mk_scenario_definition_t scenario;
+
+    make_binary_path(path, sizeof(path), "bad_missing_topology.mkscenario");
+    write_text_file(
+        path,
+        "format=modernerKrieg.scenario.v1\n"
+        "name=Bad Missing Topology\n"
+        "seed=1\n"
+        "asset.map_manifest=assets/mosul/manifests/market_commercial_streets_2003.mapmanifest\n"
+        "asset.sprite_manifest=assets/mosul/manifests/mosul_2003_sprites.spritemanifest\n"
+        "asset.building_level_manifest=assets/mosul/manifests/market_commercial_streets_2003_building_levels.json\n"
         "map.name=Market / Commercial Streets\n"
         "map.width_m=500\n"
         "map.height_m=500\n"
@@ -353,6 +408,7 @@ int main(void) {
     test_contested_risk_smoke_scenario_loads();
     test_missing_asset_manifest_is_rejected();
     test_market_scenario_requires_building_level_manifest();
+    test_market_scenario_requires_topology_manifest();
     test_invalid_force_reference_is_rejected();
     test_impossible_objective_bounds_are_rejected();
     test_invalid_score_thresholds_are_rejected();

@@ -19,6 +19,9 @@ extern "C" {
 #define MK_ASSET_MAX_BUILDING_LEVELS 8
 #define MK_ASSET_MAX_BUILDING_FEATURES 128
 #define MK_ASSET_MAX_BUILDING_REGIONS 64
+#define MK_ASSET_MAX_TOPOLOGY_NODES 64
+#define MK_ASSET_MAX_TOPOLOGY_PORTALS 128
+#define MK_ASSET_MAX_SEMANTIC_ZONES 64
 
 typedef struct {
     char id[MK_NAME_CAPACITY];
@@ -179,6 +182,62 @@ typedef struct {
     mk_asset_building_region_t regions[MK_ASSET_MAX_BUILDING_REGIONS];
 } mk_asset_building_level_manifest_t;
 
+typedef struct {
+    char id[MK_NAME_CAPACITY];
+    char kind[MK_ASSET_KIND_CAPACITY];
+    char level_id[MK_NAME_CAPACITY];
+    char region_id[MK_NAME_CAPACITY];
+    char label[MK_NAME_CAPACITY];
+    int x;
+    int y;
+    int width;
+    int height;
+    bool enterable;
+} mk_asset_topology_node_t;
+
+typedef struct {
+    char id[MK_NAME_CAPACITY];
+    char kind[MK_ASSET_KIND_CAPACITY];
+    char state[MK_ASSET_KIND_CAPACITY];
+    char from_node_id[MK_NAME_CAPACITY];
+    char to_node_id[MK_NAME_CAPACITY];
+    char level_id[MK_NAME_CAPACITY];
+    char feature_id[MK_NAME_CAPACITY];
+    int x;
+    int y;
+    int width;
+    int height;
+    bool bidirectional;
+    bool vertical;
+    int movement_cost;
+} mk_asset_topology_portal_t;
+
+typedef struct {
+    char id[MK_NAME_CAPACITY];
+    char kind[MK_ASSET_KIND_CAPACITY];
+    char node_id[MK_NAME_CAPACITY];
+    char level_id[MK_NAME_CAPACITY];
+    int x;
+    int y;
+    int width;
+    int height;
+    int priority;
+} mk_asset_semantic_zone_t;
+
+typedef struct {
+    int schema_version;
+    char id[MK_NAME_CAPACITY];
+    char map_id[MK_NAME_CAPACITY];
+    char gameplay_area_id[MK_NAME_CAPACITY];
+    char name[MK_NAME_CAPACITY];
+    size_t node_count;
+    mk_asset_topology_node_t nodes[MK_ASSET_MAX_TOPOLOGY_NODES];
+    size_t portal_count;
+    mk_asset_topology_portal_t portals[MK_ASSET_MAX_TOPOLOGY_PORTALS];
+    size_t zone_count;
+    mk_asset_semantic_zone_t zones[MK_ASSET_MAX_SEMANTIC_ZONES];
+} mk_asset_topology_manifest_t;
+
 mk_result_t mk_asset_load_map_manifest(
     const char *manifest_path,
     const char *project_root,
@@ -206,6 +265,12 @@ mk_result_t mk_asset_load_building_level_manifest(
     const char *manifest_path,
     const char *project_root,
     mk_asset_building_level_manifest_t *out_manifest
+);
+
+mk_result_t mk_asset_load_topology_manifest(
+    const char *manifest_path,
+    const mk_asset_building_level_manifest_t *building_manifest,
+    mk_asset_topology_manifest_t *out_manifest
 );
 
 const mk_asset_sprite_sheet_t *mk_asset_find_sprite_sheet(
@@ -245,6 +310,21 @@ const mk_asset_building_feature_t *mk_asset_find_building_feature(
 const mk_asset_building_region_t *mk_asset_find_building_region(
     const mk_asset_building_level_manifest_t *manifest,
     const char *region_id
+);
+
+const mk_asset_topology_node_t *mk_asset_find_topology_node(
+    const mk_asset_topology_manifest_t *manifest,
+    const char *node_id
+);
+
+const mk_asset_topology_portal_t *mk_asset_find_topology_portal(
+    const mk_asset_topology_manifest_t *manifest,
+    const char *portal_id
+);
+
+const mk_asset_semantic_zone_t *mk_asset_find_semantic_zone(
+    const mk_asset_topology_manifest_t *manifest,
+    const char *zone_id
 );
 
 bool mk_asset_building_feature_contains_pixel(

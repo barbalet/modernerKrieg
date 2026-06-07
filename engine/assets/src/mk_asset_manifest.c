@@ -687,6 +687,335 @@ static bool mk_asset_building_rect_is_valid(
         && y <= pixel_height - height;
 }
 
+static bool mk_asset_topology_node_kind_is_valid(const char *kind) {
+    return strcmp(kind, "street") == 0
+        || strcmp(kind, "alley") == 0
+        || strcmp(kind, "shop") == 0
+        || strcmp(kind, "courtyard") == 0
+        || strcmp(kind, "roof") == 0
+        || strcmp(kind, "stairwell") == 0
+        || strcmp(kind, "cache") == 0
+        || strcmp(kind, "shelter") == 0
+        || strcmp(kind, "blocked_building") == 0
+        || strcmp(kind, "mosque") == 0
+        || strcmp(kind, "workshop") == 0
+        || strcmp(kind, "garage") == 0
+        || strcmp(kind, "office") == 0;
+}
+
+static bool mk_asset_topology_portal_kind_is_valid(const char *kind) {
+    return strcmp(kind, "door") == 0
+        || strcmp(kind, "window") == 0
+        || strcmp(kind, "breach_hole") == 0
+        || strcmp(kind, "archway") == 0
+        || strcmp(kind, "stair") == 0
+        || strcmp(kind, "ladder") == 0
+        || strcmp(kind, "roof_edge") == 0
+        || strcmp(kind, "street_crossing") == 0
+        || strcmp(kind, "rubble_passage") == 0;
+}
+
+static bool mk_asset_topology_portal_state_is_valid(const char *state) {
+    return strcmp(state, "open") == 0
+        || strcmp(state, "closed") == 0
+        || strcmp(state, "locked") == 0
+        || strcmp(state, "blocked") == 0
+        || strcmp(state, "breached") == 0
+        || strcmp(state, "searched") == 0
+        || strcmp(state, "compromised") == 0
+        || strcmp(state, "unsafe") == 0;
+}
+
+static bool mk_asset_semantic_zone_kind_is_valid(const char *kind) {
+    return strcmp(kind, "civilian_shelter") == 0
+        || strcmp(kind, "evacuation_exit") == 0
+        || strcmp(kind, "market_crowd") == 0
+        || strcmp(kind, "cache") == 0
+        || strcmp(kind, "overwatch_roof") == 0
+        || strcmp(kind, "search_objective") == 0
+        || strcmp(kind, "restricted_fire_lane") == 0
+        || strcmp(kind, "danger_area") == 0;
+}
+
+static bool mk_asset_topology_node_index(
+    const mk_asset_topology_manifest_t *manifest,
+    const char *node_id,
+    size_t *out_index
+) {
+    size_t index;
+
+    if (manifest == NULL || node_id == NULL) {
+        return false;
+    }
+
+    for (index = 0; index < manifest->node_count; ++index) {
+        if (strcmp(manifest->nodes[index].id, node_id) == 0) {
+            if (out_index != NULL) {
+                *out_index = index;
+            }
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool mk_asset_topology_ids_are_unique(const mk_asset_topology_manifest_t *manifest) {
+    size_t index;
+
+    if (manifest == NULL) {
+        return false;
+    }
+
+    for (index = 0; index < manifest->node_count; ++index) {
+        size_t other_index;
+
+        for (other_index = index + 1; other_index < manifest->node_count; ++other_index) {
+            if (strcmp(manifest->nodes[index].id, manifest->nodes[other_index].id) == 0) {
+                return false;
+            }
+        }
+    }
+
+    for (index = 0; index < manifest->portal_count; ++index) {
+        size_t other_index;
+
+        for (other_index = index + 1; other_index < manifest->portal_count; ++other_index) {
+            if (strcmp(manifest->portals[index].id, manifest->portals[other_index].id) == 0) {
+                return false;
+            }
+        }
+    }
+
+    for (index = 0; index < manifest->zone_count; ++index) {
+        size_t other_index;
+
+        for (other_index = index + 1; other_index < manifest->zone_count; ++other_index) {
+            if (strcmp(manifest->zones[index].id, manifest->zones[other_index].id) == 0) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+static bool mk_asset_topology_region_is_covered(
+    const mk_asset_topology_manifest_t *manifest,
+    const char *region_id
+) {
+    size_t index;
+
+    if (manifest == NULL || region_id == NULL || region_id[0] == '\0') {
+        return false;
+    }
+
+    for (index = 0; index < manifest->node_count; ++index) {
+        if (strcmp(manifest->nodes[index].region_id, region_id) == 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static size_t mk_asset_topology_unreachable_count(const mk_asset_topology_manifest_t *manifest) {
+    bool visited[MK_ASSET_MAX_TOPOLOGY_NODES];
+    size_t queue[MK_ASSET_MAX_TOPOLOGY_NODES];
+    size_t start_index = (size_t)-1;
+    size_t queue_read = 0;
+    size_t queue_write = 0;
+    size_t unreachable = 0;
+    size_t index;
+
+    if (manifest == NULL || manifest->node_count == 0) {
+        return 0;
+    }
+
+    memset(visited, 0, sizeof(visited));
+    for (index = 0; index < manifest->node_count; ++index) {
+        if (manifest->nodes[index].enterable) {
+            start_index = index;
+            break;
+        }
+    }
+
+    if (start_index == (size_t)-1) {
+        return 0;
+    }
+
+    visited[start_index] = true;
+    queue[queue_write] = start_index;
+    queue_write += 1;
+
+    while (queue_read < queue_write) {
+        size_t current_index = queue[queue_read];
+        queue_read += 1;
+
+        for (index = 0; index < manifest->portal_count; ++index) {
+            const mk_asset_topology_portal_t *portal = &manifest->portals[index];
+            size_t from_index;
+            size_t to_index;
+            size_t next_index;
+
+            if (!portal->bidirectional
+                || strcmp(portal->state, "blocked") == 0
+                || strcmp(portal->state, "locked") == 0
+                || strcmp(portal->state, "unsafe") == 0
+                || !mk_asset_topology_node_index(manifest, portal->from_node_id, &from_index)
+                || !mk_asset_topology_node_index(manifest, portal->to_node_id, &to_index)) {
+                continue;
+            }
+
+            if (from_index == current_index) {
+                next_index = to_index;
+            } else if (to_index == current_index) {
+                next_index = from_index;
+            } else {
+                continue;
+            }
+
+            if (!manifest->nodes[next_index].enterable || visited[next_index]) {
+                continue;
+            }
+
+            visited[next_index] = true;
+            queue[queue_write] = next_index;
+            queue_write += 1;
+        }
+    }
+
+    for (index = 0; index < manifest->node_count; ++index) {
+        if (manifest->nodes[index].enterable && !visited[index]) {
+            unreachable += 1;
+        }
+    }
+
+    return unreachable;
+}
+
+static bool mk_asset_topology_is_valid(
+    const mk_asset_topology_manifest_t *manifest,
+    const mk_asset_building_level_manifest_t *building_manifest
+) {
+    size_t index;
+
+    if (manifest == NULL || building_manifest == NULL) {
+        return false;
+    }
+
+    if (manifest->schema_version <= 0
+        || strcmp(manifest->map_id, building_manifest->map_id) != 0
+        || strcmp(manifest->gameplay_area_id, building_manifest->id) != 0
+        || manifest->node_count == 0
+        || manifest->node_count > MK_ASSET_MAX_TOPOLOGY_NODES
+        || manifest->portal_count > MK_ASSET_MAX_TOPOLOGY_PORTALS
+        || manifest->zone_count > MK_ASSET_MAX_SEMANTIC_ZONES
+        || !mk_asset_topology_ids_are_unique(manifest)) {
+        return false;
+    }
+
+    for (index = 0; index < manifest->node_count; ++index) {
+        const mk_asset_topology_node_t *node = &manifest->nodes[index];
+
+        if (node->id[0] == '\0'
+            || !mk_asset_topology_node_kind_is_valid(node->kind)
+            || mk_asset_find_building_level(building_manifest, node->level_id) == NULL
+            || (node->region_id[0] != '\0' && mk_asset_find_building_region(building_manifest, node->region_id) == NULL)
+            || !mk_asset_building_rect_is_valid(
+                node->x,
+                node->y,
+                node->width,
+                node->height,
+                building_manifest->pixel_width,
+                building_manifest->pixel_height
+            )) {
+            return false;
+        }
+    }
+
+    for (index = 0; index < building_manifest->region_count; ++index) {
+        if (!mk_asset_topology_region_is_covered(manifest, building_manifest->regions[index].id)) {
+            return false;
+        }
+    }
+
+    for (index = 0; index < manifest->portal_count; ++index) {
+        const mk_asset_topology_portal_t *portal = &manifest->portals[index];
+        const mk_asset_topology_node_t *from_node;
+        const mk_asset_topology_node_t *to_node;
+        const mk_asset_building_feature_t *feature;
+        size_t from_index;
+        size_t to_index;
+
+        if (portal->id[0] == '\0'
+            || !mk_asset_topology_portal_kind_is_valid(portal->kind)
+            || !mk_asset_topology_portal_state_is_valid(portal->state)
+            || !portal->bidirectional
+            || portal->movement_cost <= 0
+            || mk_asset_find_building_level(building_manifest, portal->level_id) == NULL
+            || !mk_asset_topology_node_index(manifest, portal->from_node_id, &from_index)
+            || !mk_asset_topology_node_index(manifest, portal->to_node_id, &to_index)
+            || from_index == to_index
+            || !mk_asset_building_rect_is_valid(
+                portal->x,
+                portal->y,
+                portal->width,
+                portal->height,
+                building_manifest->pixel_width,
+                building_manifest->pixel_height
+            )) {
+            return false;
+        }
+
+        from_node = &manifest->nodes[from_index];
+        to_node = &manifest->nodes[to_index];
+        if (portal->vertical) {
+            if (strcmp(from_node->level_id, to_node->level_id) == 0) {
+                return false;
+            }
+        } else if (strcmp(from_node->level_id, to_node->level_id) != 0) {
+            return false;
+        }
+
+        if (portal->feature_id[0] != '\0') {
+            feature = mk_asset_find_building_feature(building_manifest, portal->feature_id);
+            if (feature == NULL || strcmp(feature->level_id, portal->level_id) != 0) {
+                return false;
+            }
+        }
+    }
+
+    for (index = 0; index < manifest->zone_count; ++index) {
+        const mk_asset_semantic_zone_t *zone = &manifest->zones[index];
+        const mk_asset_topology_node_t *node;
+        size_t node_index;
+
+        if (zone->id[0] == '\0'
+            || !mk_asset_semantic_zone_kind_is_valid(zone->kind)
+            || mk_asset_find_building_level(building_manifest, zone->level_id) == NULL
+            || !mk_asset_topology_node_index(manifest, zone->node_id, &node_index)
+            || zone->priority < 0
+            || !mk_asset_building_rect_is_valid(
+                zone->x,
+                zone->y,
+                zone->width,
+                zone->height,
+                building_manifest->pixel_width,
+                building_manifest->pixel_height
+            )) {
+            return false;
+        }
+
+        node = &manifest->nodes[node_index];
+        if (strcmp(node->level_id, zone->level_id) != 0) {
+            return false;
+        }
+    }
+
+    return mk_asset_topology_unreachable_count(manifest) == 0;
+}
+
 static bool mk_asset_sprite_render_entry_is_valid(
     const mk_asset_sprite_render_entry_t *entry,
     const char *project_root
@@ -1434,6 +1763,245 @@ mk_result_t mk_asset_load_building_level_manifest(
     return MK_OK;
 }
 
+mk_result_t mk_asset_load_topology_manifest(
+    const char *manifest_path,
+    const mk_asset_building_level_manifest_t *building_manifest,
+    mk_asset_topology_manifest_t *out_manifest
+) {
+    char *text = NULL;
+    const char *limit;
+    const char *array_value;
+    const char *array_end;
+    const char *cursor;
+    int node_count;
+    int portal_count;
+    int zone_count;
+    mk_result_t result;
+
+    if (out_manifest == NULL || building_manifest == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    memset(out_manifest, 0, sizeof(*out_manifest));
+    result = mk_asset_read_text_file(manifest_path, &text);
+    if (result != MK_OK) {
+        return result;
+    }
+
+    limit = text + strlen(text);
+    if (!mk_asset_json_required_int(text, limit, "schema_version", &out_manifest->schema_version)
+        || out_manifest->schema_version <= 0
+        || !mk_asset_json_required_string(text, limit, "id", false, out_manifest->id, sizeof(out_manifest->id))
+        || !mk_asset_json_required_string(text, limit, "map_id", false, out_manifest->map_id, sizeof(out_manifest->map_id))
+        || !mk_asset_json_required_string(text, limit, "gameplay_area_id", false, out_manifest->gameplay_area_id, sizeof(out_manifest->gameplay_area_id))
+        || !mk_asset_json_required_string(text, limit, "name", false, out_manifest->name, sizeof(out_manifest->name))
+        || !mk_asset_json_required_int(text, limit, "node_count", &node_count)
+        || !mk_asset_json_required_int(text, limit, "portal_count", &portal_count)
+        || !mk_asset_json_required_int(text, limit, "semantic_zone_count", &zone_count)
+        || node_count <= 0
+        || node_count > MK_ASSET_MAX_TOPOLOGY_NODES
+        || portal_count <= 0
+        || portal_count > MK_ASSET_MAX_TOPOLOGY_PORTALS
+        || zone_count <= 0
+        || zone_count > MK_ASSET_MAX_SEMANTIC_ZONES) {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    array_value = mk_asset_json_find_key(text, limit, "nodes");
+    if (array_value == NULL || array_value >= limit || *array_value != '[') {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    array_end = mk_asset_json_find_matching(array_value, limit, '[', ']');
+    if (array_end == NULL) {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    cursor = array_value + 1;
+    while (cursor < array_end) {
+        const char *object_end;
+        mk_asset_topology_node_t *node;
+
+        cursor = mk_asset_json_skip_whitespace(cursor, array_end);
+        if (cursor >= array_end) {
+            break;
+        }
+
+        if (*cursor == ',') {
+            cursor += 1;
+            continue;
+        }
+
+        if (*cursor != '{' || out_manifest->node_count >= MK_ASSET_MAX_TOPOLOGY_NODES) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        object_end = mk_asset_json_find_matching(cursor, array_end + 1, '{', '}');
+        if (object_end == NULL) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        node = &out_manifest->nodes[out_manifest->node_count];
+        if (!mk_asset_json_required_string(cursor, object_end, "id", false, node->id, sizeof(node->id))
+            || !mk_asset_json_required_string(cursor, object_end, "kind", false, node->kind, sizeof(node->kind))
+            || !mk_asset_json_required_string(cursor, object_end, "level_id", false, node->level_id, sizeof(node->level_id))
+            || !mk_asset_json_required_string(cursor, object_end, "region_id", true, node->region_id, sizeof(node->region_id))
+            || !mk_asset_json_required_string(cursor, object_end, "label", false, node->label, sizeof(node->label))
+            || !mk_asset_json_required_int(cursor, object_end, "x", &node->x)
+            || !mk_asset_json_required_int(cursor, object_end, "y", &node->y)
+            || !mk_asset_json_required_int(cursor, object_end, "width", &node->width)
+            || !mk_asset_json_required_int(cursor, object_end, "height", &node->height)
+            || !mk_asset_json_required_bool(cursor, object_end, "enterable", &node->enterable)) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        out_manifest->node_count += 1;
+        cursor = object_end + 1;
+    }
+
+    if (out_manifest->node_count != (size_t)node_count) {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    array_value = mk_asset_json_find_key(text, limit, "portals");
+    if (array_value == NULL || array_value >= limit || *array_value != '[') {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    array_end = mk_asset_json_find_matching(array_value, limit, '[', ']');
+    if (array_end == NULL) {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    cursor = array_value + 1;
+    while (cursor < array_end) {
+        const char *object_end;
+        mk_asset_topology_portal_t *portal;
+
+        cursor = mk_asset_json_skip_whitespace(cursor, array_end);
+        if (cursor >= array_end) {
+            break;
+        }
+
+        if (*cursor == ',') {
+            cursor += 1;
+            continue;
+        }
+
+        if (*cursor != '{' || out_manifest->portal_count >= MK_ASSET_MAX_TOPOLOGY_PORTALS) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        object_end = mk_asset_json_find_matching(cursor, array_end + 1, '{', '}');
+        if (object_end == NULL) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        portal = &out_manifest->portals[out_manifest->portal_count];
+        if (!mk_asset_json_required_string(cursor, object_end, "id", false, portal->id, sizeof(portal->id))
+            || !mk_asset_json_required_string(cursor, object_end, "kind", false, portal->kind, sizeof(portal->kind))
+            || !mk_asset_json_required_string(cursor, object_end, "state", false, portal->state, sizeof(portal->state))
+            || !mk_asset_json_required_string(cursor, object_end, "from_node_id", false, portal->from_node_id, sizeof(portal->from_node_id))
+            || !mk_asset_json_required_string(cursor, object_end, "to_node_id", false, portal->to_node_id, sizeof(portal->to_node_id))
+            || !mk_asset_json_required_string(cursor, object_end, "level_id", false, portal->level_id, sizeof(portal->level_id))
+            || !mk_asset_json_required_string(cursor, object_end, "feature_id", true, portal->feature_id, sizeof(portal->feature_id))
+            || !mk_asset_json_required_int(cursor, object_end, "x", &portal->x)
+            || !mk_asset_json_required_int(cursor, object_end, "y", &portal->y)
+            || !mk_asset_json_required_int(cursor, object_end, "width", &portal->width)
+            || !mk_asset_json_required_int(cursor, object_end, "height", &portal->height)
+            || !mk_asset_json_required_bool(cursor, object_end, "bidirectional", &portal->bidirectional)
+            || !mk_asset_json_required_bool(cursor, object_end, "vertical", &portal->vertical)
+            || !mk_asset_json_required_int(cursor, object_end, "movement_cost", &portal->movement_cost)) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        out_manifest->portal_count += 1;
+        cursor = object_end + 1;
+    }
+
+    if (out_manifest->portal_count != (size_t)portal_count) {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    array_value = mk_asset_json_find_key(text, limit, "semantic_zones");
+    if (array_value == NULL || array_value >= limit || *array_value != '[') {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    array_end = mk_asset_json_find_matching(array_value, limit, '[', ']');
+    if (array_end == NULL) {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    cursor = array_value + 1;
+    while (cursor < array_end) {
+        const char *object_end;
+        mk_asset_semantic_zone_t *zone;
+
+        cursor = mk_asset_json_skip_whitespace(cursor, array_end);
+        if (cursor >= array_end) {
+            break;
+        }
+
+        if (*cursor == ',') {
+            cursor += 1;
+            continue;
+        }
+
+        if (*cursor != '{' || out_manifest->zone_count >= MK_ASSET_MAX_SEMANTIC_ZONES) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        object_end = mk_asset_json_find_matching(cursor, array_end + 1, '{', '}');
+        if (object_end == NULL) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        zone = &out_manifest->zones[out_manifest->zone_count];
+        if (!mk_asset_json_required_string(cursor, object_end, "id", false, zone->id, sizeof(zone->id))
+            || !mk_asset_json_required_string(cursor, object_end, "kind", false, zone->kind, sizeof(zone->kind))
+            || !mk_asset_json_required_string(cursor, object_end, "node_id", false, zone->node_id, sizeof(zone->node_id))
+            || !mk_asset_json_required_string(cursor, object_end, "level_id", false, zone->level_id, sizeof(zone->level_id))
+            || !mk_asset_json_required_int(cursor, object_end, "x", &zone->x)
+            || !mk_asset_json_required_int(cursor, object_end, "y", &zone->y)
+            || !mk_asset_json_required_int(cursor, object_end, "width", &zone->width)
+            || !mk_asset_json_required_int(cursor, object_end, "height", &zone->height)
+            || !mk_asset_json_required_int(cursor, object_end, "priority", &zone->priority)) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        out_manifest->zone_count += 1;
+        cursor = object_end + 1;
+    }
+
+    if (out_manifest->zone_count != (size_t)zone_count
+        || !mk_asset_topology_is_valid(out_manifest, building_manifest)) {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    free(text);
+    return MK_OK;
+}
+
 const mk_asset_sprite_sheet_t *mk_asset_find_sprite_sheet(
     const mk_asset_sprite_manifest_t *manifest,
     const char *sheet_id
@@ -1573,6 +2141,63 @@ const mk_asset_building_region_t *mk_asset_find_building_region(
     for (index = 0; index < manifest->region_count; ++index) {
         if (strcmp(manifest->regions[index].id, region_id) == 0) {
             return &manifest->regions[index];
+        }
+    }
+
+    return NULL;
+}
+
+const mk_asset_topology_node_t *mk_asset_find_topology_node(
+    const mk_asset_topology_manifest_t *manifest,
+    const char *node_id
+) {
+    size_t index;
+
+    if (manifest == NULL || node_id == NULL) {
+        return NULL;
+    }
+
+    for (index = 0; index < manifest->node_count; ++index) {
+        if (strcmp(manifest->nodes[index].id, node_id) == 0) {
+            return &manifest->nodes[index];
+        }
+    }
+
+    return NULL;
+}
+
+const mk_asset_topology_portal_t *mk_asset_find_topology_portal(
+    const mk_asset_topology_manifest_t *manifest,
+    const char *portal_id
+) {
+    size_t index;
+
+    if (manifest == NULL || portal_id == NULL) {
+        return NULL;
+    }
+
+    for (index = 0; index < manifest->portal_count; ++index) {
+        if (strcmp(manifest->portals[index].id, portal_id) == 0) {
+            return &manifest->portals[index];
+        }
+    }
+
+    return NULL;
+}
+
+const mk_asset_semantic_zone_t *mk_asset_find_semantic_zone(
+    const mk_asset_topology_manifest_t *manifest,
+    const char *zone_id
+) {
+    size_t index;
+
+    if (manifest == NULL || zone_id == NULL) {
+        return NULL;
+    }
+
+    for (index = 0; index < manifest->zone_count; ++index) {
+        if (strcmp(manifest->zones[index].id, zone_id) == 0) {
+            return &manifest->zones[index];
         }
     }
 

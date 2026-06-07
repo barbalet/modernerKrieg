@@ -40,6 +40,30 @@ It links the runtime floor PNG stack to gameplay geometry:
 
 One-storey buildings should still appear on level 2 as roofs. They should have no authored level 3 or level 4 content unless a roof access or higher structure is explicitly present. Doors and breach holes should override wall blockers for both line of sight and movement. Windows should allow line of sight but normally still block movement.
 
+## Topology Manifests
+
+Topology manifests turn validated level rectangles into a tactical graph. The
+2003 demo uses:
+
+- `assets/mosul/manifests/market_commercial_streets_2003_topology.json`
+
+It records:
+
+- stable node ids for streets, alleys, shops, courtyards, roofs, stairwells,
+  caches, shelters, and deliberately blocked buildings
+- portal ids and states for doors, windows, breach holes, archways, stairs,
+  ladders, roof edges, street crossings, and rubble passages
+- semantic zones for civilian shelters, evacuation exits, market crowds,
+  caches, overwatch roofs, search objectives, restricted fire lanes, and danger
+  areas
+- level, region, feature, bounds, movement-cost, vertical-link, and debug-label
+  metadata for C validation and replay/debug output
+
+Topology manifests are loaded only after their matching building-level manifest.
+Validation rejects duplicate ids, missing level/region/feature references,
+orphan building regions, one-way portal mistakes, impossible vertical links,
+invalid semantic zones, and unreachable enterable graph fragments.
+
 ## Sprite Manifests
 
 Sprite manifests describe source sheets, source-angle sprites, generated runtime sprites, and runtime sprite IDs. They record:
@@ -87,6 +111,8 @@ Every committed manifest should be validated by CTest. Validation should reject:
 - missing source files
 - invalid layer/frame counts
 - duplicate or empty IDs
+- topology graph gaps, one-way portal mistakes, impossible vertical links, and
+  orphan building regions
 - invalid marker colors or impossible marker dimensions
 - paths that point outside the repository asset tree
 
