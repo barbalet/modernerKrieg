@@ -233,10 +233,10 @@ Implementation approach:
 - Added budget from gameplay-area integration rebaseline: 20 cycles.
 - Planned cycle budget: 100 cycles.
 - Planned cycle shape: 10 milestones x 10 cycles each.
-- Completed cycles in this ledger: 30.
-- Current cycle: 30.
-- Remaining planned cycles: 70.
-- Next cycle batch: cycles 31-40, Topology-Aware Movement.
+- Completed cycles in this ledger: 40.
+- Current cycle: 40.
+- Remaining planned cycles: 60.
+- Next cycle batch: cycles 41-50, Scenario Population And Data Expansion.
 
 Prior implementation work is captured in the current audit and is not counted
 against this rebaselined ledger. When a development batch is completed,
@@ -249,6 +249,7 @@ increment `Completed cycles in this ledger`, advance `Current cycle`, reduce
 | 2026-06-07 | 10 | 10 | 90 | Gameplay Area Adoption And Validation | Added core gameplay-area state, Mosul JSON-to-core handoff, world/pixel and blocker queries, replay/debug exposure, and validation tests. |
 | 2026-06-07 | 20 | 20 | 80 | Topology Authoring Model | Added C-validated topology JSON, core topology state and queries, Mosul scenario handoff, debug/replay exposure, and topology validation tests. |
 | 2026-06-07 | 30 | 30 | 70 | Collision, Navigation, LOS, And Cover Products | Added derived tactical point queries, sampled gameplay-area LOS, navigation and cover lookups, game LOS integration, headless tactical-product exposure, and Mosul/core tests. |
+| 2026-06-07 | 40 | 40 | 60 | Topology-Aware Movement | Added deterministic topology route planning, compact per-unit route following, vertical level transitions, route failure reporting, board-view route waypoint overlays, AI withdraw route requests, replay route fields, and heap-backed Mosul scenario validation. |
 
 ## Cycle Delta From Previous Plan
 
@@ -375,6 +376,8 @@ Exit criteria:
 - Query performance is predictable enough for AI-vs-AI runs.
 
 ### Cycles 31-40: Topology-Aware Movement
+
+Status: completed on 2026-06-07.
 
 Goal: replace straight-line movement assumptions with deterministic tactical
 pathing.

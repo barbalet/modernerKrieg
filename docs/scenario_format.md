@@ -74,6 +74,12 @@ state, topology node context, and semantic-zone context. Scenario files should
 therefore reference stable gameplay-area ids instead of duplicating collision or
 cover rules in scenario-specific keys.
 
+Movement orders can now request deterministic topology routes through the C
+core. When both the current unit position and destination resolve to enterable
+topology nodes, units follow compact route waypoints through portals and update
+their level when a vertical connector is reached. Existing straight-line orders
+remain a fallback for smoke fixtures or targets outside the authored topology.
+
 ## Interaction Terrain
 
 Terrain zones can carry first-pass interaction affordances before final interaction art and rules are complete. Frontends project these zones through the marker manifest:

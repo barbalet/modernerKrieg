@@ -420,6 +420,7 @@ mk_result_t mk_board_view_collect_tactical_overlays(
         }
 
         if (unit->has_move_target) {
+            mk_vec2_t route_target_position_m = unit->target_position_m;
             mk_tactical_overlay_t route = mk_board_view_make_overlay(
                 view,
                 MK_TACTICAL_OVERLAY_MOVE_ROUTE,
@@ -434,10 +435,15 @@ mk_result_t mk_board_view_collect_tactical_overlays(
             );
             mk_result_t result;
 
+            if (unit->has_route && unit->route_step_index < unit->route_step_count) {
+                route_target_position_m = unit->route_waypoints_m[unit->route_step_index];
+                route.intensity = (int)(unit->route_step_count - unit->route_step_index);
+            }
+
             route.unit_id = unit->id;
             route.side = unit->side;
-            route.target_position_m = unit->target_position_m;
-            route.target_screen_position_px = mk_board_view_map_to_screen(view, unit->target_position_m);
+            route.target_position_m = route_target_position_m;
+            route.target_screen_position_px = mk_board_view_map_to_screen(view, route_target_position_m);
             target.unit_id = unit->id;
             target.side = unit->side;
 

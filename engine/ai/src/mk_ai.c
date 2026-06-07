@@ -174,10 +174,7 @@ static mk_result_t mk_ai_issue_withdraw_order(mk_game_t *game, mk_unit_t *unit, 
     target.y = unit->position_m.y + dy / distance * 36.0f;
     target = mk_ai_clamp_to_map(game, target);
 
-    unit->target_position_m = target;
-    unit->has_move_target = true;
-    unit->order = MK_ORDER_WITHDRAW;
-    return MK_OK;
+    return mk_game_issue_withdraw_order(game, unit->id, target);
 }
 
 static const mk_unit_t *mk_ai_find_nearest_enemy(const mk_game_t *game, const mk_unit_t *unit) {

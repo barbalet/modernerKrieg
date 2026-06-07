@@ -50,14 +50,19 @@ static mk_gameplay_area_t make_test_gameplay_area(void) {
     area.pixels_per_meter = 10.0f;
     strcpy(area.origin, "top_left");
     area.max_storeys = 2;
-    area.level_count = 1;
+    area.level_count = 2;
     strcpy(area.levels[0].id, "ground");
     area.levels[0].index = 1;
     area.levels[0].elevation_m = 0.0f;
     strcpy(area.levels[0].image_path, "assets/test/ground.png");
     strcpy(area.levels[0].alpha, "opaque");
+    strcpy(area.levels[1].id, "roof");
+    area.levels[1].index = 2;
+    area.levels[1].elevation_m = 4.0f;
+    strcpy(area.levels[1].image_path, "assets/test/roof.png");
+    strcpy(area.levels[1].alpha, "transparent");
 
-    area.feature_count = 3;
+    area.feature_count = 4;
     strcpy(area.features[0].id, "west_wall");
     strcpy(area.features[0].level_id, "ground");
     strcpy(area.features[0].kind, "wall");
@@ -91,20 +96,31 @@ static mk_gameplay_area_t make_test_gameplay_area(void) {
     area.features[2].blocks_movement = true;
     area.features[2].allows_los = true;
 
+    strcpy(area.features[3].id, "roof_stair");
+    strcpy(area.features[3].level_id, "ground");
+    strcpy(area.features[3].kind, "stair");
+    area.features[3].pixel_x = 145;
+    area.features[3].pixel_y = 205;
+    area.features[3].pixel_width = 20;
+    area.features[3].pixel_height = 20;
+    area.features[3].bounds_m = make_rect(14.5f, 20.5f, 2.0f, 2.0f);
+    area.features[3].allows_los = true;
+    area.features[3].allows_movement = true;
+
     area.region_count = 1;
     strcpy(area.regions[0].id, "shop_row");
-    area.regions[0].storeys = 1;
+    area.regions[0].storeys = 2;
     area.regions[0].pixel_x = 80;
     area.regions[0].pixel_y = 180;
     area.regions[0].pixel_width = 120;
     area.regions[0].pixel_height = 120;
     area.regions[0].bounds_m = make_rect(8.0f, 18.0f, 12.0f, 12.0f);
-    strcpy(area.regions[0].roof_level_id, "ground");
+    strcpy(area.regions[0].roof_level_id, "roof");
 
     area.topology_loaded = true;
     area.topology_schema_version = 1;
     strcpy(area.topology_id, "test_topology");
-    area.topology_node_count = 2;
+    area.topology_node_count = 3;
     strcpy(area.topology_nodes[0].id, "street");
     strcpy(area.topology_nodes[0].kind, "street");
     strcpy(area.topology_nodes[0].level_id, "ground");
@@ -129,7 +145,19 @@ static mk_gameplay_area_t make_test_gameplay_area(void) {
     area.topology_nodes[1].bounds_m = make_rect(8.0f, 18.0f, 12.0f, 12.0f);
     area.topology_nodes[1].enterable = true;
 
-    area.topology_portal_count = 1;
+    strcpy(area.topology_nodes[2].id, "shop_roof");
+    strcpy(area.topology_nodes[2].kind, "roof");
+    strcpy(area.topology_nodes[2].level_id, "roof");
+    strcpy(area.topology_nodes[2].region_id, "shop_row");
+    strcpy(area.topology_nodes[2].label, "Shop Roof");
+    area.topology_nodes[2].pixel_x = 80;
+    area.topology_nodes[2].pixel_y = 180;
+    area.topology_nodes[2].pixel_width = 120;
+    area.topology_nodes[2].pixel_height = 120;
+    area.topology_nodes[2].bounds_m = make_rect(8.0f, 18.0f, 12.0f, 12.0f);
+    area.topology_nodes[2].enterable = true;
+
+    area.topology_portal_count = 2;
     strcpy(area.topology_portals[0].id, "street_to_shop");
     strcpy(area.topology_portals[0].kind, "door");
     strcpy(area.topology_portals[0].state, "open");
@@ -145,6 +173,22 @@ static mk_gameplay_area_t make_test_gameplay_area(void) {
     area.topology_portals[0].bidirectional = true;
     area.topology_portals[0].vertical = false;
     area.topology_portals[0].movement_cost = 1;
+
+    strcpy(area.topology_portals[1].id, "shop_to_roof");
+    strcpy(area.topology_portals[1].kind, "stair");
+    strcpy(area.topology_portals[1].state, "open");
+    strcpy(area.topology_portals[1].from_node_id, "shop");
+    strcpy(area.topology_portals[1].to_node_id, "shop_roof");
+    strcpy(area.topology_portals[1].level_id, "ground");
+    strcpy(area.topology_portals[1].feature_id, "roof_stair");
+    area.topology_portals[1].pixel_x = 145;
+    area.topology_portals[1].pixel_y = 205;
+    area.topology_portals[1].pixel_width = 20;
+    area.topology_portals[1].pixel_height = 20;
+    area.topology_portals[1].bounds_m = make_rect(14.5f, 20.5f, 2.0f, 2.0f);
+    area.topology_portals[1].bidirectional = true;
+    area.topology_portals[1].vertical = true;
+    area.topology_portals[1].movement_cost = 2;
 
     area.semantic_zone_count = 1;
     strcpy(area.semantic_zones[0].id, "shop_shelter");
@@ -232,6 +276,7 @@ static void test_gameplay_area_coordinate_and_blocker_queries(void) {
     const mk_gameplay_semantic_zone_t *zone;
     mk_gameplay_tactical_query_t tactical_query;
     mk_gameplay_los_trace_t gameplay_los;
+    mk_gameplay_route_t route;
     mk_line_of_sight_t line_of_sight;
     int navigation_cost;
     int cover;
@@ -269,7 +314,7 @@ static void test_gameplay_area_coordinate_and_blocker_queries(void) {
 
     region = mk_gameplay_area_find_region(&area, "shop_row");
     assert(region != NULL);
-    assert(region->storeys == 1);
+    assert(region->storeys == 2);
     assert(mk_gameplay_area_find_region_at_world(&area, mk_vec2(12.0f, 20.0f)) == region);
 
     assert(mk_gameplay_area_topology_is_loaded(&area));
@@ -356,6 +401,50 @@ static void test_gameplay_area_coordinate_and_blocker_queries(void) {
     ) == MK_OK);
     assert(gameplay_los.visible);
 
+    assert(mk_gameplay_area_plan_route(
+        &area,
+        "ground",
+        mk_vec2(5.0f, 5.0f),
+        "ground",
+        mk_vec2(12.0f, 20.0f),
+        &route
+    ) == MK_OK);
+    assert(route.valid);
+    assert(strcmp(route.start_node_id, "street") == 0);
+    assert(strcmp(route.goal_node_id, "shop") == 0);
+    assert(route.step_count == 2);
+    assert(strcmp(route.steps[0].portal_id, "street_to_shop") == 0);
+    assert(!route.uses_vertical_transition);
+
+    assert(mk_gameplay_area_plan_route(
+        &area,
+        "ground",
+        mk_vec2(12.0f, 20.0f),
+        "roof",
+        mk_vec2(12.0f, 20.0f),
+        &route
+    ) == MK_OK);
+    assert(route.valid);
+    assert(strcmp(route.goal_node_id, "shop_roof") == 0);
+    assert(route.uses_vertical_transition);
+    assert(route.step_count == 2);
+    assert(strcmp(route.steps[0].portal_id, "shop_to_roof") == 0);
+    assert(route.steps[0].vertical_transition);
+    assert(strcmp(route.steps[0].level_id, "roof") == 0);
+
+    area.topology_portals[0].state[0] = '\0';
+    strcpy(area.topology_portals[0].state, "locked");
+    assert(mk_gameplay_area_plan_route(
+        &area,
+        "ground",
+        mk_vec2(5.0f, 5.0f),
+        "ground",
+        mk_vec2(12.0f, 20.0f),
+        &route
+    ) == MK_ERROR_NOT_FOUND);
+    assert(strcmp(route.blocked_reason, "unreachable") == 0);
+    area = make_test_gameplay_area();
+
     memset(&scenario, 0, sizeof(scenario));
     strcpy(scenario.name, "Gameplay Area Scenario");
     scenario.seed = 7;
@@ -363,7 +452,7 @@ static void test_gameplay_area_coordinate_and_blocker_queries(void) {
     assert(mk_scenario_set_gameplay_area(&scenario, &area) == MK_OK);
     assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
     assert(mk_gameplay_area_is_loaded(&game.gameplay_area));
-    assert(game.gameplay_area.level_count == 1);
+    assert(game.gameplay_area.level_count == 2);
     assert(mk_game_trace_line_of_sight(&game, mk_vec2(5.0f, 20.5f), mk_vec2(15.0f, 20.5f), &line_of_sight) == MK_OK);
     assert(!line_of_sight.visible);
     assert(line_of_sight.blocked_by_gameplay_area);
@@ -378,6 +467,65 @@ static void test_gameplay_area_coordinate_and_blocker_queries(void) {
     area = make_test_gameplay_area();
     area.topology_portals[0].vertical = true;
     assert(mk_scenario_set_gameplay_area(&scenario, &area) == MK_ERROR_INVALID_DATA);
+}
+
+static void test_topology_route_following_moves_units_between_levels(void) {
+    mk_gameplay_area_t area = make_test_gameplay_area();
+    mk_scenario_definition_t scenario;
+    mk_game_t game;
+    mk_unit_t unit;
+    mk_soldier_t soldier;
+    mk_weapon_profile_t rifle;
+    mk_unit_t *stored_unit;
+    uint32_t unit_id = 0;
+    int tick;
+
+    memset(&scenario, 0, sizeof(scenario));
+    strcpy(scenario.name, "Route Scenario");
+    scenario.seed = 8;
+    scenario.map = mk_make_map("Route Map", 100.0f, 100.0f);
+    assert(mk_scenario_set_gameplay_area(&scenario, &area) == MK_OK);
+
+    rifle = mk_make_weapon("M4", 300, 2, 35, 8);
+    unit = mk_make_unit("Route Team", MK_SIDE_PLAYER, MK_TRAINING_REGULAR, mk_vec2(5.0f, 5.0f));
+    soldier = mk_make_soldier("Rifleman", MK_ROLE_RIFLEMAN, rifle);
+    assert(mk_unit_add_soldier(&unit, &soldier, NULL) == MK_OK);
+    assert(mk_scenario_add_unit(&scenario, &unit, &unit_id) == MK_OK);
+
+    assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
+    stored_unit = mk_game_find_unit(&game, unit_id);
+    assert(stored_unit != NULL);
+    assert(strcmp(stored_unit->level_id, "ground") == 0);
+
+    assert(mk_game_issue_move_order_to_level(&game, unit_id, "roof", mk_vec2(12.0f, 20.0f)) == MK_OK);
+    assert(stored_unit->has_route);
+    assert(stored_unit->route_step_count == 3);
+    assert(stored_unit->route_total_cost > 0);
+    assert(stored_unit->route_uses_vertical_transition);
+    assert(strcmp(stored_unit->route_step_portal_ids[0], "street_to_shop") == 0);
+    assert(strcmp(stored_unit->route_step_portal_ids[1], "shop_to_roof") == 0);
+
+    for (tick = 0; tick < 12 && stored_unit->has_move_target; ++tick) {
+        mk_game_step(&game);
+    }
+
+    assert(!stored_unit->has_move_target);
+    assert(!stored_unit->has_route);
+    assert(stored_unit->order == MK_ORDER_HOLD);
+    assert(strcmp(stored_unit->level_id, "roof") == 0);
+    assert(stored_unit->route_vertical_transitions_completed == 1);
+    assert_close(stored_unit->position_m.x, 12.0f);
+    assert_close(stored_unit->position_m.y, 20.0f);
+
+    stored_unit->position_m = mk_vec2(5.0f, 5.0f);
+    strcpy(stored_unit->level_id, "ground");
+    area = game.gameplay_area;
+    area.topology_portals[0].state[0] = '\0';
+    strcpy(area.topology_portals[0].state, "locked");
+    game.gameplay_area = area;
+    assert(mk_game_issue_move_order_to_level(&game, unit_id, "roof", mk_vec2(12.0f, 20.0f)) == MK_ERROR_NOT_FOUND);
+    assert(!stored_unit->has_route);
+    assert(strcmp(stored_unit->route_failure_reason, "unreachable") == 0);
 }
 
 static void test_unit_and_soldier_creation(void) {
@@ -1098,9 +1246,10 @@ static void test_after_action_report_is_stable(void) {
 }
 
 static void test_invalid_scenario_is_rejected(void) {
-    mk_scenario_definition_t scenario = make_east_mosul_block_scenario_fixture();
+    mk_scenario_definition_t scenario;
     mk_game_t game;
 
+    scenario = make_east_mosul_block_scenario_fixture();
     scenario.map.width_m = 0.0f;
     assert(mk_game_load_scenario(&game, &scenario) == MK_ERROR_INVALID_DATA);
 
@@ -1139,6 +1288,7 @@ int main(void) {
     test_result_names_are_stable();
     test_math_value_helpers();
     test_gameplay_area_coordinate_and_blocker_queries();
+    test_topology_route_following_moves_units_between_levels();
     test_unit_and_soldier_creation();
     test_map_tiles_are_configurable_and_addressable();
     test_capacity_limits_are_reported();

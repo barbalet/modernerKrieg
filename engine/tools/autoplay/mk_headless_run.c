@@ -306,17 +306,25 @@ static void mk_headless_print_replay_tick(
 
         fprintf(
             stream,
-            "event tick=%u kind=unit id=%u side=%s order=%s status=%s x=%.2f y=%.2f target_x=%.2f target_y=%.2f has_target=%d hidden=%d revealed=%d\n",
+            "event tick=%u kind=unit id=%u side=%s order=%s status=%s level=\"%s\" x=%.2f y=%.2f target_x=%.2f target_y=%.2f has_target=%d has_route=%d route_step=%u route_steps=%u route_cost=%d route_vertical=%u route_failures=%u route_reason=\"%s\" hidden=%d revealed=%d\n",
             game->tick,
             unit->id,
             mk_headless_side_name(unit->side),
             mk_headless_order_name(unit->order),
             mk_headless_status_name(unit->status),
+            unit->level_id,
             unit->position_m.x,
             unit->position_m.y,
             unit->target_position_m.x,
             unit->target_position_m.y,
             unit->has_move_target ? 1 : 0,
+            unit->has_route ? 1 : 0,
+            (unsigned)unit->route_step_index,
+            (unsigned)unit->route_step_count,
+            unit->route_total_cost,
+            (unsigned)unit->route_vertical_transitions_completed,
+            (unsigned)unit->route_failure_count,
+            unit->route_failure_reason,
             unit->hidden ? 1 : 0,
             unit->revealed ? 1 : 0
         );

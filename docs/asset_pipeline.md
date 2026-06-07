@@ -82,6 +82,8 @@ Current derived products include:
   shelters, caches, and rooftop zones
 - sampled gameplay-area LOS traces with feature ids for the first blocking
   feature
+- deterministic topology routes through enterable nodes and routeable portals,
+  including vertical transitions through stairs or ladders
 
 These derived products are exposed through C queries so native frontends,
 headless runs, AI, and tests see the same tactical interpretation.

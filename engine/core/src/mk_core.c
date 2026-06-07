@@ -1,5 +1,6 @@
 #include "mk_core.h"
 
+#include <float.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -1674,7 +1675,121 @@ static int mk_game_score_time_weight(const mk_game_t *game) {
     return MK_DEFAULT_SCORE_TIME_WEIGHT;
 }
 
-static void mk_update_unit_movement(mk_unit_t *unit) {
+static void mk_unit_clear_route(mk_unit_t *unit) {
+    if (unit == NULL) {
+        return;
+    }
+
+    unit->has_route = false;
+    unit->route_step_count = 0;
+    unit->route_step_index = 0;
+    unit->route_total_cost = 0;
+    unit->route_uses_vertical_transition = false;
+    memset(unit->route_waypoints_m, 0, sizeof(unit->route_waypoints_m));
+    memset(unit->route_step_level_ids, 0, sizeof(unit->route_step_level_ids));
+    memset(unit->route_step_portal_ids, 0, sizeof(unit->route_step_portal_ids));
+    memset(unit->route_step_vertical_transition, 0, sizeof(unit->route_step_vertical_transition));
+    unit->route_stuck_ticks = 0;
+}
+
+static void mk_unit_set_route_failure(mk_unit_t *unit, const char *reason) {
+    if (unit == NULL) {
+        return;
+    }
+
+    mk_copy_text(unit->route_failure_reason, sizeof(unit->route_failure_reason), reason);
+    unit->route_failure_count += 1;
+    mk_unit_clear_route(unit);
+}
+
+static float mk_unit_wound_move_multiplier(const mk_unit_t *unit) {
+    size_t index;
+    size_t movable_count = 0;
+    size_t impaired_count = 0;
+
+    if (unit == NULL || unit->soldier_count == 0) {
+        return 1.0f;
+    }
+
+    for (index = 0; index < unit->soldier_count; ++index) {
+        const mk_soldier_t *soldier = &unit->soldiers[index];
+
+        if (soldier->casualty || !soldier->can_move || soldier->wound_state == MK_WOUND_KILLED) {
+            impaired_count += 1;
+            continue;
+        }
+
+        movable_count += 1;
+        if (soldier->wound_state == MK_WOUND_SERIOUS || soldier->wound_state == MK_WOUND_INCAPACITATED) {
+            impaired_count += 1;
+        }
+    }
+
+    if (movable_count == 0) {
+        return 0.0f;
+    }
+
+    if (impaired_count >= unit->soldier_count) {
+        return 0.5f;
+    }
+
+    if (impaired_count > 0) {
+        return 0.75f;
+    }
+
+    return 1.0f;
+}
+
+static bool mk_unit_assign_route(mk_unit_t *unit, const mk_gameplay_route_t *route) {
+    size_t index;
+
+    if (unit == NULL || route == NULL || !route->valid || route->step_count == 0 || route->step_count > MK_MAX_GAMEPLAY_ROUTE_STEPS) {
+        return false;
+    }
+
+    mk_unit_clear_route(unit);
+    unit->has_route = true;
+    unit->route_step_count = route->step_count;
+    unit->route_step_index = 0;
+    unit->route_total_cost = route->total_cost;
+    unit->route_uses_vertical_transition = route->uses_vertical_transition;
+    for (index = 0; index < route->step_count; ++index) {
+        unit->route_waypoints_m[index] = route->steps[index].waypoint_m;
+        mk_copy_name(unit->route_step_level_ids[index], route->steps[index].level_id);
+        mk_copy_name(unit->route_step_portal_ids[index], route->steps[index].portal_id);
+        unit->route_step_vertical_transition[index] = route->steps[index].vertical_transition;
+    }
+
+    return true;
+}
+
+
+static const char *mk_game_default_level_id(const mk_game_t *game) {
+    if (game != NULL
+        && mk_gameplay_area_is_loaded(&game->gameplay_area)
+        && game->gameplay_area.level_count > 0) {
+        return game->gameplay_area.levels[0].id;
+    }
+
+    return "";
+}
+
+static const char *mk_unit_current_level_id(const mk_game_t *game, const mk_unit_t *unit) {
+    if (unit != NULL && unit->level_id[0] != '\0') {
+        return unit->level_id;
+    }
+
+    return mk_game_default_level_id(game);
+}
+
+static bool mk_order_is_movement_order(mk_order_t order) {
+    return order == MK_ORDER_MOVE
+        || order == MK_ORDER_ASSAULT_MOVE
+        || order == MK_ORDER_WITHDRAW
+        || order == MK_ORDER_INVESTIGATE;
+}
+
+static void mk_update_unit_movement(mk_game_t *game, mk_unit_t *unit) {
     float dx;
     float dy;
     float distance_squared;
@@ -1682,28 +1797,41 @@ static void mk_update_unit_movement(mk_unit_t *unit) {
     float step_squared;
     float distance;
     float move_multiplier;
+    mk_vec2_t movement_target;
 
     if (unit == NULL || !unit->has_move_target) {
         return;
     }
 
     move_multiplier = mk_unit_status_move_multiplier(unit->status);
+    move_multiplier *= mk_unit_wound_move_multiplier(unit);
     if (move_multiplier <= 0.0f) {
         unit->has_move_target = false;
+        mk_unit_set_route_failure(unit, "immobile");
         unit->order = MK_ORDER_RALLY;
         return;
     }
 
-    if (unit->order != MK_ORDER_MOVE
-        && unit->order != MK_ORDER_ASSAULT_MOVE
-        && unit->order != MK_ORDER_WITHDRAW
-        && unit->order != MK_ORDER_INVESTIGATE) {
+    if (!mk_order_is_movement_order(unit->order)) {
         unit->has_move_target = false;
+        mk_unit_clear_route(unit);
         return;
     }
 
-    dx = unit->target_position_m.x - unit->position_m.x;
-    dy = unit->target_position_m.y - unit->position_m.y;
+    movement_target = unit->target_position_m;
+    if (unit->has_route) {
+        if (unit->route_step_count == 0 || unit->route_step_index >= unit->route_step_count) {
+            mk_unit_set_route_failure(unit, "route_exhausted");
+            unit->has_move_target = false;
+            unit->order = MK_ORDER_HOLD;
+            return;
+        }
+
+        movement_target = unit->route_waypoints_m[unit->route_step_index];
+    }
+
+    dx = movement_target.x - unit->position_m.x;
+    dy = movement_target.y - unit->position_m.y;
     distance_squared = dx * dx + dy * dy;
     speed = (unit->move_speed_m_per_tick > 0.0f ? unit->move_speed_m_per_tick : MK_DEFAULT_MOVE_SPEED_M_PER_TICK)
         * move_multiplier;
@@ -1715,8 +1843,26 @@ static void mk_update_unit_movement(mk_unit_t *unit) {
     step_squared = speed * speed;
 
     if (distance_squared <= step_squared || distance_squared <= 0.0001f) {
+        unit->position_m = movement_target;
+        if (unit->has_route) {
+            if (unit->route_step_level_ids[unit->route_step_index][0] != '\0') {
+                mk_copy_name(unit->level_id, unit->route_step_level_ids[unit->route_step_index]);
+            }
+            if (unit->route_step_vertical_transition[unit->route_step_index]) {
+                unit->route_vertical_transitions_completed += 1;
+            }
+
+            unit->route_step_index += 1;
+            unit->route_stuck_ticks = 0;
+            unit->route_last_position_m = unit->position_m;
+            if (unit->route_step_index < unit->route_step_count) {
+                return;
+            }
+        }
+
         unit->position_m = unit->target_position_m;
         unit->has_move_target = false;
+        mk_unit_clear_route(unit);
         unit->order = unit->order == MK_ORDER_WITHDRAW ? MK_ORDER_RALLY : MK_ORDER_HOLD;
         return;
     }
@@ -1724,6 +1870,26 @@ static void mk_update_unit_movement(mk_unit_t *unit) {
     distance = sqrtf(distance_squared);
     unit->position_m.x += dx / distance * speed;
     unit->position_m.y += dy / distance * speed;
+    unit->facing_degrees = atan2f(dy, dx) * 57.2957795f;
+
+    if (unit->has_route) {
+        float moved_since_last = mk_vec2_distance(unit->route_last_position_m, unit->position_m);
+
+        if (moved_since_last < 0.01f) {
+            unit->route_stuck_ticks += 1;
+        } else {
+            unit->route_stuck_ticks = 0;
+            unit->route_last_position_m = unit->position_m;
+        }
+
+        if (unit->route_stuck_ticks > 8U) {
+            mk_unit_set_route_failure(unit, "stuck");
+            unit->has_move_target = false;
+            unit->order = MK_ORDER_RALLY;
+        }
+    }
+
+    (void)game;
 }
 
 static bool mk_faction_id_exists(const mk_scenario_definition_t *scenario, uint32_t faction_id) {
@@ -1921,6 +2087,9 @@ static bool mk_scenario_is_valid(const mk_scenario_definition_t *scenario) {
             || unit->soldier_count > MK_MAX_SOLDIERS_PER_UNIT
             || !mk_position_fits_map(unit->position_m, &scenario->map)
             || (unit->has_move_target && !mk_position_fits_map(unit->target_position_m, &scenario->map))
+            || (unit->level_id[0] != '\0'
+                && mk_gameplay_area_is_loaded(&scenario->gameplay_area)
+                && mk_gameplay_area_find_level(&scenario->gameplay_area, unit->level_id) == NULL)
             || !mk_faction_id_exists(scenario, unit->faction_id)
             || !mk_force_id_exists(scenario, unit->force_id)
             || !mk_controller_id_exists(scenario, unit->controller_id)) {
@@ -2698,6 +2867,284 @@ mk_result_t mk_gameplay_area_trace_line_of_sight(
     return MK_OK;
 }
 
+static void mk_gameplay_route_set_blocked_reason(mk_gameplay_route_t *route, const char *reason) {
+    if (route != NULL) {
+        mk_copy_text(route->blocked_reason, sizeof(route->blocked_reason), reason);
+    }
+}
+
+static bool mk_gameplay_route_position_is_walkable(
+    const mk_gameplay_area_t *area,
+    const char *level_id,
+    mk_vec2_t position_m,
+    const char *blocked_reason,
+    mk_gameplay_route_t *route
+) {
+    mk_gameplay_tactical_query_t query;
+
+    if (mk_gameplay_area_query_tactical_at(area, level_id, position_m, &query) != MK_OK) {
+        mk_gameplay_route_set_blocked_reason(route, blocked_reason);
+        return false;
+    }
+
+    if (query.blocks_movement) {
+        mk_gameplay_route_set_blocked_reason(route, blocked_reason);
+        return false;
+    }
+
+    return true;
+}
+
+static bool mk_gameplay_area_portal_is_routeable(const mk_gameplay_topology_portal_t *portal) {
+    return portal != NULL
+        && portal->bidirectional
+        && !mk_gameplay_area_portal_blocks_movement(portal);
+}
+
+static bool mk_gameplay_route_add_step(
+    mk_gameplay_route_t *route,
+    const mk_gameplay_topology_node_t *node,
+    const mk_gameplay_topology_portal_t *portal,
+    mk_vec2_t waypoint_m,
+    int cumulative_cost
+) {
+    mk_gameplay_route_step_t *step;
+
+    if (route == NULL || node == NULL || route->step_count >= MK_MAX_GAMEPLAY_ROUTE_STEPS) {
+        return false;
+    }
+
+    step = &route->steps[route->step_count];
+    memset(step, 0, sizeof(*step));
+    mk_copy_name(step->node_id, node->id);
+    mk_copy_name(step->level_id, node->level_id);
+    step->waypoint_m = waypoint_m;
+    step->cumulative_cost = cumulative_cost;
+    if (portal != NULL) {
+        mk_copy_name(step->portal_id, portal->id);
+        step->vertical_transition = portal->vertical;
+        if (portal->vertical) {
+            route->uses_vertical_transition = true;
+        }
+    }
+
+    route->step_count += 1;
+    return true;
+}
+
+mk_result_t mk_gameplay_area_plan_route(
+    const mk_gameplay_area_t *area,
+    const char *start_level_id,
+    mk_vec2_t start_m,
+    const char *goal_level_id,
+    mk_vec2_t goal_m,
+    mk_gameplay_route_t *out_route
+) {
+    int distance[MK_MAX_GAMEPLAY_TOPOLOGY_NODES];
+    bool visited[MK_MAX_GAMEPLAY_TOPOLOGY_NODES];
+    size_t previous_node[MK_MAX_GAMEPLAY_TOPOLOGY_NODES];
+    size_t previous_portal[MK_MAX_GAMEPLAY_TOPOLOGY_NODES];
+    size_t node_path[MK_MAX_GAMEPLAY_TOPOLOGY_NODES];
+    size_t path_count = 0;
+    size_t start_index;
+    size_t goal_index;
+    size_t index;
+    mk_gameplay_route_t route;
+
+    if (area == NULL || start_level_id == NULL || goal_level_id == NULL || out_route == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    memset(&route, 0, sizeof(route));
+    route.start_m = start_m;
+    route.goal_m = goal_m;
+    mk_copy_name(route.start_level_id, start_level_id);
+    mk_copy_name(route.goal_level_id, goal_level_id);
+
+    if (!area->loaded
+        || !area->topology_loaded
+        || area->topology_node_count == 0
+        || mk_gameplay_area_find_level(area, start_level_id) == NULL
+        || mk_gameplay_area_find_level(area, goal_level_id) == NULL) {
+        mk_gameplay_route_set_blocked_reason(&route, "missing_topology");
+        *out_route = route;
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    if (!mk_gameplay_route_position_is_walkable(area, start_level_id, start_m, "blocked_start", &route)
+        || !mk_gameplay_route_position_is_walkable(area, goal_level_id, goal_m, "blocked_goal", &route)) {
+        *out_route = route;
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    if (!mk_gameplay_area_topology_node_index(
+            area,
+            mk_gameplay_area_find_topology_node_at_world(area, start_level_id, start_m) != NULL
+                ? mk_gameplay_area_find_topology_node_at_world(area, start_level_id, start_m)->id
+                : "",
+            &start_index
+        )) {
+        mk_gameplay_route_set_blocked_reason(&route, "missing_start_node");
+        *out_route = route;
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    if (!mk_gameplay_area_topology_node_index(
+            area,
+            mk_gameplay_area_find_topology_node_at_world(area, goal_level_id, goal_m) != NULL
+                ? mk_gameplay_area_find_topology_node_at_world(area, goal_level_id, goal_m)->id
+                : "",
+            &goal_index
+        )) {
+        mk_gameplay_route_set_blocked_reason(&route, "missing_goal_node");
+        *out_route = route;
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    if (!area->topology_nodes[start_index].enterable || !area->topology_nodes[goal_index].enterable) {
+        mk_gameplay_route_set_blocked_reason(&route, "blocked_node");
+        *out_route = route;
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    for (index = 0; index < MK_MAX_GAMEPLAY_TOPOLOGY_NODES; ++index) {
+        distance[index] = MK_GAMEPLAY_BLOCKED_NAVIGATION_COST;
+        visited[index] = false;
+        previous_node[index] = (size_t)-1;
+        previous_portal[index] = (size_t)-1;
+    }
+
+    distance[start_index] = 0;
+    for (;;) {
+        size_t current_index = (size_t)-1;
+        int best_distance = MK_GAMEPLAY_BLOCKED_NAVIGATION_COST;
+        size_t portal_index;
+
+        for (index = 0; index < area->topology_node_count; ++index) {
+            if (!visited[index] && distance[index] < best_distance) {
+                best_distance = distance[index];
+                current_index = index;
+            }
+        }
+
+        if (current_index == (size_t)-1 || current_index == goal_index) {
+            break;
+        }
+
+        visited[current_index] = true;
+        for (portal_index = 0; portal_index < area->topology_portal_count; ++portal_index) {
+            const mk_gameplay_topology_portal_t *portal = &area->topology_portals[portal_index];
+            size_t from_index;
+            size_t to_index;
+            size_t next_index;
+            int next_cost;
+
+            if (!mk_gameplay_area_portal_is_routeable(portal)
+                || !mk_gameplay_area_topology_node_index(area, portal->from_node_id, &from_index)
+                || !mk_gameplay_area_topology_node_index(area, portal->to_node_id, &to_index)) {
+                continue;
+            }
+
+            if (from_index == current_index) {
+                next_index = to_index;
+            } else if (to_index == current_index) {
+                next_index = from_index;
+            } else {
+                continue;
+            }
+
+            if (visited[next_index] || !area->topology_nodes[next_index].enterable) {
+                continue;
+            }
+
+            next_cost = distance[current_index]
+                + portal->movement_cost
+                + mk_gameplay_area_node_navigation_cost(&area->topology_nodes[next_index])
+                + (portal->vertical ? 2 : 0);
+            if (next_cost < distance[next_index]) {
+                distance[next_index] = next_cost;
+                previous_node[next_index] = current_index;
+                previous_portal[next_index] = portal_index;
+            }
+        }
+    }
+
+    if (distance[goal_index] >= MK_GAMEPLAY_BLOCKED_NAVIGATION_COST) {
+        mk_gameplay_route_set_blocked_reason(&route, "unreachable");
+        *out_route = route;
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    for (index = goal_index; index != (size_t)-1; index = previous_node[index]) {
+        if (path_count >= MK_MAX_GAMEPLAY_TOPOLOGY_NODES) {
+            mk_gameplay_route_set_blocked_reason(&route, "route_capacity");
+            *out_route = route;
+            return MK_ERROR_CAPACITY;
+        }
+
+        node_path[path_count] = index;
+        path_count += 1;
+        if (index == start_index) {
+            break;
+        }
+    }
+
+    if (path_count == 0 || node_path[path_count - 1] != start_index) {
+        mk_gameplay_route_set_blocked_reason(&route, "unreachable");
+        *out_route = route;
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    mk_copy_name(route.start_node_id, area->topology_nodes[start_index].id);
+    mk_copy_name(route.goal_node_id, area->topology_nodes[goal_index].id);
+    route.total_cost = distance[goal_index];
+
+    if (start_index == goal_index) {
+        if (!mk_gameplay_route_add_step(&route, &area->topology_nodes[goal_index], NULL, goal_m, route.total_cost)) {
+            mk_gameplay_route_set_blocked_reason(&route, "route_capacity");
+            *out_route = route;
+            return MK_ERROR_CAPACITY;
+        }
+    } else {
+        size_t reverse_index;
+
+        for (reverse_index = path_count - 1; reverse_index > 0; --reverse_index) {
+            size_t to_index = node_path[reverse_index - 1];
+            size_t portal_index = previous_portal[to_index];
+            const mk_gameplay_topology_portal_t *portal;
+
+            if (portal_index == (size_t)-1 || portal_index >= area->topology_portal_count) {
+                mk_gameplay_route_set_blocked_reason(&route, "missing_portal");
+                *out_route = route;
+                return MK_ERROR_INVALID_DATA;
+            }
+
+            portal = &area->topology_portals[portal_index];
+            if (!mk_gameplay_route_add_step(
+                    &route,
+                    &area->topology_nodes[to_index],
+                    portal,
+                    mk_rect_center(portal->bounds_m),
+                    distance[to_index]
+                )) {
+                mk_gameplay_route_set_blocked_reason(&route, "route_capacity");
+                *out_route = route;
+                return MK_ERROR_CAPACITY;
+            }
+        }
+
+        if (!mk_gameplay_route_add_step(&route, &area->topology_nodes[goal_index], NULL, goal_m, route.total_cost)) {
+            mk_gameplay_route_set_blocked_reason(&route, "route_capacity");
+            *out_route = route;
+            return MK_ERROR_CAPACITY;
+        }
+    }
+
+    route.valid = route.step_count > 0;
+    *out_route = route;
+    return route.valid ? MK_OK : MK_ERROR_NOT_FOUND;
+}
+
 static bool mk_gameplay_area_blocks_at(
     const mk_gameplay_area_t *area,
     const char *level_id,
@@ -2779,7 +3226,7 @@ void mk_game_step(mk_game_t *game) {
             recovery += 2;
         }
 
-        mk_update_unit_movement(unit);
+        mk_update_unit_movement(game, unit);
         unit->suppression = mk_subtract_floor_zero(unit->suppression, recovery);
 
         for (soldier_index = 0; soldier_index < unit->soldier_count; ++soldier_index) {
@@ -3152,6 +3599,9 @@ mk_result_t mk_game_load_scenario(mk_game_t *game, const mk_scenario_definition_
     memset(game->contact_reports, 0, sizeof(game->contact_reports));
 
     for (index = 0; index < game->unit_count; ++index) {
+        if (game->units[index].level_id[0] == '\0') {
+            mk_copy_name(game->units[index].level_id, mk_game_default_level_id(game));
+        }
         mk_update_unit_status(&game->units[index]);
     }
 
@@ -3277,19 +3727,79 @@ mk_result_t mk_game_clear_selection(mk_game_t *game) {
     return MK_OK;
 }
 
+static mk_result_t mk_game_try_assign_unit_route(
+    const mk_game_t *game,
+    mk_unit_t *unit,
+    const char *target_level_id,
+    mk_vec2_t target_position_m,
+    bool require_route
+) {
+    const char *start_level_id;
+    const char *goal_level_id;
+    mk_gameplay_route_t route;
+    mk_result_t result;
+
+    if (game == NULL || unit == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    mk_unit_clear_route(unit);
+    if (!mk_gameplay_area_topology_is_loaded(&game->gameplay_area)) {
+        return require_route ? MK_ERROR_INVALID_DATA : MK_OK;
+    }
+
+    start_level_id = mk_unit_current_level_id(game, unit);
+    goal_level_id = target_level_id != NULL && target_level_id[0] != '\0' ? target_level_id : start_level_id;
+    if (start_level_id[0] == '\0' || goal_level_id[0] == '\0') {
+        return require_route ? MK_ERROR_INVALID_DATA : MK_OK;
+    }
+
+    result = mk_gameplay_area_plan_route(
+        &game->gameplay_area,
+        start_level_id,
+        unit->position_m,
+        goal_level_id,
+        target_position_m,
+        &route
+    );
+    if (result != MK_OK) {
+        mk_copy_text(unit->route_failure_reason, sizeof(unit->route_failure_reason), route.blocked_reason);
+        return require_route ? result : MK_OK;
+    }
+
+    if (!mk_unit_assign_route(unit, &route)) {
+        mk_copy_text(unit->route_failure_reason, sizeof(unit->route_failure_reason), "route_capacity");
+        return MK_ERROR_CAPACITY;
+    }
+
+    unit->route_request_id += 1;
+    unit->route_stuck_ticks = 0;
+    unit->route_vertical_transitions_completed = 0;
+    unit->route_last_position_m = unit->position_m;
+    mk_copy_text(unit->route_failure_reason, sizeof(unit->route_failure_reason), "");
+    if (unit->level_id[0] == '\0') {
+        mk_copy_name(unit->level_id, start_level_id);
+    }
+
+    return MK_OK;
+}
+
 static mk_result_t mk_game_issue_position_order(
     mk_game_t *game,
     uint32_t unit_id,
     mk_vec2_t target_position_m,
-    mk_order_t order
+    mk_order_t order,
+    const char *target_level_id,
+    bool require_route
 ) {
     mk_unit_t *unit;
+    mk_result_t route_result;
 
     if (game == NULL) {
         return MK_ERROR_INVALID_ARGUMENT;
     }
 
-    if (order != MK_ORDER_MOVE && order != MK_ORDER_ASSAULT_MOVE && order != MK_ORDER_INVESTIGATE) {
+    if (!mk_order_is_movement_order(order)) {
         return MK_ERROR_INVALID_ARGUMENT;
     }
 
@@ -3300,6 +3810,11 @@ static mk_result_t mk_game_issue_position_order(
     unit = mk_game_find_unit(game, unit_id);
     if (unit == NULL) {
         return MK_ERROR_NOT_FOUND;
+    }
+
+    route_result = mk_game_try_assign_unit_route(game, unit, target_level_id, target_position_m, require_route);
+    if (route_result != MK_OK) {
+        return route_result;
     }
 
     unit->target_position_m = target_position_m;
@@ -3322,23 +3837,37 @@ mk_result_t mk_game_issue_order(mk_game_t *game, uint32_t unit_id, mk_order_t or
     }
 
     unit->order = order;
-    if (order != MK_ORDER_MOVE && order != MK_ORDER_ASSAULT_MOVE && order != MK_ORDER_INVESTIGATE) {
+    if (!mk_order_is_movement_order(order)) {
         unit->has_move_target = false;
+        mk_unit_clear_route(unit);
     }
 
     return MK_OK;
 }
 
 mk_result_t mk_game_issue_move_order(mk_game_t *game, uint32_t unit_id, mk_vec2_t target_position_m) {
-    return mk_game_issue_position_order(game, unit_id, target_position_m, MK_ORDER_MOVE);
+    return mk_game_issue_position_order(game, unit_id, target_position_m, MK_ORDER_MOVE, NULL, false);
 }
 
 mk_result_t mk_game_issue_assault_move_order(mk_game_t *game, uint32_t unit_id, mk_vec2_t target_position_m) {
-    return mk_game_issue_position_order(game, unit_id, target_position_m, MK_ORDER_ASSAULT_MOVE);
+    return mk_game_issue_position_order(game, unit_id, target_position_m, MK_ORDER_ASSAULT_MOVE, NULL, false);
 }
 
 mk_result_t mk_game_issue_investigate_order(mk_game_t *game, uint32_t unit_id, mk_vec2_t target_position_m) {
-    return mk_game_issue_position_order(game, unit_id, target_position_m, MK_ORDER_INVESTIGATE);
+    return mk_game_issue_position_order(game, unit_id, target_position_m, MK_ORDER_INVESTIGATE, NULL, false);
+}
+
+mk_result_t mk_game_issue_withdraw_order(mk_game_t *game, uint32_t unit_id, mk_vec2_t target_position_m) {
+    return mk_game_issue_position_order(game, unit_id, target_position_m, MK_ORDER_WITHDRAW, NULL, false);
+}
+
+mk_result_t mk_game_issue_move_order_to_level(
+    mk_game_t *game,
+    uint32_t unit_id,
+    const char *target_level_id,
+    mk_vec2_t target_position_m
+) {
+    return mk_game_issue_position_order(game, unit_id, target_position_m, MK_ORDER_MOVE, target_level_id, true);
 }
 
 mk_result_t mk_game_issue_selected_move_order(mk_game_t *game, mk_vec2_t target_position_m) {

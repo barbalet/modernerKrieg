@@ -145,6 +145,10 @@ static void test_tactical_overlays_from_snapshot(void) {
     game.civilians[0].risk = 4;
     game.objectives[0].controlling_side = MK_SIDE_PLAYER;
     assert(mk_game_snapshot(&game, &snapshot) == MK_OK);
+    snapshot.units[0].has_route = true;
+    snapshot.units[0].route_step_count = 2;
+    snapshot.units[0].route_step_index = 1;
+    snapshot.units[0].route_waypoints_m[1] = make_vec2(96.0f, 240.0f);
     snapshot.contact_report_count = 3;
     snapshot.contact_reports[0].id = 1;
     snapshot.contact_reports[0].kind = MK_CONTACT_REPORT_FIRE;
@@ -193,7 +197,9 @@ static void test_tactical_overlays_from_snapshot(void) {
         } else if (overlay->kind == MK_TACTICAL_OVERLAY_MOVE_ROUTE) {
             saw_route = true;
             assert(overlay->unit_id == 1);
-            assert_close(overlay->target_position_m.x, 112.0f);
+            assert_close(overlay->target_position_m.x, 96.0f);
+            assert_close(overlay->target_position_m.y, 240.0f);
+            assert(overlay->intensity == 1);
         } else if (overlay->kind == MK_TACTICAL_OVERLAY_MOVE_TARGET) {
             saw_target = true;
             assert(overlay->unit_id == 1);

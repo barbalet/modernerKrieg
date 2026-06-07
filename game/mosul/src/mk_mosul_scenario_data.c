@@ -1812,7 +1812,7 @@ mk_result_t mk_mosul_load_scenario_file(
     mk_scenario_definition_t *out_scenario
 ) {
     mk_mosul_scenario_entry_list_t entries;
-    mk_scenario_definition_t scenario;
+    mk_scenario_definition_t *scenario = NULL;
     mk_weapon_profile_t weapons[MK_MOSUL_SCENARIO_MAX_WEAPONS];
     uint32_t controller_ids[MK_MAX_CONTROLLERS];
     uint32_t faction_ids[MK_MAX_FACTIONS];
@@ -1822,72 +1822,80 @@ mk_result_t mk_mosul_load_scenario_file(
     size_t force_count = 0;
     size_t weapon_count = 0;
     char format[64];
-    mk_game_t validation_game;
+    mk_game_t *validation_game = NULL;
     mk_result_t result;
 
     if (scenario_path == NULL || out_scenario == NULL) {
         return MK_ERROR_INVALID_ARGUMENT;
     }
 
+    scenario = (mk_scenario_definition_t *)calloc(1, sizeof(*scenario));
+    validation_game = (mk_game_t *)calloc(1, sizeof(*validation_game));
+    if (scenario == NULL || validation_game == NULL) {
+        result = MK_ERROR_CAPACITY;
+        goto cleanup;
+    }
+
     result = mk_mosul_read_entries(scenario_path, &entries);
     if (result != MK_OK) {
-        return result;
+        goto cleanup;
     }
 
     if (!mk_mosul_required_text(&entries, "format", format, sizeof(format))
         || strcmp(format, "modernerKrieg.scenario.v1") != 0) {
-        return MK_ERROR_INVALID_DATA;
+        result = MK_ERROR_INVALID_DATA;
+        goto cleanup;
     }
 
-    memset(&scenario, 0, sizeof(scenario));
     memset(weapons, 0, sizeof(weapons));
     memset(controller_ids, 0, sizeof(controller_ids));
     memset(faction_ids, 0, sizeof(faction_ids));
     memset(force_ids, 0, sizeof(force_ids));
 
-    if (!mk_mosul_required_text(&entries, "name", scenario.name, sizeof(scenario.name))
-        || !mk_mosul_required_u64(&entries, "seed", &scenario.seed)) {
-        return MK_ERROR_INVALID_DATA;
+    if (!mk_mosul_required_text(&entries, "name", scenario->name, sizeof(scenario->name))
+        || !mk_mosul_required_u64(&entries, "seed", &scenario->seed)) {
+        result = MK_ERROR_INVALID_DATA;
+        goto cleanup;
     }
 
-    result = mk_mosul_load_briefing_and_scoring(&entries, &scenario);
+    result = mk_mosul_load_briefing_and_scoring(&entries, scenario);
     if (result != MK_OK) {
-        return result;
+        goto cleanup;
     }
 
-    result = mk_mosul_load_map(&entries, &scenario);
+    result = mk_mosul_load_map(&entries, scenario);
     if (result != MK_OK) {
-        return result;
+        goto cleanup;
     }
 
-    result = mk_mosul_validate_asset_references(&entries, project_root, &scenario);
+    result = mk_mosul_validate_asset_references(&entries, project_root, scenario);
     if (result != MK_OK) {
-        return result;
+        goto cleanup;
     }
 
-    result = mk_mosul_load_tile_ranges(&entries, &scenario);
+    result = mk_mosul_load_tile_ranges(&entries, scenario);
     if (result != MK_OK) {
-        return result;
+        goto cleanup;
     }
 
-    result = mk_mosul_load_terrain(&entries, &scenario);
+    result = mk_mosul_load_terrain(&entries, scenario);
     if (result != MK_OK) {
-        return result;
+        goto cleanup;
     }
 
-    result = mk_mosul_load_controllers(&entries, &scenario, controller_ids, &controller_count);
+    result = mk_mosul_load_controllers(&entries, scenario, controller_ids, &controller_count);
     if (result != MK_OK) {
-        return result;
+        goto cleanup;
     }
 
-    result = mk_mosul_load_factions(&entries, &scenario, faction_ids, &faction_count);
+    result = mk_mosul_load_factions(&entries, scenario, faction_ids, &faction_count);
     if (result != MK_OK) {
-        return result;
+        goto cleanup;
     }
 
     result = mk_mosul_load_forces(
         &entries,
-        &scenario,
+        scenario,
         controller_ids,
         controller_count,
         faction_ids,
@@ -1896,27 +1904,27 @@ mk_result_t mk_mosul_load_scenario_file(
         &force_count
     );
     if (result != MK_OK) {
-        return result;
+        goto cleanup;
     }
 
-    result = mk_mosul_load_objectives(&entries, &scenario);
+    result = mk_mosul_load_objectives(&entries, scenario);
     if (result != MK_OK) {
-        return result;
+        goto cleanup;
     }
 
     result = mk_mosul_load_weapons(&entries, weapons, &weapon_count);
     if (result != MK_OK) {
-        return result;
+        goto cleanup;
     }
 
-    result = mk_mosul_load_civilians(&entries, &scenario, faction_ids, faction_count);
+    result = mk_mosul_load_civilians(&entries, scenario, faction_ids, faction_count);
     if (result != MK_OK) {
-        return result;
+        goto cleanup;
     }
 
     result = mk_mosul_load_units(
         &entries,
-        &scenario,
+        scenario,
         controller_ids,
         controller_count,
         faction_ids,
@@ -1927,14 +1935,19 @@ mk_result_t mk_mosul_load_scenario_file(
         weapon_count
     );
     if (result != MK_OK) {
-        return result;
+        goto cleanup;
     }
 
-    result = mk_game_load_scenario(&validation_game, &scenario);
+    result = mk_game_load_scenario(validation_game, scenario);
     if (result != MK_OK) {
-        return result;
+        goto cleanup;
     }
 
-    *out_scenario = scenario;
-    return MK_OK;
+    *out_scenario = *scenario;
+    result = MK_OK;
+
+cleanup:
+    free(validation_game);
+    free(scenario);
+    return result;
 }

@@ -23,6 +23,7 @@ extern "C" {
 #define MK_MAX_SOLDIERS_PER_UNIT 16
 #define MK_MAX_UNITS 64
 #define MK_MAX_CONTACT_REPORTS 64
+#define MK_MAX_GAMEPLAY_ROUTE_STEPS 16
 #define MK_MAX_GAMEPLAY_AREA_LEVELS 8
 #define MK_MAX_GAMEPLAY_AREA_FEATURES 128
 #define MK_MAX_GAMEPLAY_AREA_REGIONS 64
@@ -211,6 +212,30 @@ typedef struct {
 } mk_color_t;
 
 typedef struct {
+    char node_id[MK_NAME_CAPACITY];
+    char portal_id[MK_NAME_CAPACITY];
+    char level_id[MK_NAME_CAPACITY];
+    mk_vec2_t waypoint_m;
+    int cumulative_cost;
+    bool vertical_transition;
+} mk_gameplay_route_step_t;
+
+typedef struct {
+    bool valid;
+    char start_node_id[MK_NAME_CAPACITY];
+    char goal_node_id[MK_NAME_CAPACITY];
+    char start_level_id[MK_NAME_CAPACITY];
+    char goal_level_id[MK_NAME_CAPACITY];
+    mk_vec2_t start_m;
+    mk_vec2_t goal_m;
+    size_t step_count;
+    int total_cost;
+    bool uses_vertical_transition;
+    char blocked_reason[MK_KIND_CAPACITY];
+    mk_gameplay_route_step_t steps[MK_MAX_GAMEPLAY_ROUTE_STEPS];
+} mk_gameplay_route_t;
+
+typedef struct {
     uint32_t id;
     char name[MK_NAME_CAPACITY];
     mk_side_t side;
@@ -288,6 +313,7 @@ typedef struct {
     mk_training_t training;
     mk_order_t order;
     mk_order_source_t order_source;
+    char level_id[MK_NAME_CAPACITY];
     mk_vec2_t position_m;
     mk_vec2_t target_position_m;
     float facing_degrees;
@@ -301,6 +327,21 @@ typedef struct {
     bool communications_up;
     bool cover_posture;
     bool has_move_target;
+    bool has_route;
+    size_t route_step_count;
+    size_t route_step_index;
+    int route_total_cost;
+    bool route_uses_vertical_transition;
+    mk_vec2_t route_waypoints_m[MK_MAX_GAMEPLAY_ROUTE_STEPS];
+    char route_step_level_ids[MK_MAX_GAMEPLAY_ROUTE_STEPS][MK_NAME_CAPACITY];
+    char route_step_portal_ids[MK_MAX_GAMEPLAY_ROUTE_STEPS][MK_NAME_CAPACITY];
+    bool route_step_vertical_transition[MK_MAX_GAMEPLAY_ROUTE_STEPS];
+    uint32_t route_request_id;
+    uint32_t route_stuck_ticks;
+    uint32_t route_failure_count;
+    uint32_t route_vertical_transitions_completed;
+    mk_vec2_t route_last_position_m;
+    char route_failure_reason[MK_KIND_CAPACITY];
     bool hidden;
     bool revealed;
     int concealment;
@@ -723,6 +764,13 @@ mk_result_t mk_game_issue_order(mk_game_t *game, uint32_t unit_id, mk_order_t or
 mk_result_t mk_game_issue_move_order(mk_game_t *game, uint32_t unit_id, mk_vec2_t target_position_m);
 mk_result_t mk_game_issue_assault_move_order(mk_game_t *game, uint32_t unit_id, mk_vec2_t target_position_m);
 mk_result_t mk_game_issue_investigate_order(mk_game_t *game, uint32_t unit_id, mk_vec2_t target_position_m);
+mk_result_t mk_game_issue_withdraw_order(mk_game_t *game, uint32_t unit_id, mk_vec2_t target_position_m);
+mk_result_t mk_game_issue_move_order_to_level(
+    mk_game_t *game,
+    uint32_t unit_id,
+    const char *target_level_id,
+    mk_vec2_t target_position_m
+);
 mk_result_t mk_game_issue_selected_move_order(mk_game_t *game, mk_vec2_t target_position_m);
 mk_result_t mk_game_issue_selected_investigate_order(mk_game_t *game, mk_vec2_t target_position_m);
 mk_result_t mk_game_trace_line_of_sight(
@@ -850,6 +898,14 @@ mk_result_t mk_gameplay_area_trace_line_of_sight(
     mk_vec2_t from_m,
     mk_vec2_t to_m,
     mk_gameplay_los_trace_t *out_trace
+);
+mk_result_t mk_gameplay_area_plan_route(
+    const mk_gameplay_area_t *area,
+    const char *start_level_id,
+    mk_vec2_t start_m,
+    const char *goal_level_id,
+    mk_vec2_t goal_m,
+    mk_gameplay_route_t *out_route
 );
 bool mk_gameplay_area_feature_contains_pixel(
     const mk_gameplay_feature_t *feature,
