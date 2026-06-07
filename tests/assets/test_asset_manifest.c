@@ -86,8 +86,9 @@ static void test_sprite_manifest_loads_first_frames(void) {
     MK_TEST_ASSERT(manifest.sheet_count == 4);
     MK_TEST_ASSERT(manifest.frame_count == 5);
     MK_TEST_ASSERT(strcmp(manifest.runtime_render_manifest, "assets/mosul/runtime/sprites/rendered/render_manifest.json") == 0);
-    MK_TEST_ASSERT(manifest.runtime_rendered_count == 896);
+    MK_TEST_ASSERT(manifest.runtime_rendered_count == 1064);
     MK_TEST_ASSERT(manifest.runtime_infantry_count == 640);
+    MK_TEST_ASSERT(manifest.runtime_civilian_count == 168);
     MK_TEST_ASSERT(manifest.runtime_weapon_count == 64);
     MK_TEST_ASSERT(manifest.runtime_vehicle_count == 192);
 
@@ -122,10 +123,11 @@ static void test_sprite_render_manifest_loads_all_runtime_facings(void) {
     MK_TEST_ASSERT(mk_asset_load_sprite_render_manifest(render_path, MK_TEST_PROJECT_ROOT, &render_manifest) == MK_OK);
     MK_TEST_ASSERT(render_manifest.schema_version == 1);
     MK_TEST_ASSERT(strcmp(render_manifest.source_manifest, "assets/mosul/runtime/sprites/manifest.json") == 0);
-    MK_TEST_ASSERT(render_manifest.rendered_count == 896);
+    MK_TEST_ASSERT(render_manifest.rendered_count == 1064);
     MK_TEST_ASSERT(render_manifest.missing_source_count == 0);
     MK_TEST_ASSERT(render_manifest.error_count == 0);
     MK_TEST_ASSERT(render_manifest.infantry_count == 640);
+    MK_TEST_ASSERT(render_manifest.civilian_count == 168);
     MK_TEST_ASSERT(render_manifest.weapon_count == 64);
     MK_TEST_ASSERT(render_manifest.vehicle_count == 192);
 
@@ -139,6 +141,17 @@ static void test_sprite_render_manifest_loads_all_runtime_facings(void) {
     );
     MK_TEST_ASSERT(entry != NULL);
     MK_TEST_ASSERT(strcmp(entry->path, "assets/mosul/runtime/sprites/rendered/infantry_128/allied/us_army_rifleman/standing/north.png") == 0);
+
+    entry = mk_asset_find_sprite_render_entry(
+        &render_manifest,
+        "civilian",
+        "teenage_girl",
+        "wounded",
+        "civilian",
+        "south_east"
+    );
+    MK_TEST_ASSERT(entry != NULL);
+    MK_TEST_ASSERT(strcmp(entry->path, "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/wounded/south_east.png") == 0);
 
     entry = mk_asset_find_sprite_render_entry(
         &render_manifest,

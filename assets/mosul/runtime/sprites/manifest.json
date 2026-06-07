@@ -105,6 +105,22 @@
         ]
       }
     },
+    "civilians_128": {
+      "kind": "civilian",
+      "pixel_size": [128, 128],
+      "states": ["standing", "wounded", "dead"],
+      "factions": {
+        "civilian": [
+          { "id": "old_man", "display_name": "Old civilian man" },
+          { "id": "old_woman", "display_name": "Old civilian woman" },
+          { "id": "adult_woman", "display_name": "Civilian woman" },
+          { "id": "teenage_boy", "display_name": "Teenage civilian boy" },
+          { "id": "teenage_girl", "display_name": "Teenage civilian girl" },
+          { "id": "young_girl", "display_name": "Young civilian girl" },
+          { "id": "young_boy", "display_name": "Young civilian boy" }
+        ]
+      }
+    },
     "weapons_128": {
       "kind": "weapon",
       "pixel_size": [128, 128],

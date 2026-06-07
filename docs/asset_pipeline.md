@@ -43,9 +43,10 @@ The full imported render-pipeline manifests are loaded and validated by the C as
 - `assets/mosul/runtime/sprites/manifest.json`
 - `assets/mosul/runtime/sprites/rendered/render_manifest.json`
 
-The current runtime sprite set contains 896 PNGs, and tests assert that every render-manifest path exists:
+The current runtime sprite set contains 1,064 PNGs, and tests assert that every render-manifest path exists:
 
 - 640 infantry sprites: 16 demo roles x 5 states x 8 facings.
+- 168 civilian sprites: 7 civilian archetypes x 3 states x 8 facings.
 - 64 weapon sprites: 8 weapon types x 8 facings.
 - 192 vehicle sprites: 8 vehicle types x 3 damage states x 8 facings.
 

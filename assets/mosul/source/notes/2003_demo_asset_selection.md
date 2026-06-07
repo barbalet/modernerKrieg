@@ -13,6 +13,7 @@ Included source groups:
 - `line_art/`: Mosul context, combatant, weapon, vehicle, tactics, and U.S.-aligned reference plates relevant to the 2003 demo art direction.
 - `sprite_sheets/`: 128 px tactical sheets for combatants, movement stances, U.S.-aligned troops, vehicles, and weapons.
 - `sprite_sheets/source_angles/infantry_128/`: three approved source angles for all 16 demo infantry roles across standing, crouch, prone, wounded, and dead states.
+- `sprite_sheets/source_angles/civilians_128/`: three approved source angles for seven civilian archetypes across standing, wounded, and dead states.
 - `sprite_sheets/source_angles/weapons_128/`: three approved source angles for 128 px weapon sprites.
 - `sprite_sheets/source_angles/vehicles_1024/`: three approved source angles for 1024 px vehicle sprites across intact, damaged, and destroyed states.
 - `maps/market_commercial_streets_demo_2003/`: the 2003 Market / Commercial Streets line-art minimap, multistorey line-art overview, previews, unmodified layer manifest, and renderer/source map layers.

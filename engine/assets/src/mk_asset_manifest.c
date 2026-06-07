@@ -585,7 +585,9 @@ static bool mk_asset_sprite_render_entry_is_valid(
         return false;
     }
 
-    if (strcmp(entry->kind, "infantry") == 0 || strcmp(entry->kind, "vehicle") == 0) {
+    if (strcmp(entry->kind, "infantry") == 0
+        || strcmp(entry->kind, "civilian") == 0
+        || strcmp(entry->kind, "vehicle") == 0) {
         return entry->state[0] != '\0' && entry->faction[0] != '\0';
     }
 
@@ -736,6 +738,7 @@ mk_result_t mk_asset_load_sprite_manifest(
         || !mk_asset_optional_path(&entries, "runtime_render_manifest", project_root, true, out_manifest->runtime_render_manifest, sizeof(out_manifest->runtime_render_manifest))
         || !mk_asset_optional_count(&entries, "runtime_rendered_count", &out_manifest->runtime_rendered_count)
         || !mk_asset_optional_count(&entries, "runtime_infantry_count", &out_manifest->runtime_infantry_count)
+        || !mk_asset_optional_count(&entries, "runtime_civilian_count", &out_manifest->runtime_civilian_count)
         || !mk_asset_optional_count(&entries, "runtime_weapon_count", &out_manifest->runtime_weapon_count)
         || !mk_asset_optional_count(&entries, "runtime_vehicle_count", &out_manifest->runtime_vehicle_count)
         || out_manifest->runtime_rendered_count > MK_ASSET_MAX_SPRITE_RENDER_ENTRIES) {
@@ -944,6 +947,8 @@ mk_result_t mk_asset_load_sprite_render_manifest(
 
         if (strcmp(entry->kind, "infantry") == 0) {
             out_manifest->infantry_count += 1;
+        } else if (strcmp(entry->kind, "civilian") == 0) {
+            out_manifest->civilian_count += 1;
         } else if (strcmp(entry->kind, "weapon") == 0) {
             out_manifest->weapon_count += 1;
         } else if (strcmp(entry->kind, "vehicle") == 0) {

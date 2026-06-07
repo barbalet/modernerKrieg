@@ -169,8 +169,8 @@ The public MOSUL demo target is the 2003 Market / Commercial Streets scenario: a
 - line-art map previews and multi-storey source layers
 - Market / Commercial Streets ground, upper-floor, roof-access, multistorey-mask, preview, and layer-manifest files
 - 128 px top-down combatant, stance, vehicle, and weapon sheets
-- complete source-angle infantry, weapon, and vehicle sprites
-- 896 rendered runtime-facing PNGs under `assets/mosul/runtime/sprites/rendered`
+- complete source-angle infantry, civilian, weapon, and vehicle sprites
+- 1,064 rendered runtime-facing PNGs under `assets/mosul/runtime/sprites/rendered`
 - JSON sprite pipeline manifests under `assets/mosul/runtime/sprites/`, validated by the C asset loader
 - reference plates for combatants, weapons, vehicles, and urban tactics
 

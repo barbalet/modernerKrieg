@@ -14,7 +14,7 @@ extern "C" {
 #define MK_ASSET_MAX_MAP_LAYERS 16
 #define MK_ASSET_MAX_SPRITE_SHEETS 16
 #define MK_ASSET_MAX_SPRITE_FRAMES 128
-#define MK_ASSET_MAX_SPRITE_RENDER_ENTRIES 1024
+#define MK_ASSET_MAX_SPRITE_RENDER_ENTRIES 2048
 #define MK_ASSET_MAX_MARKERS 64
 
 typedef struct {
@@ -74,6 +74,7 @@ typedef struct {
     char runtime_render_manifest[MK_ASSET_PATH_CAPACITY];
     size_t runtime_rendered_count;
     size_t runtime_infantry_count;
+    size_t runtime_civilian_count;
     size_t runtime_weapon_count;
     size_t runtime_vehicle_count;
     size_t sheet_count;
@@ -98,6 +99,7 @@ typedef struct {
     size_t missing_source_count;
     size_t error_count;
     size_t infantry_count;
+    size_t civilian_count;
     size_t weapon_count;
     size_t vehicle_count;
     mk_asset_sprite_render_entry_t rendered[MK_ASSET_MAX_SPRITE_RENDER_ENTRIES];

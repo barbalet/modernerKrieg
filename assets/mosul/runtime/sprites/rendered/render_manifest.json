@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "source_manifest": "assets/mosul/runtime/sprites/manifest.json",
-  "rendered_count": 896,
+  "rendered_count": 1064,
   "missing_source_count": 0,
   "error_count": 0,
   "rendered": [
@@ -5123,6 +5123,1350 @@
       "item_id": "armed_looter",
       "state": "dead",
       "faction": "opposing",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/standing/north.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/standing/south.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/standing/east.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/standing/west.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/standing/north_east.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/standing/north_west.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/standing/south_east.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/standing/south_west.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/wounded/north.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/wounded/south.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/wounded/east.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/wounded/west.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/wounded/north_east.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/wounded/north_west.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/wounded/south_east.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/wounded/south_west.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/dead/north.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/dead/south.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/dead/east.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/dead/west.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/dead/north_east.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/dead/north_west.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/dead/south_east.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/dead/south_west.png",
+      "kind": "civilian",
+      "item_id": "old_man",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/standing/north.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/standing/south.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/standing/east.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/standing/west.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/standing/north_east.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/standing/north_west.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/standing/south_east.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/standing/south_west.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/wounded/north.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/wounded/south.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/wounded/east.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/wounded/west.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/wounded/north_east.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/wounded/north_west.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/wounded/south_east.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/wounded/south_west.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/dead/north.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/dead/south.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/dead/east.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/dead/west.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/dead/north_east.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/dead/north_west.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/dead/south_east.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_woman/dead/south_west.png",
+      "kind": "civilian",
+      "item_id": "old_woman",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/standing/north.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/standing/south.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/standing/east.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/standing/west.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/standing/north_east.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/standing/north_west.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/standing/south_east.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/standing/south_west.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/wounded/north.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/wounded/south.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/wounded/east.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/wounded/west.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/wounded/north_east.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/wounded/north_west.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/wounded/south_east.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/wounded/south_west.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/dead/north.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/dead/south.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/dead/east.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/dead/west.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/dead/north_east.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/dead/north_west.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/dead/south_east.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/adult_woman/dead/south_west.png",
+      "kind": "civilian",
+      "item_id": "adult_woman",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/standing/north.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/standing/south.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/standing/east.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/standing/west.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/standing/north_east.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/standing/north_west.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/standing/south_east.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/standing/south_west.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/wounded/north.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/wounded/south.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/wounded/east.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/wounded/west.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/wounded/north_east.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/wounded/north_west.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/wounded/south_east.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/wounded/south_west.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/dead/north.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/dead/south.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/dead/east.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/dead/west.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/dead/north_east.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/dead/north_west.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/dead/south_east.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_boy/dead/south_west.png",
+      "kind": "civilian",
+      "item_id": "teenage_boy",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/standing/north.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/standing/south.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/standing/east.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/standing/west.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/standing/north_east.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/standing/north_west.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/standing/south_east.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/standing/south_west.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/wounded/north.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/wounded/south.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/wounded/east.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/wounded/west.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/wounded/north_east.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/wounded/north_west.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/wounded/south_east.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/wounded/south_west.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/dead/north.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/dead/south.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/dead/east.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/dead/west.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/dead/north_east.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/dead/north_west.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/dead/south_east.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/teenage_girl/dead/south_west.png",
+      "kind": "civilian",
+      "item_id": "teenage_girl",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/standing/north.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/standing/south.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/standing/east.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/standing/west.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/standing/north_east.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/standing/north_west.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/standing/south_east.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/standing/south_west.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/wounded/north.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/wounded/south.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/wounded/east.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/wounded/west.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/wounded/north_east.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/wounded/north_west.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/wounded/south_east.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/wounded/south_west.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/dead/north.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/dead/south.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/dead/east.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/dead/west.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/dead/north_east.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/dead/north_west.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/dead/south_east.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_girl/dead/south_west.png",
+      "kind": "civilian",
+      "item_id": "young_girl",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/standing/north.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/standing/south.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/standing/east.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/standing/west.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/standing/north_east.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/standing/north_west.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/standing/south_east.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/standing/south_west.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "standing",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/wounded/north.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/wounded/south.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/wounded/east.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/wounded/west.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/wounded/north_east.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/wounded/north_west.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/wounded/south_east.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/wounded/south_west.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "wounded",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/dead/north.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/dead/south.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/dead/east.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/dead/west.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/dead/north_east.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/dead/north_west.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/dead/south_east.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "dead",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/civilians_128/civilian/young_boy/dead/south_west.png",
+      "kind": "civilian",
+      "item_id": "young_boy",
+      "state": "dead",
+      "faction": "civilian",
       "angle": "south_west"
     },
     {

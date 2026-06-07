@@ -20,7 +20,7 @@ The first public target is the 2003 Market / Commercial Streets demo. `derZweite
 - The SDL prototype has been removed after evaluation. No SDL app target, SDL package target, or SDL development dependency remains in the active build.
 - The next launchable interfaces should be platform-native shells over the same C libraries: a Mac frontend first, then a Windows frontend.
 - Source art for the 2003 demo is imported under `assets/mosul/source/`.
-- Public source art includes line-art references, 128 px top-down sprite sheets, source-angle weapon sprites, and Market / Commercial Streets map/layer assets.
+- Public source art includes line-art references, 128 px top-down sprite sheets, source-angle civilian/weapon sprites, and Market / Commercial Streets map/layer assets.
 - The first 100-cycle public-demo plan is complete; remaining work is now final art replacement, deeper interaction rules, cross-platform packaging validation, and playtesting.
 
 ## Runtime Shape
@@ -102,11 +102,12 @@ Current source asset groups:
 - `assets/mosul/source/line_art/`: Mosul context, combatant, weapon, vehicle, and urban tactics plates.
 - `assets/mosul/source/sprite_sheets/`: 128 px combatant, stance, vehicle, and weapon source sheets.
 - `assets/mosul/source/sprite_sheets/source_angles/infantry_128/`: approved source-angle infantry PNGs for 16 demo roles across standing, crouch, prone, wounded, and dead states.
+- `assets/mosul/source/sprite_sheets/source_angles/civilians_128/`: approved source-angle civilian PNGs for 7 archetypes across standing, wounded, and dead states.
 - `assets/mosul/source/sprite_sheets/source_angles/weapons_128/`: approved source-angle weapon PNGs.
 - `assets/mosul/source/sprite_sheets/source_angles/vehicles_1024/`: approved source-angle vehicle PNGs across intact, damaged, and destroyed states.
 - `assets/mosul/source/maps/market_commercial_streets_demo_2003/`: Market / Commercial Streets map previews, layer manifest, and source map layers.
 - `assets/mosul/source/notes/`: provenance and demo asset selection notes.
-- `assets/mosul/runtime/sprites/rendered/`: generated runtime-facing sprites, currently 896 PNGs.
+- `assets/mosul/runtime/sprites/rendered/`: generated runtime-facing sprites, currently 1,064 PNGs.
 
 Immediate asset work:
 
@@ -118,7 +119,6 @@ Immediate asset work:
 
 Additional art probably needed for the first demo:
 
-- civilian/non-combatant top-down sprites
 - order and status UI icons
 - hidden-contact and suspected-danger markers
 - breach, search/cache, checkpoint, rooftop, stair, and blocked-route markers
