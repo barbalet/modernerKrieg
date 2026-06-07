@@ -9,33 +9,21 @@
     {
       "name": "default",
       "displayName": "Default",
-      "description": "Configure the core, tests, headless runner, and optional SDL3 app.",
+      "description": "Configure the portable core, tests, headless runner, AI battle runner, and replay tools.",
       "binaryDir": "${sourceDir}/build/default",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "MK_BUILD_TESTS": "ON",
-        "MK_BUILD_SDL_APP": "ON"
-      }
-    },
-    {
-      "name": "default-arm64",
-      "displayName": "Default Apple Silicon",
-      "description": "Configure the SDL-enabled default build for arm64 Homebrew SDL3 libraries.",
-      "inherits": "default",
-      "binaryDir": "${sourceDir}/build/default-arm64",
-      "cacheVariables": {
-        "CMAKE_OSX_ARCHITECTURES": "arm64"
+        "MK_BUILD_TESTS": "ON"
       }
     },
     {
       "name": "headless",
       "displayName": "Headless",
-      "description": "Configure the portable core, tests, and headless runner without SDL3.",
+      "description": "Configure the portable core, tests, and headless runner.",
       "binaryDir": "${sourceDir}/build/headless",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "MK_BUILD_TESTS": "ON",
-        "MK_BUILD_SDL_APP": "OFF"
+        "MK_BUILD_TESTS": "ON"
       }
     },
     {
@@ -46,7 +34,6 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "MK_BUILD_TESTS": "ON",
-        "MK_BUILD_SDL_APP": "OFF",
         "MK_WARNINGS_AS_ERRORS": "ON"
       }
     }
@@ -55,10 +42,6 @@
     {
       "name": "default",
       "configurePreset": "default"
-    },
-    {
-      "name": "default-arm64",
-      "configurePreset": "default-arm64"
     },
     {
       "name": "headless",
@@ -73,13 +56,6 @@
     {
       "name": "default",
       "configurePreset": "default",
-      "output": {
-        "outputOnFailure": true
-      }
-    },
-    {
-      "name": "default-arm64",
-      "configurePreset": "default-arm64",
       "output": {
         "outputOnFailure": true
       }

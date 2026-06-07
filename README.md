@@ -2,7 +2,7 @@
 
 `modernerKrieg` is a portable tactical wargame engine for the MOSUL public demo.
 
-The project starts fresh as an SDL3 + CMake codebase. `derZweiteWeltkrieg` remains a design reference for deterministic tactical rules and engine layering, but this repository is not a submodule consumer or direct dependency.
+The project starts fresh as a portable C + CMake engine with native Mac and Windows frontends planned above it. `derZweiteWeltkrieg` remains a design reference for deterministic tactical rules and engine layering, but this repository is not a submodule consumer or direct dependency.
 
 ## Current Shape
 
@@ -10,7 +10,6 @@ The project starts fresh as an SDL3 + CMake codebase. `derZweiteWeltkrieg` remai
 - `engine/render/` contains renderer-independent board-view, pan/zoom, and marker projection code.
 - `engine/assets/` contains manifest parsing and validation for map, sprite, and marker metadata.
 - `engine/ai/` contains controller policies that emit normal core orders.
-- `engine/platform/sdl3/` contains the optional SDL3 app shell with PNG-backed map/sprite loading, tactical overlays, briefing/status/AAR panels, and smoke-frame launch controls.
 - `engine/tools/autoplay/` contains deterministic headless run, replay validation/playback, and AI-vs-AI battle tools.
 - `game/mosul/` contains Mosul-specific scenario/content code built above the reusable core.
 - `tests/autoplay/` contains fixed-step/headless runner tests.
@@ -144,36 +143,7 @@ Add simple balance expectations to fail a headless run when the expected state i
   --quiet
 ```
 
-The SDL3 app target is provisional. If SDL3 proves workable for the game feel and deployment path, it will be used. If not, the contingency is a new SwiftUI GUI over the same tactical model. The SDL3 target is enabled automatically when CMake can find SDL3. If SDL3 is installed in a custom prefix, pass its CMake package location:
-
-```sh
-cmake -S . -B build -DSDL3_DIR=/path/to/sdl3/lib/cmake/SDL3
-cmake --build build
-```
-
-On Apple Silicon with Homebrew SDL3, use the arm64 preset:
-
-```sh
-cmake --preset default-arm64
-cmake --build --preset default-arm64
-ctest --preset default-arm64
-```
-
-Run the SDL shell for a deterministic smoke check without opening a normal app session:
-
-```sh
-SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software ./build/default-arm64/bin/modernerKrieg --project-root . --ai-only --smoke-frames 2
-```
-
-Build a macOS-first smoke-tested package folder and zip:
-
-```sh
-cmake --build --preset default-arm64 --target modernerKrieg_macos_smoke_package
-```
-
-The package target writes `build/default-arm64/package/modernerKrieg-macos-smoke/` and `build/default-arm64/package/modernerKrieg-macos-smoke.zip`. The copied package is smoke-tested with its own asset/scenario layout before the archive is created.
-
-If SDL3 is not available, CMake still builds the portable core and tests.
+The previous SDL experiment has been removed. The launchable interfaces should now be platform-native shells over the same C libraries: a Mac frontend first, then a Windows frontend, with the command-line tools remaining the deterministic test and debugging surface.
 
 ## Xcode AI Battles
 
@@ -183,7 +153,7 @@ The checked-in Xcode command-line project is:
 modernerKriegAIBattles.xcodeproj
 ```
 
-Open it in Xcode and run the shared `mk_ai_battle` scheme to build the portable C core, asset parser, AI, renderer helper, Mosul scenario loader, and AI battle runner without SDL. The scheme runs the five-seed AI-vs-AI balance check by default, prints regular battle summaries plus watchdog stall reports, and exits nonzero when settlement, stall, or worst-score expectations are not met.
+Open it in Xcode and run the shared `mk_ai_battle` scheme to build the portable C core, asset parser, AI, renderer helper, Mosul scenario loader, and AI battle runner. The scheme runs the five-seed AI-vs-AI balance check by default, prints regular battle summaries plus watchdog stall reports, and exits nonzero when settlement, stall, or worst-score expectations are not met.
 Battles stop once they reach a success or partial outcome; pass `--keep-running-after-outcome` for longer soak runs that should keep checking for late tactical stalls.
 
 You can also build it from Terminal:
@@ -216,7 +186,7 @@ CTest validates those files and rejects broken references.
 
 ## Interaction
 
-The core now supports deterministic board interaction without depending on SDL:
+The core now supports deterministic board interaction without depending on a platform frontend:
 
 - pick a unit at a map coordinate
 - select or clear a selected unit
@@ -224,7 +194,7 @@ The core now supports deterministic board interaction without depending on SDL:
 - issue investigate orders toward unresolved suspected or false contacts
 - issue withdraw orders through AI when units are pinned or heavily suppressed
 - issue a move order and advance toward the target on each simulation tick
-- run the same fixed-step loop from the SDL app or a headless command-line runner
+- run the same fixed-step loop from native frontends or a headless command-line runner
 - load scenario state with controllers, forces, civilians, map tiles, terrain zones, objectives, and units
 - trace line of sight between map positions or units
 - report blocking terrain and target cover
@@ -245,15 +215,13 @@ The core now supports deterministic board interaction without depending on SDL:
 - pan and zoom a board view
 - project terrain, objectives, units, and soldier offsets into screen space
 - project tactical overlays for selection, movement, fire, suppression, hidden contacts, suspected/false contacts, casualties, objectives, objective control, civilian risk, and visible unit order status
-- validate map, sprite, and marker manifests without SDL
+- validate map, sprite, and marker manifests from portable C
 - load the 2003 scenario from data with parser-side and core-side validation
 - run a selected scenario through the headless tool with seed, tick-count, quiet, and transcript controls
 - run player and opposing tactical controllers as deterministic AI-only headless runs with move, investigate, overwatch, suppress, hold, civilian-risk restraint, and withdraw choices
-- hand map, sprite, and marker manifests to the SDL app, which can load PNGs when SDL3_image is available, draw compact HUD plus briefing/status/AAR panels, render order-status and interaction-zone glyphs, and fall back otherwise
+- hand map, sprite, and marker manifests to platform frontends for PNG-backed map, unit, marker, HUD, briefing, status, and AAR presentation
 
-The first 100-cycle plan is complete. Next work should focus on final art replacement, deeper search/breach/rooftop rules, and Windows/Linux packaging validation.
-
-When the SDL3 app target is available, left-click selects a unit, right-click gives the selected unit a move order, right-clicking a suspected/false contact gives an investigate order, arrow keys pan the board, and plus/minus zoom the board. Pass `--ai-only` to watch both tactical sides play the scenario.
+The first 100-cycle plan is complete. Next work should focus on final art replacement, deeper search/breach/rooftop rules, a native Mac frontend, a native Windows frontend, and platform packaging validation.
 
 ## Design Intent
 

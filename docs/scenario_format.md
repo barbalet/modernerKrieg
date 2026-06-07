@@ -57,7 +57,7 @@ CTest covers the default 2003 data file, fixture parity, objective labels, brief
 
 ## Interaction Terrain
 
-Terrain zones can carry first-pass interaction affordances before final interaction art and rules are complete. The SDL shell projects these zones through the marker manifest:
+Terrain zones can carry first-pass interaction affordances before final interaction art and rules are complete. Frontends project these zones through the marker manifest:
 
 - `breach_point`: breach/search affordance at a door, shopfront, gate, or wall segment.
 - `rooftop`: rooftop or stair access affordance.

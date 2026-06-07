@@ -16,9 +16,9 @@ The first public target is the 2003 Market / Commercial Streets demo. `derZweite
 - The 2003 Market / Commercial Streets scenario now loads from a validated `.mkscenario` data file, with a C fixture retained for parity tests.
 - `mk_headless_run` can load an explicit scenario path, override the seed, run for a fixed tick budget, suppress console output, write a transcript with contact/risk counters, briefing, debug lines, versioned replay/event files, balance expectations, and after-action output, and run both non-civilian tactical sides under basic AI.
 - `mk_replay_validate` can validate versioned `.mkreplay` event files, assert final result/outcome fields, and print compact tick-range playback summaries.
-- The SDL app can read the map, sprite, and marker manifests and, when SDL3_image is available, load the manifest PNG assets; otherwise it keeps fallback map/unit/overlay rendering. It now draws a compact score/objective/risk HUD, mission/status/AAR panels, order-status and interaction-zone glyphs, supports deterministic smoke-frame runs, and can watch both tactical sides under AI.
 - The first runtime map overview exists at `assets/mosul/runtime/maps/market_commercial_streets_2003/overview.png`.
-- The SDL3 app shell is optional and experimental. If SDL3 is available, it provides the current launchable app path; if not, the core and tests still build.
+- The SDL prototype has been removed after evaluation. No SDL app target, SDL package target, or SDL development dependency remains in the active build.
+- The next launchable interfaces should be platform-native shells over the same C libraries: a Mac frontend first, then a Windows frontend.
 - Source art for the 2003 demo is imported under `assets/mosul/source/`.
 - Public source art includes line-art references, 128 px top-down sprite sheets, source-angle weapon sprites, and Market / Commercial Streets map/layer assets.
 - The first 100-cycle public-demo plan is complete; remaining work is now final art replacement, deeper interaction rules, cross-platform packaging validation, and playtesting.
@@ -31,7 +31,7 @@ The playable app should behave primarily as a PNG loader and renderer with gamep
 - Render the map as image layers or generated tiles, not as colored terrain rectangles.
 - Render units from sprite metadata, facing, role, side, stance, casualty state, and selection state.
 - Render tactical overlays for orders, routes, line of sight, objectives, suppression, hidden contacts, civilian risk, breach/search points, and rooftop access.
-- Keep SDL/SwiftUI/frontend code as presentation and input handling only.
+- Keep native frontend code as presentation and input handling only.
 - Keep rules, scenario state, combat, AI, and scoring in portable C.
 
 This separation keeps the first app simple: art on screen, gameplay in the core, and a thin bridge between them.
@@ -75,7 +75,6 @@ modernerKrieg/
     ai/             controller policies that emit core orders
     core/           portable rules and state
     render/         renderer-independent board projection
-    platform/sdl3/  optional SDL3 app shell
     tools/
       autoplay/     headless runs, future AI-vs-AI batches
       assets/       asset/scenario validation and generation
@@ -92,7 +91,7 @@ modernerKrieg/
     assets/
 ```
 
-`engine/core` must not depend on SDL, graphics APIs, operating-system UI, or Mosul-specific art files. The Mosul game module can depend on the engine. The app/frontend can depend on both.
+`engine/core` must not depend on frontend frameworks, graphics APIs, operating-system UI, or Mosul-specific art files. The Mosul game module can depend on the engine. The app/frontend can depend on both.
 
 ## Asset Pipeline
 
@@ -163,20 +162,21 @@ The demo should prove the modern urban problem before broadening scope.
 
 ## Frontend Choice
 
-SDL3 remains the fastest way to validate a cross-platform runtime, but it is still a choice, not an identity.
+The SDL experiment is closed. The engine should now favor platform-native presentation while preserving a shared C simulation, asset, render-projection, AI, replay, and validation core.
 
-- Keep building and testing the SDL3 app if SDL3 is available.
-- Keep the C core portable enough for a SwiftUI frontend if SDL3 does not produce the desired feel.
+- Build the Mac frontend as the first platform-native interface over the existing C libraries.
+- Build the Windows frontend against the same C-facing contracts rather than forking gameplay logic.
+- Keep command-line AI battles, replay validation, and CTest as the fastest diagnostic surface.
 - Do not put rules, scenario decisions, or asset interpretation exclusively in frontend code.
 
 ## Completed Foundation
 
 The following baseline work is complete and should be preserved while the plan pivots to PNG-backed public-demo work:
 
-- Milestone 0 skeleton: CMake, optional SDL3 app shell, headless runner, fixed-step loop, test helper layer, build presets, CI notes, asset folder stubs, core-no-SDL smoke test, and architecture/third-party docs.
+- Milestone 0 skeleton: CMake, an experimental app shell since removed, headless runner, fixed-step loop, test helper layer, build presets, CI notes, asset folder stubs, core/frontend-boundary smoke test, and architecture/third-party docs.
 - Milestone 1 core-state first half: stable containers for controllers, forces, command identities, terrain tiles, civilians, units, soldiers, weapons, objectives, snapshots, scenario loading, and validation.
-- Asset/data foundation pass: source-safe asset pipeline docs, map manifest, sprite manifest, manifest parser/validator, manifest CTests, SDL manifest handoff, and 2003 scenario entry point.
-- Current tests cover deterministic RNG, scenario loading, scenario data validation, snapshots, movement, LOS, firing, suppression, board-view transforms, fixed-step runs, asset manifests, and the core/SDL boundary.
+- Asset/data foundation pass: source-safe asset pipeline docs, map manifest, sprite manifest, manifest parser/validator, manifest CTests, frontend manifest handoff, and 2003 scenario entry point.
+- Current tests cover deterministic RNG, scenario loading, scenario data validation, snapshots, movement, LOS, firing, suppression, board-view transforms, fixed-step runs, asset manifests, and the portable-core boundary.
 
 ## Development Cycle Ledger
 
@@ -206,23 +206,25 @@ When a development batch is completed, increment `Completed cycles in this ledge
 | 2026-06-07 | 90 | 90 | 10 | Milestone E / Replay Playback + Seed Sweeps | Added `.mkreplay` tick-range playback summaries, replay playback CTest coverage, AI battle seed-step sweeps, batch settlement/stall/worst-score expectations, a deterministic five-seed AI-only balance CTest, and matching Xcode scheme launch arguments. Verified direct seed sweep expectations, replay playback, default-arm64 CTest, strict warning-as-error CTest, and Xcode project build. |
 | 2026-06-07 | 100 | 100 | 0 | Milestone E / Interaction Data + Package | Added first-pass breach/search, cache/search, and rooftop/stair terrain zones; renderer-independent interaction-zone overlays; SDL mission/status/AAR panels; SDL `--project-root`, `--scenario`, and `--ai-only` launch controls; an SDL smoke CTest using the new controls; and a macOS smoke-tested package target. Verified direct SDL AI-only smoke, package creation, default-arm64 CTest, strict warning-as-error CTest, and package smoke. |
 
+Historical ledger rows can mention the removed SDL experiment. Current and future development should use native frontends over the portable C core.
+
 ## Milestones
 
 ### Milestone A: PNG Map On Screen
 
 - Complete: add map asset metadata.
 - Complete: load a Market / Commercial Streets PNG map source or generated runtime image.
-- Complete: render it through the current board view with pan/zoom when SDL3/SDL3_image is available, with fallback rendering otherwise.
+- Complete: project it through the current board view with pan/zoom data for native frontends.
 - Complete: preserve map-to-screen and screen-to-map picking.
 - Keep headless tests passing.
 
 ### Milestone B: Real Unit Sprites
 
 - Complete: add sprite metadata for the first U.S. patrol and one opposing cell.
-- Complete: render unit sprites from role/side/state when SDL3_image is available.
+- Complete: expose unit sprite choices from role/side/state for frontend rendering.
 - Complete: render selection rings, movement targets, order lines, suppression, casualty, objective, and civilian-risk overlays from renderer-independent data.
 - Complete: render visible unit order-status glyphs from renderer-independent overlay data.
-- Complete: add fallback markers for missing sprite assets or unavailable SDL3_image.
+- Complete: add fallback markers for missing sprite assets or unavailable image backends.
 - Continue: add finalized sprite art and packed runtime atlases when the art pass settles.
 
 ### Milestone C: 2003 Scenario Data
@@ -252,21 +254,22 @@ When a development batch is completed, increment `Completed cycles in this ledge
 - Complete: add first player-facing investigate command affordance for suspected and false contacts.
 - Complete: add replay validation tooling and invalid-replay coverage for versioned replay/event files.
 - Complete: add first contested-objective and civilian-risk AI-only balance smoke coverage.
-- Complete: add first SDL score/objective/risk HUD, order-status glyphs, and dummy-video SDL smoke test.
+- Complete: add first score/objective/risk HUD, order-status glyphs, and app smoke-test prototype during the SDL evaluation.
 - Complete: add replay playback for versioned `.mkreplay` event files.
 - Complete: broaden AI-only balance coverage into seed sweeps with batch summary expectations.
 - Complete: add scenario data for first-pass breach/search, cache/search, and rooftop/stair access points.
-- Complete: add player-facing briefing and after-action UI presentation inside the SDL shell.
-- Complete: package one macOS-first smoke-tested build.
+- Complete: add player-facing briefing and after-action UI presentation during the SDL evaluation.
+- Complete: package one macOS-first smoke-tested prototype before the SDL path was retired.
 - Complete: document how to build, run, test, and package the current runtime assets.
 
 ## Post-Plan Next Steps
 
 1. Replace provisional source art with the uniform art pass and regenerate runtime products.
 2. Deepen breach/search/cache/rooftop affordances into rules, commands, AI choices, and AAR scoring.
-3. Validate packaging on Windows and Linux in addition to the macOS smoke package.
-4. Add a new post-plan cycle ledger for playtest, usability, and deployment work.
-5. Keep all manifest/scenario/render/AI changes covered by CTest, including missing asset and invalid-reference failures.
+3. Build a native Mac frontend over the portable C contracts and use it to replace the retired SDL launch path.
+4. Build a native Windows frontend against the same contracts.
+5. Add a new post-plan cycle ledger for playtest, usability, and deployment work.
+6. Keep all manifest/scenario/render/AI changes covered by CTest, including missing asset and invalid-reference failures.
 
 ## Quality Bar
 

@@ -12,7 +12,6 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
 option(MK_BUILD_TESTS "Build modernerKrieg headless tests" ON)
-option(MK_BUILD_SDL_APP "Build the SDL3 application when SDL3 is available" ON)
 option(MK_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
@@ -255,60 +254,9 @@ if(MK_BUILD_TESTS)
       --expect-min-score -40
   )
   add_test(
-    NAME mk_core_no_sdl_headers
+    NAME mk_core_no_platform_headers
     COMMAND ${CMAKE_COMMAND}
       -DMK_PROJECT_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
-      -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckCoreNoSDL.cmake
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckCoreNoPlatformHeaders.cmake
   )
-endif()
-
-if(MK_BUILD_SDL_APP)
-  find_package(SDL3 CONFIG QUIET)
-
-  if(SDL3_FOUND)
-    add_executable(modernerKrieg
-      engine/platform/sdl3/main.c
-    )
-    target_link_libraries(modernerKrieg PRIVATE modernerKriegAi modernerKriegRender modernerKriegMosul SDL3::SDL3)
-    target_compile_definitions(modernerKrieg
-      PRIVATE
-        MK_PROJECT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
-    )
-
-    find_package(SDL3_image CONFIG QUIET)
-    if(SDL3_image_FOUND)
-      target_link_libraries(modernerKrieg PRIVATE SDL3_image::SDL3_image)
-      target_compile_definitions(modernerKrieg PRIVATE MK_HAS_SDL3_IMAGE=1)
-    else()
-      message(STATUS "SDL3_image was not found; the SDL app will use the manifest-driven fallback map renderer.")
-    endif()
-
-    mk_apply_warnings(modernerKrieg)
-
-    if(MK_BUILD_TESTS)
-      add_test(
-        NAME modernerKrieg_sdl_smoke
-        COMMAND modernerKrieg --project-root ${CMAKE_CURRENT_SOURCE_DIR} --ai-only --smoke-frames 2
-      )
-      set_tests_properties(
-        modernerKrieg_sdl_smoke
-        PROPERTIES
-          ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software"
-      )
-    endif()
-
-    add_custom_target(
-      modernerKrieg_macos_smoke_package
-      COMMAND ${CMAKE_COMMAND}
-        -DMK_APP=$<TARGET_FILE:modernerKrieg>
-        -DMK_PROJECT_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
-        -DMK_PACKAGE_ROOT=${CMAKE_CURRENT_BINARY_DIR}/package
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/PackageMacSmoke.cmake
-      DEPENDS modernerKrieg
-      COMMENT "Creating smoke-tested macOS SDL package"
-    )
-  else()
-    message(STATUS "SDL3 was not found; skipping the modernerKrieg SDL app target.")
-    message(STATUS "Install SDL3 or set SDL3_DIR to enable the app target.")
-  endif()
 endif()

@@ -1,6 +1,6 @@
 # Build Matrix
 
-The skeleton should remain buildable without SDL3. SDL3 enables the windowed app, but the portable core, tests, and headless runner must continue to work on their own.
+The portable core, tests, headless runner, AI battle runner, replay tools, and renderer-independent projection layer should remain buildable without any platform UI dependency. Native Mac and Windows frontends should sit above these targets.
 
 ## Local Presets
 
@@ -19,35 +19,13 @@ cmake --build --preset strict
 ctest --preset strict
 ```
 
-Use the default preset when SDL3 is available or when checking that the app target skips cleanly:
+Use the default preset for the ordinary portable C build:
 
 ```sh
 cmake --preset default
 cmake --build --preset default
 ctest --preset default
 ```
-
-On Apple Silicon with Homebrew SDL3, prefer the arm64 default preset:
-
-```sh
-cmake --preset default-arm64
-cmake --build --preset default-arm64
-ctest --preset default-arm64
-```
-
-The SDL app has a deterministic smoke mode:
-
-```sh
-SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software ./build/default-arm64/bin/modernerKrieg --project-root . --ai-only --smoke-frames 2
-```
-
-Create the current macOS-first smoke-tested package:
-
-```sh
-cmake --build --preset default-arm64 --target modernerKrieg_macos_smoke_package
-```
-
-The package target copies the SDL binary, scenario file, manifests, and the referenced PNG assets into `build/default-arm64/package/modernerKrieg-macos-smoke/`, smoke-tests that copied layout with dummy video, and writes `build/default-arm64/package/modernerKrieg-macos-smoke.zip`.
 
 Run repeated AI-vs-AI battles from CMake:
 
@@ -82,9 +60,9 @@ The shared Xcode scheme launches with the five-seed balance arguments enabled, s
 
 ## Platform Notes
 
-- macOS: install CMake and optionally SDL3 through Homebrew. The headless preset should work without SDL3. On Apple Silicon, Homebrew SDL libraries are arm64, so use `default-arm64` for the SDL-enabled CMake app build. The `modernerKriegAIBattles.xcodeproj` project builds a command-line AI battle runner directly in Xcode without SDL.
-- Windows: use a C compiler supported by CMake, such as MSVC. SDL3 should provide `SDL3Config.cmake` or be passed through `SDL3_DIR`.
-- Linux: install CMake, a C compiler, and optionally SDL3 development packages that provide the CMake config file.
+- macOS: install CMake and use the checked-in `modernerKriegAIBattles.xcodeproj` project for the command-line AI battle runner. The native Mac frontend should link the same portable C libraries when it is added.
+- Windows: use a C compiler supported by CMake, such as MSVC. The native Windows frontend should link the same portable C libraries when it is added.
+- Linux: install CMake and a C compiler for headless/autoplay validation. A Linux presentation layer is not part of the current native frontend pivot.
 
 ## CI Smoke Checks
 
