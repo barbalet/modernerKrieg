@@ -24,6 +24,22 @@ Map manifests describe authored map art before it becomes gameplay terrain. They
 
 The first map target is the 2003 Market / Commercial Streets demo, using the imported 7000 px map source layers.
 
+## Building Level Manifests
+
+The 2003 demo now has a C-validated building-level JSON manifest:
+
+- `assets/mosul/manifests/market_commercial_streets_2003_building_levels.json`
+
+It links the runtime floor PNG stack to gameplay geometry:
+
+- four 7,000 px line-art PNGs under `assets/mosul/runtime/maps/market_commercial_streets_2003/levels/`
+- per-level PNG path, alpha mode, elevation, and default LOS/movement behavior
+- explicit feature rectangles for walls, doors, windows, breach holes, stairs, and roof edges
+- explicit `blocks_los`, `blocks_movement`, `allows_los`, and `allows_movement` booleans
+- building regions with storey counts and roof-level IDs
+
+One-storey buildings should still appear on level 2 as roofs. They should have no authored level 3 or level 4 content unless a roof access or higher structure is explicitly present. Doors and breach holes should override wall blockers for both line of sight and movement. Windows should allow line of sight but normally still block movement.
+
 ## Sprite Manifests
 
 Sprite manifests describe source sheets, source-angle sprites, generated runtime sprites, and runtime sprite IDs. They record:
@@ -81,4 +97,5 @@ Generated assets should be reproducible. Do not edit generated files by hand. Th
 Current runtime product:
 
 - `assets/mosul/runtime/maps/market_commercial_streets_2003/overview.png`: copied from the source `preview_1400.png` as the first runtime map overview.
+- `assets/mosul/runtime/maps/market_commercial_streets_2003/levels/`: copied from the source 7,000 px ground, roof/second-floor, upper-floor, and roof-access line-art layers.
 - `assets/mosul/runtime/sprites/rendered/`: copied from the MOSUL render pipeline as the first complete runtime-facing sprite set.

@@ -16,7 +16,7 @@ Scenario files live in `game/mosul/scenarios/`. The default demo scenario is:
 game/mosul/scenarios/market_commercial_streets_2003.mkscenario
 ```
 
-Asset references inside a scenario must be repo-relative paths under `assets/mosul/`. The loader validates referenced map and sprite manifests before the scenario reaches the core.
+Asset references inside a scenario must be repo-relative paths under `assets/mosul/`. The loader validates referenced map and sprite manifests before the scenario reaches the core. The optional `asset.building_level_manifest` reference validates the JSON floor stack, runtime PNG paths, wall/opening records, building regions, and map dimensions.
 
 ## Sections
 
@@ -25,7 +25,7 @@ The current loader supports:
 - scenario metadata: `name`, `seed`, and optional `briefing`
 - score metadata: optional `score.success_threshold`, `score.partial_threshold`, and score weight fields
 - after-action copy: optional `after_action.success`, `after_action.partial`, and `after_action.failure`
-- asset references: `asset.map_manifest`, `asset.sprite_manifest`
+- asset references: `asset.map_manifest`, `asset.sprite_manifest`, and optional `asset.building_level_manifest`
 - map metadata and tile grid
 - `tile_range.*` records for compact tile overrides
 - `terrain.*` records for line-of-sight and cover zones

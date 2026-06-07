@@ -405,6 +405,54 @@ static bool mk_asset_json_required_int(
     return true;
 }
 
+static bool mk_asset_json_required_float(
+    const char *start,
+    const char *limit,
+    const char *key,
+    float *out_value
+) {
+    const char *value = mk_asset_json_find_key(start, limit, key);
+    char *end = NULL;
+    float parsed;
+
+    if (value == NULL || out_value == NULL) {
+        return false;
+    }
+
+    parsed = strtof(value, &end);
+    if (end == (char *)value || end > limit) {
+        return false;
+    }
+
+    *out_value = parsed;
+    return true;
+}
+
+static bool mk_asset_json_required_bool(
+    const char *start,
+    const char *limit,
+    const char *key,
+    bool *out_value
+) {
+    const char *value = mk_asset_json_find_key(start, limit, key);
+
+    if (value == NULL || out_value == NULL) {
+        return false;
+    }
+
+    if (value + 4 <= limit && strncmp(value, "true", 4) == 0) {
+        *out_value = true;
+        return true;
+    }
+
+    if (value + 5 <= limit && strncmp(value, "false", 5) == 0) {
+        *out_value = false;
+        return true;
+    }
+
+    return false;
+}
+
 static bool mk_asset_json_required_string(
     const char *start,
     const char *limit,
@@ -569,6 +617,74 @@ static bool mk_asset_sprite_render_paths_are_unique(const mk_asset_sprite_render
     }
 
     return true;
+}
+
+static bool mk_asset_building_ids_are_unique(const mk_asset_building_level_manifest_t *manifest) {
+    size_t index;
+
+    for (index = 0; index < manifest->level_count; ++index) {
+        size_t other_index;
+
+        for (other_index = index + 1; other_index < manifest->level_count; ++other_index) {
+            if (strcmp(manifest->levels[index].id, manifest->levels[other_index].id) == 0
+                || manifest->levels[index].index == manifest->levels[other_index].index) {
+                return false;
+            }
+        }
+    }
+
+    for (index = 0; index < manifest->feature_count; ++index) {
+        size_t other_index;
+
+        for (other_index = index + 1; other_index < manifest->feature_count; ++other_index) {
+            if (strcmp(manifest->features[index].id, manifest->features[other_index].id) == 0) {
+                return false;
+            }
+        }
+    }
+
+    for (index = 0; index < manifest->region_count; ++index) {
+        size_t other_index;
+
+        for (other_index = index + 1; other_index < manifest->region_count; ++other_index) {
+            if (strcmp(manifest->regions[index].id, manifest->regions[other_index].id) == 0) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+static bool mk_asset_building_alpha_is_valid(const char *alpha) {
+    return strcmp(alpha, "opaque") == 0 || strcmp(alpha, "overlay") == 0;
+}
+
+static bool mk_asset_building_feature_kind_is_valid(const char *kind) {
+    return strcmp(kind, "wall") == 0
+        || strcmp(kind, "door") == 0
+        || strcmp(kind, "window") == 0
+        || strcmp(kind, "breach_hole") == 0
+        || strcmp(kind, "stair") == 0
+        || strcmp(kind, "roof_edge") == 0;
+}
+
+static bool mk_asset_building_rect_is_valid(
+    int x,
+    int y,
+    int width,
+    int height,
+    int pixel_width,
+    int pixel_height
+) {
+    return x >= 0
+        && y >= 0
+        && width > 0
+        && height > 0
+        && pixel_width > 0
+        && pixel_height > 0
+        && x <= pixel_width - width
+        && y <= pixel_height - height;
 }
 
 static bool mk_asset_sprite_render_entry_is_valid(
@@ -1047,6 +1163,277 @@ mk_result_t mk_asset_load_marker_manifest(
     return MK_OK;
 }
 
+mk_result_t mk_asset_load_building_level_manifest(
+    const char *manifest_path,
+    const char *project_root,
+    mk_asset_building_level_manifest_t *out_manifest
+) {
+    char *text = NULL;
+    const char *limit;
+    const char *array_value;
+    const char *array_end;
+    const char *cursor;
+    int level_count;
+    int feature_count;
+    int region_count;
+    mk_result_t result;
+
+    if (out_manifest == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    memset(out_manifest, 0, sizeof(*out_manifest));
+    result = mk_asset_read_text_file(manifest_path, &text);
+    if (result != MK_OK) {
+        return result;
+    }
+
+    limit = text + strlen(text);
+    if (!mk_asset_json_required_int(text, limit, "schema_version", &out_manifest->schema_version)
+        || out_manifest->schema_version <= 0
+        || !mk_asset_json_required_string(text, limit, "id", false, out_manifest->id, sizeof(out_manifest->id))
+        || !mk_asset_json_required_string(text, limit, "map_id", false, out_manifest->map_id, sizeof(out_manifest->map_id))
+        || !mk_asset_json_required_string(text, limit, "name", false, out_manifest->name, sizeof(out_manifest->name))
+        || !mk_asset_json_required_float(text, limit, "world_width_m", &out_manifest->world_width_m)
+        || !mk_asset_json_required_float(text, limit, "world_height_m", &out_manifest->world_height_m)
+        || !mk_asset_json_required_int(text, limit, "pixel_width", &out_manifest->pixel_width)
+        || !mk_asset_json_required_int(text, limit, "pixel_height", &out_manifest->pixel_height)
+        || !mk_asset_json_required_float(text, limit, "pixels_per_meter", &out_manifest->pixels_per_meter)
+        || !mk_asset_json_required_string(text, limit, "origin", false, out_manifest->origin, sizeof(out_manifest->origin))
+        || !mk_asset_json_required_string(text, limit, "art_style", false, out_manifest->art_style, sizeof(out_manifest->art_style))
+        || !mk_asset_json_required_int(text, limit, "max_storeys", &out_manifest->max_storeys)
+        || !mk_asset_json_required_int(text, limit, "level_count", &level_count)
+        || !mk_asset_json_required_int(text, limit, "feature_count", &feature_count)
+        || !mk_asset_json_required_int(text, limit, "building_region_count", &region_count)
+        || out_manifest->world_width_m <= 0.0f
+        || out_manifest->world_height_m <= 0.0f
+        || out_manifest->pixel_width <= 0
+        || out_manifest->pixel_height <= 0
+        || out_manifest->pixels_per_meter <= 0.0f
+        || out_manifest->max_storeys <= 0
+        || level_count <= 0
+        || level_count > MK_ASSET_MAX_BUILDING_LEVELS
+        || feature_count <= 0
+        || feature_count > MK_ASSET_MAX_BUILDING_FEATURES
+        || region_count <= 0
+        || region_count > MK_ASSET_MAX_BUILDING_REGIONS) {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    array_value = mk_asset_json_find_key(text, limit, "levels");
+    if (array_value == NULL || array_value >= limit || *array_value != '[') {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    array_end = mk_asset_json_find_matching(array_value, limit, '[', ']');
+    if (array_end == NULL) {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    cursor = array_value + 1;
+    while (cursor < array_end) {
+        const char *object_end;
+        mk_asset_building_level_t *level;
+
+        cursor = mk_asset_json_skip_whitespace(cursor, array_end);
+        if (cursor >= array_end) {
+            break;
+        }
+
+        if (*cursor == ',') {
+            cursor += 1;
+            continue;
+        }
+
+        if (*cursor != '{' || out_manifest->level_count >= MK_ASSET_MAX_BUILDING_LEVELS) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        object_end = mk_asset_json_find_matching(cursor, array_end + 1, '{', '}');
+        if (object_end == NULL) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        level = &out_manifest->levels[out_manifest->level_count];
+        if (!mk_asset_json_required_string(cursor, object_end, "id", false, level->id, sizeof(level->id))
+            || !mk_asset_json_required_int(cursor, object_end, "index", &level->index)
+            || !mk_asset_json_required_float(cursor, object_end, "elevation_m", &level->elevation_m)
+            || !mk_asset_json_required_string(cursor, object_end, "png", false, level->png_path, sizeof(level->png_path))
+            || !mk_asset_json_required_string(cursor, object_end, "alpha", false, level->alpha, sizeof(level->alpha))
+            || !mk_asset_json_required_bool(cursor, object_end, "blocks_los_default", &level->blocks_los_default)
+            || !mk_asset_json_required_bool(cursor, object_end, "blocks_movement_default", &level->blocks_movement_default)
+            || level->index <= 0
+            || level->elevation_m < 0.0f
+            || !mk_asset_building_alpha_is_valid(level->alpha)
+            || !mk_asset_file_exists(project_root, level->png_path)) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        out_manifest->level_count += 1;
+        cursor = object_end + 1;
+    }
+
+    if (out_manifest->level_count != (size_t)level_count) {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    array_value = mk_asset_json_find_key(text, limit, "features");
+    if (array_value == NULL || array_value >= limit || *array_value != '[') {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    array_end = mk_asset_json_find_matching(array_value, limit, '[', ']');
+    if (array_end == NULL) {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    cursor = array_value + 1;
+    while (cursor < array_end) {
+        const char *object_end;
+        mk_asset_building_feature_t *feature;
+
+        cursor = mk_asset_json_skip_whitespace(cursor, array_end);
+        if (cursor >= array_end) {
+            break;
+        }
+
+        if (*cursor == ',') {
+            cursor += 1;
+            continue;
+        }
+
+        if (*cursor != '{' || out_manifest->feature_count >= MK_ASSET_MAX_BUILDING_FEATURES) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        object_end = mk_asset_json_find_matching(cursor, array_end + 1, '{', '}');
+        if (object_end == NULL) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        feature = &out_manifest->features[out_manifest->feature_count];
+        if (!mk_asset_json_required_string(cursor, object_end, "id", false, feature->id, sizeof(feature->id))
+            || !mk_asset_json_required_string(cursor, object_end, "level_id", false, feature->level_id, sizeof(feature->level_id))
+            || !mk_asset_json_required_string(cursor, object_end, "kind", false, feature->kind, sizeof(feature->kind))
+            || !mk_asset_json_required_int(cursor, object_end, "x", &feature->x)
+            || !mk_asset_json_required_int(cursor, object_end, "y", &feature->y)
+            || !mk_asset_json_required_int(cursor, object_end, "width", &feature->width)
+            || !mk_asset_json_required_int(cursor, object_end, "height", &feature->height)
+            || !mk_asset_json_required_bool(cursor, object_end, "blocks_los", &feature->blocks_los)
+            || !mk_asset_json_required_bool(cursor, object_end, "blocks_movement", &feature->blocks_movement)
+            || !mk_asset_json_required_bool(cursor, object_end, "allows_los", &feature->allows_los)
+            || !mk_asset_json_required_bool(cursor, object_end, "allows_movement", &feature->allows_movement)
+            || !mk_asset_building_feature_kind_is_valid(feature->kind)
+            || !mk_asset_building_rect_is_valid(
+                feature->x,
+                feature->y,
+                feature->width,
+                feature->height,
+                out_manifest->pixel_width,
+                out_manifest->pixel_height
+            )
+            || (feature->blocks_los && feature->allows_los)
+            || (feature->blocks_movement && feature->allows_movement)
+            || mk_asset_find_building_level(out_manifest, feature->level_id) == NULL) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        out_manifest->feature_count += 1;
+        cursor = object_end + 1;
+    }
+
+    if (out_manifest->feature_count != (size_t)feature_count) {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    array_value = mk_asset_json_find_key(text, limit, "building_regions");
+    if (array_value == NULL || array_value >= limit || *array_value != '[') {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    array_end = mk_asset_json_find_matching(array_value, limit, '[', ']');
+    if (array_end == NULL) {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    cursor = array_value + 1;
+    while (cursor < array_end) {
+        const char *object_end;
+        mk_asset_building_region_t *region;
+
+        cursor = mk_asset_json_skip_whitespace(cursor, array_end);
+        if (cursor >= array_end) {
+            break;
+        }
+
+        if (*cursor == ',') {
+            cursor += 1;
+            continue;
+        }
+
+        if (*cursor != '{' || out_manifest->region_count >= MK_ASSET_MAX_BUILDING_REGIONS) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        object_end = mk_asset_json_find_matching(cursor, array_end + 1, '{', '}');
+        if (object_end == NULL) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        region = &out_manifest->regions[out_manifest->region_count];
+        if (!mk_asset_json_required_string(cursor, object_end, "id", false, region->id, sizeof(region->id))
+            || !mk_asset_json_required_int(cursor, object_end, "storeys", &region->storeys)
+            || !mk_asset_json_required_int(cursor, object_end, "x", &region->x)
+            || !mk_asset_json_required_int(cursor, object_end, "y", &region->y)
+            || !mk_asset_json_required_int(cursor, object_end, "width", &region->width)
+            || !mk_asset_json_required_int(cursor, object_end, "height", &region->height)
+            || !mk_asset_json_required_string(cursor, object_end, "roof_level_id", false, region->roof_level_id, sizeof(region->roof_level_id))
+            || region->storeys <= 0
+            || region->storeys > out_manifest->max_storeys
+            || !mk_asset_building_rect_is_valid(
+                region->x,
+                region->y,
+                region->width,
+                region->height,
+                out_manifest->pixel_width,
+                out_manifest->pixel_height
+            )
+            || mk_asset_find_building_level(out_manifest, region->roof_level_id) == NULL) {
+            free(text);
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        out_manifest->region_count += 1;
+        cursor = object_end + 1;
+    }
+
+    if (out_manifest->region_count != (size_t)region_count
+        || !mk_asset_building_ids_are_unique(out_manifest)) {
+        free(text);
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    free(text);
+    return MK_OK;
+}
+
 const mk_asset_sprite_sheet_t *mk_asset_find_sprite_sheet(
     const mk_asset_sprite_manifest_t *manifest,
     const char *sheet_id
@@ -1133,4 +1520,144 @@ const mk_asset_sprite_render_entry_t *mk_asset_find_sprite_render_entry(
     }
 
     return NULL;
+}
+
+const mk_asset_building_level_t *mk_asset_find_building_level(
+    const mk_asset_building_level_manifest_t *manifest,
+    const char *level_id
+) {
+    size_t index;
+
+    if (manifest == NULL || level_id == NULL) {
+        return NULL;
+    }
+
+    for (index = 0; index < manifest->level_count; ++index) {
+        if (strcmp(manifest->levels[index].id, level_id) == 0) {
+            return &manifest->levels[index];
+        }
+    }
+
+    return NULL;
+}
+
+const mk_asset_building_feature_t *mk_asset_find_building_feature(
+    const mk_asset_building_level_manifest_t *manifest,
+    const char *feature_id
+) {
+    size_t index;
+
+    if (manifest == NULL || feature_id == NULL) {
+        return NULL;
+    }
+
+    for (index = 0; index < manifest->feature_count; ++index) {
+        if (strcmp(manifest->features[index].id, feature_id) == 0) {
+            return &manifest->features[index];
+        }
+    }
+
+    return NULL;
+}
+
+const mk_asset_building_region_t *mk_asset_find_building_region(
+    const mk_asset_building_level_manifest_t *manifest,
+    const char *region_id
+) {
+    size_t index;
+
+    if (manifest == NULL || region_id == NULL) {
+        return NULL;
+    }
+
+    for (index = 0; index < manifest->region_count; ++index) {
+        if (strcmp(manifest->regions[index].id, region_id) == 0) {
+            return &manifest->regions[index];
+        }
+    }
+
+    return NULL;
+}
+
+bool mk_asset_building_feature_contains_pixel(
+    const mk_asset_building_feature_t *feature,
+    int x,
+    int y
+) {
+    if (feature == NULL) {
+        return false;
+    }
+
+    return x >= feature->x
+        && y >= feature->y
+        && x < feature->x + feature->width
+        && y < feature->y + feature->height;
+}
+
+static bool mk_asset_building_level_blocks_at_pixel(
+    const mk_asset_building_level_manifest_t *manifest,
+    const char *level_id,
+    int x,
+    int y,
+    bool check_line_of_sight
+) {
+    const mk_asset_building_level_t *level;
+    bool blocked = false;
+    size_t index;
+
+    if (manifest == NULL || level_id == NULL || x < 0 || y < 0 || x >= manifest->pixel_width || y >= manifest->pixel_height) {
+        return false;
+    }
+
+    level = mk_asset_find_building_level(manifest, level_id);
+    if (level == NULL) {
+        return false;
+    }
+
+    blocked = check_line_of_sight ? level->blocks_los_default : level->blocks_movement_default;
+    for (index = 0; index < manifest->feature_count; ++index) {
+        const mk_asset_building_feature_t *feature = &manifest->features[index];
+
+        if (strcmp(feature->level_id, level_id) != 0 || !mk_asset_building_feature_contains_pixel(feature, x, y)) {
+            continue;
+        }
+
+        if (check_line_of_sight) {
+            if (feature->allows_los) {
+                return false;
+            }
+
+            if (feature->blocks_los) {
+                blocked = true;
+            }
+        } else {
+            if (feature->allows_movement) {
+                return false;
+            }
+
+            if (feature->blocks_movement) {
+                blocked = true;
+            }
+        }
+    }
+
+    return blocked;
+}
+
+bool mk_asset_building_level_blocks_los_at_pixel(
+    const mk_asset_building_level_manifest_t *manifest,
+    const char *level_id,
+    int x,
+    int y
+) {
+    return mk_asset_building_level_blocks_at_pixel(manifest, level_id, x, y, true);
+}
+
+bool mk_asset_building_level_blocks_movement_at_pixel(
+    const mk_asset_building_level_manifest_t *manifest,
+    const char *level_id,
+    int x,
+    int y
+) {
+    return mk_asset_building_level_blocks_at_pixel(manifest, level_id, x, y, false);
 }

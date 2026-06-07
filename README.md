@@ -168,6 +168,8 @@ The public MOSUL demo target is the 2003 Market / Commercial Streets scenario: a
 
 - line-art map previews and multi-storey source layers
 - Market / Commercial Streets ground, upper-floor, roof-access, multistorey-mask, preview, and layer-manifest files
+- four 7,000 px runtime building-level PNGs for ground, roofs/second floors, upper floors, and roof access
+- a JSON building-level manifest for walls, doors, windows, breach holes, stairs, roof edges, and storey regions
 - 128 px top-down combatant, stance, vehicle, and weapon sheets
 - complete source-angle infantry, civilian, weapon, and vehicle sprites
 - 1,064 rendered runtime-facing PNGs under `assets/mosul/runtime/sprites/rendered`
@@ -180,9 +182,11 @@ The first scenario and asset manifests are in place:
 
 - `game/mosul/scenarios/market_commercial_streets_2003.mkscenario`
 - `assets/mosul/manifests/market_commercial_streets_2003.mapmanifest`
+- `assets/mosul/manifests/market_commercial_streets_2003_building_levels.json`
 - `assets/mosul/manifests/mosul_2003_sprites.spritemanifest`
 - `assets/mosul/manifests/mosul_2003_markers.markermanifest`
 - `assets/mosul/runtime/maps/market_commercial_streets_2003/overview.png`
+- `assets/mosul/runtime/maps/market_commercial_streets_2003/levels/`
 
 CTest validates those files and rejects broken references.
 

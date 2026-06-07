@@ -74,6 +74,70 @@ static void test_map_manifest_loads_market_layers(void) {
     MK_TEST_ASSERT(file_exists(runtime_path));
 }
 
+static void test_building_level_manifest_loads_multistorey_stack(void) {
+    char path[512];
+    char level_path[512];
+    mk_asset_building_level_manifest_t manifest;
+    const mk_asset_building_level_t *level;
+    const mk_asset_building_feature_t *wall;
+    const mk_asset_building_feature_t *door;
+    const mk_asset_building_feature_t *window;
+    const mk_asset_building_region_t *region;
+
+    make_project_path(
+        path,
+        sizeof(path),
+        "assets/mosul/manifests/market_commercial_streets_2003_building_levels.json"
+    );
+
+    MK_TEST_ASSERT(mk_asset_load_building_level_manifest(path, MK_TEST_PROJECT_ROOT, &manifest) == MK_OK);
+    MK_TEST_ASSERT(manifest.schema_version == 1);
+    MK_TEST_ASSERT(strcmp(manifest.id, "market_commercial_streets_2003_building_levels") == 0);
+    MK_TEST_ASSERT(strcmp(manifest.map_id, "market_commercial_streets_2003") == 0);
+    MK_TEST_ASSERT_CLOSE(manifest.world_width_m, 500.0f);
+    MK_TEST_ASSERT_CLOSE(manifest.world_height_m, 500.0f);
+    MK_TEST_ASSERT(manifest.pixel_width == 7000);
+    MK_TEST_ASSERT(manifest.pixel_height == 7000);
+    MK_TEST_ASSERT_CLOSE(manifest.pixels_per_meter, 14.0f);
+    MK_TEST_ASSERT(manifest.max_storeys == 4);
+    MK_TEST_ASSERT(manifest.level_count == 4);
+    MK_TEST_ASSERT(manifest.feature_count == 25);
+    MK_TEST_ASSERT(manifest.region_count == 8);
+
+    level = mk_asset_find_building_level(&manifest, "level_02_roofs_and_second_floor");
+    MK_TEST_ASSERT(level != NULL);
+    MK_TEST_ASSERT(strcmp(level->alpha, "overlay") == 0);
+    MK_TEST_ASSERT(strcmp(level->png_path, "assets/mosul/runtime/maps/market_commercial_streets_2003/levels/level_02_roofs_and_second_floor.png") == 0);
+    make_project_path(level_path, sizeof(level_path), level->png_path);
+    MK_TEST_ASSERT(file_exists(level_path));
+
+    wall = mk_asset_find_building_feature(&manifest, "souq_west_outer_wall_ground");
+    MK_TEST_ASSERT(wall != NULL);
+    MK_TEST_ASSERT(strcmp(wall->kind, "wall") == 0);
+    MK_TEST_ASSERT(mk_asset_building_feature_contains_pixel(wall, 840, 1500));
+    MK_TEST_ASSERT(mk_asset_building_level_blocks_los_at_pixel(&manifest, "level_01_ground", 840, 1500));
+    MK_TEST_ASSERT(mk_asset_building_level_blocks_movement_at_pixel(&manifest, "level_01_ground", 840, 1500));
+
+    door = mk_asset_find_building_feature(&manifest, "souq_west_door_ground");
+    MK_TEST_ASSERT(door != NULL);
+    MK_TEST_ASSERT(strcmp(door->kind, "door") == 0);
+    MK_TEST_ASSERT(!mk_asset_building_level_blocks_los_at_pixel(&manifest, "level_01_ground", 840, 2200));
+    MK_TEST_ASSERT(!mk_asset_building_level_blocks_movement_at_pixel(&manifest, "level_01_ground", 840, 2200));
+
+    window = mk_asset_find_building_feature(&manifest, "souq_east_window_ground");
+    MK_TEST_ASSERT(window != NULL);
+    MK_TEST_ASSERT(strcmp(window->kind, "window") == 0);
+    MK_TEST_ASSERT(!mk_asset_building_level_blocks_los_at_pixel(&manifest, "level_01_ground", 2110, 1720));
+    MK_TEST_ASSERT(mk_asset_building_level_blocks_movement_at_pixel(&manifest, "level_01_ground", 2110, 1720));
+    MK_TEST_ASSERT(!mk_asset_building_level_blocks_los_at_pixel(&manifest, "level_01_ground", 100, 100));
+    MK_TEST_ASSERT(!mk_asset_building_level_blocks_movement_at_pixel(&manifest, "level_01_ground", 100, 100));
+
+    region = mk_asset_find_building_region(&manifest, "single_storey_shop_row_north");
+    MK_TEST_ASSERT(region != NULL);
+    MK_TEST_ASSERT(region->storeys == 1);
+    MK_TEST_ASSERT(strcmp(region->roof_level_id, "level_02_roofs_and_second_floor") == 0);
+}
+
 static void test_sprite_manifest_loads_first_frames(void) {
     char path[512];
     mk_asset_sprite_manifest_t manifest;
@@ -325,6 +389,7 @@ static void test_sprite_render_manifest_rejects_missing_runtime_png(void) {
 
 int main(void) {
     test_map_manifest_loads_market_layers();
+    test_building_level_manifest_loads_multistorey_stack();
     test_sprite_manifest_loads_first_frames();
     test_sprite_render_manifest_loads_all_runtime_facings();
     test_marker_manifest_loads_tactical_markers();

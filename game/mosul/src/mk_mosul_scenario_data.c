@@ -725,10 +725,13 @@ static mk_result_t mk_mosul_validate_asset_references(
 ) {
     char map_manifest_relative[256];
     char sprite_manifest_relative[256];
+    const char *building_level_manifest_relative;
     char map_manifest_path[MK_MOSUL_SCENARIO_PATH_CAPACITY];
     char sprite_manifest_path[MK_MOSUL_SCENARIO_PATH_CAPACITY];
+    char building_level_manifest_path[MK_MOSUL_SCENARIO_PATH_CAPACITY];
     mk_asset_map_manifest_t map_manifest;
     mk_asset_sprite_manifest_t sprite_manifest;
+    mk_asset_building_level_manifest_t building_level_manifest;
 
     if (!mk_mosul_required_text(entries, "asset.map_manifest", map_manifest_relative, sizeof(map_manifest_relative))
         || !mk_mosul_required_text(entries, "asset.sprite_manifest", sprite_manifest_relative, sizeof(sprite_manifest_relative))
@@ -747,9 +750,35 @@ static mk_result_t mk_mosul_validate_asset_references(
         return MK_ERROR_INVALID_DATA;
     }
 
+    building_level_manifest_relative = mk_mosul_entry_value(entries, "asset.building_level_manifest");
+    if (building_level_manifest_relative != NULL) {
+        if (!mk_mosul_asset_path_is_safe(building_level_manifest_relative)
+            || !mk_mosul_make_project_path(
+                project_root,
+                building_level_manifest_relative,
+                building_level_manifest_path,
+                sizeof(building_level_manifest_path)
+            )
+            || mk_asset_load_building_level_manifest(
+                building_level_manifest_path,
+                project_root,
+                &building_level_manifest
+            ) != MK_OK) {
+            return MK_ERROR_INVALID_DATA;
+        }
+    }
+
     if (map != NULL
         && (!mk_mosul_float_close(map_manifest.world_width_m, map->width_m)
             || !mk_mosul_float_close(map_manifest.world_height_m, map->height_m))) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    if (building_level_manifest_relative != NULL
+        && map != NULL
+        && (strcmp(building_level_manifest.map_id, map_manifest.id) != 0
+            || !mk_mosul_float_close(building_level_manifest.world_width_m, map->width_m)
+            || !mk_mosul_float_close(building_level_manifest.world_height_m, map->height_m))) {
         return MK_ERROR_INVALID_DATA;
     }
 

@@ -27,3 +27,4 @@ Excluded source groups:
 - `.DS_Store` and other local operating-system metadata.
 
 Runtime-facing rendered flips are intentionally excluded from this source directory and stored under `assets/mosul/runtime/sprites/rendered/`.
+Runtime-facing map level PNGs are generated or copied from the approved source layers into `assets/mosul/runtime/maps/market_commercial_streets_2003/levels/`. Gameplay floor, wall, door, window, breach, stair, roof-edge, and storey-region metadata is stored in `assets/mosul/manifests/market_commercial_streets_2003_building_levels.json`.

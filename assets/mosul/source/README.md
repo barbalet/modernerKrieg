@@ -31,6 +31,7 @@ Keep source assets unmodified. Engine-ready files should live outside this folde
 - `assets/mosul/sprites/` for sliced or cleaned sprite PNGs
 - `assets/mosul/atlases/` for atlas metadata and packed sheets
 - `assets/mosul/maps/` for playable map data
+- `assets/mosul/runtime/maps/` for runtime floor PNGs generated or copied from approved source layers
 
 Every committed source asset should have clear provenance and usage rights. Do not add downloaded, copyrighted, private, or restricted material unless it is allowed to be stored in this repository.
 

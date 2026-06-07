@@ -16,6 +16,9 @@ extern "C" {
 #define MK_ASSET_MAX_SPRITE_FRAMES 128
 #define MK_ASSET_MAX_SPRITE_RENDER_ENTRIES 2048
 #define MK_ASSET_MAX_MARKERS 64
+#define MK_ASSET_MAX_BUILDING_LEVELS 8
+#define MK_ASSET_MAX_BUILDING_FEATURES 128
+#define MK_ASSET_MAX_BUILDING_REGIONS 64
 
 typedef struct {
     char id[MK_NAME_CAPACITY];
@@ -121,6 +124,61 @@ typedef struct {
     mk_asset_marker_t markers[MK_ASSET_MAX_MARKERS];
 } mk_asset_marker_manifest_t;
 
+typedef struct {
+    char id[MK_NAME_CAPACITY];
+    int index;
+    float elevation_m;
+    char png_path[MK_ASSET_PATH_CAPACITY];
+    char alpha[MK_ASSET_KIND_CAPACITY];
+    bool blocks_los_default;
+    bool blocks_movement_default;
+} mk_asset_building_level_t;
+
+typedef struct {
+    char id[MK_NAME_CAPACITY];
+    char level_id[MK_NAME_CAPACITY];
+    char kind[MK_ASSET_KIND_CAPACITY];
+    int x;
+    int y;
+    int width;
+    int height;
+    bool blocks_los;
+    bool blocks_movement;
+    bool allows_los;
+    bool allows_movement;
+} mk_asset_building_feature_t;
+
+typedef struct {
+    char id[MK_NAME_CAPACITY];
+    int storeys;
+    int x;
+    int y;
+    int width;
+    int height;
+    char roof_level_id[MK_NAME_CAPACITY];
+} mk_asset_building_region_t;
+
+typedef struct {
+    int schema_version;
+    char id[MK_NAME_CAPACITY];
+    char map_id[MK_NAME_CAPACITY];
+    char name[MK_NAME_CAPACITY];
+    float world_width_m;
+    float world_height_m;
+    int pixel_width;
+    int pixel_height;
+    float pixels_per_meter;
+    char origin[MK_ASSET_KIND_CAPACITY];
+    char art_style[MK_ASSET_PATH_CAPACITY];
+    int max_storeys;
+    size_t level_count;
+    mk_asset_building_level_t levels[MK_ASSET_MAX_BUILDING_LEVELS];
+    size_t feature_count;
+    mk_asset_building_feature_t features[MK_ASSET_MAX_BUILDING_FEATURES];
+    size_t region_count;
+    mk_asset_building_region_t regions[MK_ASSET_MAX_BUILDING_REGIONS];
+} mk_asset_building_level_manifest_t;
+
 mk_result_t mk_asset_load_map_manifest(
     const char *manifest_path,
     const char *project_root,
@@ -142,6 +200,12 @@ mk_result_t mk_asset_load_sprite_render_manifest(
 mk_result_t mk_asset_load_marker_manifest(
     const char *manifest_path,
     mk_asset_marker_manifest_t *out_manifest
+);
+
+mk_result_t mk_asset_load_building_level_manifest(
+    const char *manifest_path,
+    const char *project_root,
+    mk_asset_building_level_manifest_t *out_manifest
 );
 
 const mk_asset_sprite_sheet_t *mk_asset_find_sprite_sheet(
@@ -166,6 +230,41 @@ const mk_asset_sprite_render_entry_t *mk_asset_find_sprite_render_entry(
 const mk_asset_marker_t *mk_asset_find_marker(
     const mk_asset_marker_manifest_t *manifest,
     const char *marker_id
+);
+
+const mk_asset_building_level_t *mk_asset_find_building_level(
+    const mk_asset_building_level_manifest_t *manifest,
+    const char *level_id
+);
+
+const mk_asset_building_feature_t *mk_asset_find_building_feature(
+    const mk_asset_building_level_manifest_t *manifest,
+    const char *feature_id
+);
+
+const mk_asset_building_region_t *mk_asset_find_building_region(
+    const mk_asset_building_level_manifest_t *manifest,
+    const char *region_id
+);
+
+bool mk_asset_building_feature_contains_pixel(
+    const mk_asset_building_feature_t *feature,
+    int x,
+    int y
+);
+
+bool mk_asset_building_level_blocks_los_at_pixel(
+    const mk_asset_building_level_manifest_t *manifest,
+    const char *level_id,
+    int x,
+    int y
+);
+
+bool mk_asset_building_level_blocks_movement_at_pixel(
+    const mk_asset_building_level_manifest_t *manifest,
+    const char *level_id,
+    int x,
+    int y
 );
 
 #ifdef __cplusplus
