@@ -233,10 +233,10 @@ Implementation approach:
 - Added budget from gameplay-area integration rebaseline: 20 cycles.
 - Planned cycle budget: 100 cycles.
 - Planned cycle shape: 10 milestones x 10 cycles each.
-- Completed cycles in this ledger: 76.
-- Current cycle: 76.
-- Remaining planned cycles: 24.
-- Next cycle batch: cycles 77-80, Tactical AI And AI-Vs-AI Balance.
+- Completed cycles in this ledger: 91.
+- Current cycle: 91.
+- Remaining planned cycles: 9.
+- Next cycle batch: cycles 92-100, Demo Hardening, Performance, And Release Readiness.
 
 Prior implementation work is captured in the current audit and is not counted
 against this rebaselined ledger. When a development batch is completed,
@@ -254,6 +254,7 @@ increment `Completed cycles in this ledger`, advance `Current cycle`, reduce
 | 2026-06-07 | 46 | 46 | 54 | Scenario Population Data Foundation | Added C-level spawn zones, unit templates, civilian archetypes/groups, richer Market 2003 civilians and hidden opfor, topology-linked population validation, replay exposure, docs, and tests. |
 | 2026-06-07 | 61 | 61 | 39 | Scenario Variants, Civilian AI, And Search Hook | Added seven compact Market 2003 scenario variants, C-level civilian intent/destination/path state, deterministic civilian AI movement, civilian instruction API, replay route exposure, search/cache reveal hooks, docs, and smoke tests. |
 | 2026-06-07 | 76 | 76 | 24 | Urban Interactions And AI Guardrails | Completed cycles 62-70 with persistent search state, breachable portal state, interaction scoring, rooftop/elevation fire modifiers, replay/contact support, and core tests; completed cycles 71-76 with player AI search/breach behavior, broader AI-battle stall signatures, and cache-search AI battle CTest coverage. |
+| 2026-06-07 | 91 | 91 | 9 | Tactical AI, Demo API, And Hardening Start | Completed cycles 77-80 with objective-aware AI, hidden topology defender overwatch, updated balance expectations, and AI tests; completed cycles 81-90 with the portable `modernerKriegDemo` C session API, draw-command export, screen picking, selected move helpers, lifecycle/performance counters, and C demo session tests; completed cycle 91 by adding demo counters and the expanded default/strict CTest matrix entry point. |
 
 ## Cycle Delta From Previous Plan
 
@@ -525,11 +526,13 @@ Exit criteria:
 
 ### Cycles 71-80: Tactical AI And AI-Vs-AI Balance
 
-Status: in progress. Cycles 71-76 completed on 2026-06-07 with player-side AI
+Status: completed on 2026-06-07. Cycles 71-76 completed player-side AI
 searching nearby false-contact terrain, searching nearby semantic cache/search
 zones, breaching nearby closed/locked portals, expanded AI battle progress
 signatures for civilians/search/portal state, and CTest coverage for cache
-search AI battles.
+search AI battles. Cycles 77-80 completed objective-aware player/opfor movement,
+hidden topology defender overwatch, updated AI balance expectations, and focused
+AI tests.
 
 Goal: make AI-only runs meaningful enough to expose engine problems early.
 
@@ -562,6 +565,12 @@ Exit criteria:
 
 ### Cycles 81-90: C Demo Integration And Native Wrapper Contract
 
+Status: completed on 2026-06-07 with the portable `modernerKriegDemo` C session
+API, opaque session lifecycle, default/specific scenario loading, AI-only fixed
+stepping, summary/snapshot queries, board fitting, draw-command export, screen
+picking, selection, selected-unit move helpers, performance counters, CMake
+library wiring, native-wrapper docs, and platform-free demo session tests.
+
 Goal: expose the complete C demo cleanly to native Mac and Windows frontends.
 
 Deliverables:
@@ -592,6 +601,11 @@ Exit criteria:
 - The C engine remains runnable and testable without any platform frontend.
 
 ### Cycles 91-100: Demo Hardening, Performance, And Release Readiness
+
+Status: in progress. Cycle 91 completed on 2026-06-07 with demo session
+performance counters, CTest coverage for the native-wrapper contract, updated
+default replay/balance expectations after objective-aware AI, and documentation
+for frontend responsibilities.
 
 Goal: finish the C engine side of a playable public demo.
 

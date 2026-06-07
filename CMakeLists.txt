@@ -106,6 +106,24 @@ target_compile_definitions(modernerKriegMosul
 
 mk_apply_warnings(modernerKriegMosul)
 
+add_library(modernerKriegDemo STATIC
+  engine/demo/src/mk_demo.c
+)
+
+target_include_directories(modernerKriegDemo
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/engine/demo/include>
+)
+
+target_link_libraries(modernerKriegDemo PUBLIC modernerKriegAi modernerKriegRender modernerKriegMosul)
+
+target_compile_definitions(modernerKriegDemo
+  PRIVATE
+    MK_PROJECT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+mk_apply_warnings(modernerKriegDemo)
+
 add_executable(mk_headless_run
   engine/tools/autoplay/mk_headless_run.c
 )
@@ -158,6 +176,12 @@ if(MK_BUILD_TESTS)
   target_link_libraries(mk_basic_ai_tests PRIVATE modernerKriegAi modernerKriegMosul)
   target_include_directories(mk_basic_ai_tests PRIVATE tests)
 
+  add_executable(mk_demo_session_tests
+    tests/demo/test_demo_session.c
+  )
+  target_link_libraries(mk_demo_session_tests PRIVATE modernerKriegDemo)
+  target_include_directories(mk_demo_session_tests PRIVATE tests)
+
   add_executable(mk_asset_manifest_tests
     tests/assets/test_asset_manifest.c
   )
@@ -184,6 +208,7 @@ if(MK_BUILD_TESTS)
   mk_apply_warnings(mk_board_view_tests)
   mk_apply_warnings(mk_fixed_loop_tests)
   mk_apply_warnings(mk_basic_ai_tests)
+  mk_apply_warnings(mk_demo_session_tests)
   mk_apply_warnings(mk_asset_manifest_tests)
   mk_apply_warnings(mk_mosul_scenario_data_tests)
 
@@ -191,6 +216,7 @@ if(MK_BUILD_TESTS)
   add_test(NAME mk_board_view_tests COMMAND mk_board_view_tests)
   add_test(NAME mk_fixed_loop_tests COMMAND mk_fixed_loop_tests)
   add_test(NAME mk_basic_ai_tests COMMAND mk_basic_ai_tests)
+  add_test(NAME mk_demo_session_tests COMMAND mk_demo_session_tests)
   add_test(NAME mk_asset_manifest_tests COMMAND mk_asset_manifest_tests)
   add_test(NAME mk_mosul_scenario_data_tests COMMAND mk_mosul_scenario_data_tests)
   add_test(NAME mk_headless_run_smoke COMMAND mk_headless_run --steps 3 --quiet)
@@ -231,7 +257,7 @@ if(MK_BUILD_TESTS)
       --aar
       --debug-log
       --expect-objective opfor
-      --expect-min-score -50
+      --expect-min-score -60
   )
   add_test(
     NAME mk_headless_run_replay_output

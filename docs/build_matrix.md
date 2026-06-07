@@ -1,6 +1,6 @@
 # Build Matrix
 
-The portable core, tests, headless runner, AI battle runner, replay tools, and renderer-independent projection layer should remain buildable without any platform UI dependency. Native Mac and Windows frontends should sit above these targets.
+The portable core, demo session API, tests, headless runner, AI battle runner, replay tools, and renderer-independent projection layer should remain buildable without any platform UI dependency. Native Mac and Windows frontends should sit above these targets.
 
 ## Local Presets
 
@@ -26,6 +26,9 @@ cmake --preset default
 cmake --build --preset default
 ctest --preset default
 ```
+
+The default and strict suites include `mk_demo_session_tests`, which exercises
+the native-wrapper C contract without launching a platform frontend.
 
 Run repeated AI-vs-AI battles from CMake:
 
@@ -60,8 +63,8 @@ The shared Xcode scheme launches with the five-seed balance arguments enabled, s
 
 ## Platform Notes
 
-- macOS: install CMake and use the checked-in `modernerKriegAIBattles.xcodeproj` project for the command-line AI battle runner. The native Mac frontend should link the same portable C libraries when it is added.
-- Windows: use a C compiler supported by CMake, such as MSVC. The native Windows frontend should link the same portable C libraries when it is added.
+- macOS: install CMake and use the checked-in `modernerKriegAIBattles.xcodeproj` project for the command-line AI battle runner. The native Mac frontend should link `modernerKriegDemo` and keep gameplay in C.
+- Windows: use a C compiler supported by CMake, such as MSVC. The native Windows frontend should link `modernerKriegDemo` and keep gameplay in C.
 - Linux: install CMake and a C compiler for headless/autoplay validation. A Linux presentation layer is not part of the current native frontend pivot.
 
 ## GitHub Actions Checks

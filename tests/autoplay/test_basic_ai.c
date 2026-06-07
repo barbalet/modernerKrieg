@@ -104,8 +104,8 @@ static void test_basic_ai_emits_orders_for_both_sides(void) {
     MK_TEST_ASSERT(game.units[1].order == MK_ORDER_MOVE);
     MK_TEST_ASSERT(game.units[1].order_source == MK_ORDER_SOURCE_AI);
     MK_TEST_ASSERT(game.units[1].has_move_target);
-    MK_TEST_ASSERT_CLOSE(game.units[1].target_position_m.x, 80.0f);
-    MK_TEST_ASSERT_CLOSE(game.units[1].target_position_m.y, 246.0f);
+    MK_TEST_ASSERT_CLOSE(game.units[1].target_position_m.x, 330.0f);
+    MK_TEST_ASSERT_CLOSE(game.units[1].target_position_m.y, 238.0f);
 
     MK_TEST_ASSERT(game.units[2].side == MK_SIDE_CIVILIAN);
     MK_TEST_ASSERT(game.units[2].order == MK_ORDER_HOLD);
@@ -143,8 +143,8 @@ static void test_basic_ai_advances_expected_positions(void) {
 
     MK_TEST_ASSERT_CLOSE(game.units[0].position_m.x, 86.00f);
     MK_TEST_ASSERT_CLOSE(game.units[0].position_m.y, 245.81f);
-    MK_TEST_ASSERT_CLOSE(game.units[1].position_m.x, 344.01f);
-    MK_TEST_ASSERT_CLOSE(game.units[1].position_m.y, 230.36f);
+    MK_TEST_ASSERT_CLOSE(game.units[1].position_m.x, 344.43f);
+    MK_TEST_ASSERT_CLOSE(game.units[1].position_m.y, 232.23f);
     MK_TEST_ASSERT_CLOSE(game.units[2].position_m.x, 252.0f);
     MK_TEST_ASSERT_CLOSE(game.units[2].position_m.y, 206.0f);
 }
@@ -339,6 +339,20 @@ static void test_basic_ai_breaches_nearby_closed_portal(void) {
     MK_TEST_ASSERT(game.units[0].order_source == MK_ORDER_SOURCE_AI);
 }
 
+static void test_basic_ai_hidden_topology_opfor_holds_defensive_node(void) {
+    mk_game_t game = make_loaded_game();
+
+    MK_TEST_ASSERT(game.unit_count > 3);
+    MK_TEST_ASSERT(game.units[3].side == MK_SIDE_OPFOR);
+    MK_TEST_ASSERT(game.units[3].hidden);
+    MK_TEST_ASSERT(game.units[3].topology_node_id[0] != '\0');
+
+    MK_TEST_ASSERT(mk_ai_issue_basic_orders(&game) == MK_OK);
+    MK_TEST_ASSERT(game.units[3].order == MK_ORDER_OVERWATCH);
+    MK_TEST_ASSERT(game.units[3].order_source == MK_ORDER_SOURCE_AI);
+    MK_TEST_ASSERT(!game.units[3].has_move_target);
+}
+
 static const char *test_order_name(mk_order_t order) {
     switch (order) {
         case MK_ORDER_MOVE:
@@ -414,6 +428,7 @@ int main(void) {
     test_basic_ai_searches_nearby_false_contact_terrain();
     test_basic_ai_searches_nearby_semantic_cache();
     test_basic_ai_breaches_nearby_closed_portal();
+    test_basic_ai_hidden_topology_opfor_holds_defensive_node();
     test_basic_ai_transcript_is_deterministic();
 
     puts("mk_basic_ai_tests: ok");

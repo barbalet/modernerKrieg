@@ -31,12 +31,50 @@ static bool mk_ai_unit_can_receive_orders(const mk_unit_t *unit) {
         && unit->soldier_count > 0;
 }
 
-static bool mk_ai_find_first_objective(const mk_game_t *game, mk_vec2_t *out_position) {
-    if (game == NULL || out_position == NULL || game->objective_count == 0) {
+static bool mk_ai_find_best_objective(
+    const mk_game_t *game,
+    const mk_unit_t *unit,
+    mk_side_t side,
+    mk_vec2_t *out_position
+) {
+    const mk_objective_t *best_objective = NULL;
+    float best_score = -FLT_MAX;
+    size_t index;
+
+    if (game == NULL || unit == NULL || out_position == NULL || game->objective_count == 0) {
         return false;
     }
 
-    *out_position = game->objectives[0].position_m;
+    for (index = 0; index < game->objective_count; ++index) {
+        const mk_objective_t *objective = &game->objectives[index];
+        float distance = mk_vec2_distance(unit->position_m, objective->position_m);
+        float score = (float)objective->value * 100.0f - distance;
+
+        if (side == MK_SIDE_PLAYER) {
+            if (objective->controlling_side == MK_SIDE_PLAYER) {
+                score -= 120.0f;
+            } else if (objective->controlling_side == MK_SIDE_OPFOR) {
+                score += 80.0f;
+            }
+        } else if (side == MK_SIDE_OPFOR) {
+            if (objective->controlling_side == MK_SIDE_OPFOR) {
+                score -= 80.0f;
+            } else if (objective->controlling_side == MK_SIDE_PLAYER) {
+                score += 100.0f;
+            }
+        }
+
+        if (best_objective == NULL || score > best_score) {
+            best_objective = objective;
+            best_score = score;
+        }
+    }
+
+    if (best_objective == NULL) {
+        return false;
+    }
+
+    *out_position = best_objective->position_m;
     return true;
 }
 
@@ -339,6 +377,32 @@ static bool mk_ai_portal_can_be_breached(const mk_gameplay_topology_portal_t *po
         && strcmp(portal->state, "unsafe") != 0;
 }
 
+static const mk_gameplay_topology_node_t *mk_ai_find_unit_topology_node(
+    const mk_game_t *game,
+    const mk_unit_t *unit
+) {
+    if (game == NULL || unit == NULL || unit->topology_node_id[0] == '\0') {
+        return NULL;
+    }
+
+    return mk_gameplay_area_find_topology_node(&game->gameplay_area, unit->topology_node_id);
+}
+
+static bool mk_ai_unit_is_in_defensible_node(const mk_game_t *game, const mk_unit_t *unit) {
+    const mk_gameplay_topology_node_t *node = mk_ai_find_unit_topology_node(game, unit);
+
+    if (node == NULL) {
+        return false;
+    }
+
+    return strcmp(node->kind, "roof") == 0
+        || strcmp(node->kind, "shop") == 0
+        || strcmp(node->kind, "workshop") == 0
+        || strcmp(node->kind, "garage") == 0
+        || strcmp(node->kind, "alley") == 0
+        || strcmp(node->kind, "cache") == 0;
+}
+
 static const mk_gameplay_topology_portal_t *mk_ai_find_nearby_breachable_portal(
     const mk_game_t *game,
     const mk_unit_t *unit,
@@ -444,7 +508,7 @@ static mk_result_t mk_ai_issue_player_order(mk_game_t *game, const mk_unit_t *un
         return mk_game_issue_order(game, unit->id, MK_ORDER_SUPPRESS);
     }
 
-    if (!mk_ai_find_first_objective(game, &objective_position)) {
+    if (!mk_ai_find_best_objective(game, unit, MK_SIDE_PLAYER, &objective_position)) {
         return mk_game_issue_order(game, unit->id, MK_ORDER_HOLD);
     }
 
@@ -457,6 +521,7 @@ static mk_result_t mk_ai_issue_player_order(mk_game_t *game, const mk_unit_t *un
 
 static mk_result_t mk_ai_issue_opfor_order(mk_game_t *game, const mk_unit_t *unit) {
     const mk_unit_t *enemy = mk_ai_find_nearest_enemy(game, unit);
+    mk_vec2_t objective_position;
     float distance;
     mk_line_of_sight_t line_of_sight;
 
@@ -468,6 +533,10 @@ static mk_result_t mk_ai_issue_opfor_order(mk_game_t *game, const mk_unit_t *uni
         return mk_ai_issue_withdraw_order(game, mk_game_find_unit(game, unit->id), enemy);
     }
 
+    if (unit->hidden && !unit->revealed && mk_ai_unit_is_in_defensible_node(game, unit)) {
+        return mk_game_issue_order(game, unit->id, MK_ORDER_OVERWATCH);
+    }
+
     if (unit->status == MK_UNIT_PINNED || unit->suppression >= 10) {
         return mk_ai_issue_withdraw_order(game, mk_game_find_unit(game, unit->id), enemy);
     }
@@ -477,6 +546,11 @@ static mk_result_t mk_ai_issue_opfor_order(mk_game_t *game, const mk_unit_t *uni
         && mk_game_unit_line_of_sight(game, unit->id, enemy->id, &line_of_sight) == MK_OK
         && line_of_sight.visible) {
         return mk_game_issue_order(game, unit->id, MK_ORDER_SUPPRESS);
+    }
+
+    if (mk_ai_find_best_objective(game, unit, MK_SIDE_OPFOR, &objective_position)
+        && mk_vec2_distance(unit->position_m, objective_position) < distance) {
+        return mk_game_issue_move_order(game, unit->id, objective_position);
     }
 
     return mk_game_issue_move_order(game, unit->id, enemy->position_m);

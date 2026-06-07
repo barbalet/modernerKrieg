@@ -145,6 +145,12 @@ Add simple balance expectations to fail a headless run when the expected state i
 
 The previous SDL experiment has been removed. The launchable interfaces should now be platform-native shells over the same C libraries: a Mac frontend first, then a Windows frontend, with the command-line tools remaining the deterministic test and debugging surface.
 
+The native frontend entry point is the portable `modernerKriegDemo` C library.
+It exposes an opaque session API for scenario loading, fixed stepping, optional
+AI-only stepping, summaries, snapshots, draw-command export, screen picking,
+selection, and simple order helpers. Platform frontends should link that layer
+and keep gameplay rules in C.
+
 ## Xcode AI Battles
 
 The checked-in Xcode command-line project is:
@@ -221,13 +227,21 @@ The core now supports deterministic board interaction without depending on a pla
 - pan and zoom a board view
 - project terrain, objectives, units, and soldier offsets into screen space
 - project tactical overlays for selection, movement, fire, suppression, hidden contacts, suspected/false contacts, casualties, objectives, objective control, civilian risk, and visible unit order status
+- create a native-wrapper C demo session without platform UI dependencies
+- export stable draw commands for map levels, units, civilians, soldiers, objectives, contacts, and overlays
+- map screen coordinates back to units, civilians, contacts, objectives, terrain, topology nodes, portals, and semantic zones
+- issue selected-unit move orders from screen coordinates
+- expose demo performance counters for fixed ticks, AI batches, draw queries, picks, snapshots, and order requests
 - validate map, sprite, and marker manifests from portable C
 - load the 2003 scenario from data with parser-side and core-side validation
 - run a selected scenario through the headless tool with seed, tick-count, quiet, and transcript controls
 - run player and opposing tactical controllers as deterministic AI-only headless runs with move, investigate, overwatch, suppress, hold, civilian-risk restraint, and withdraw choices
-- hand map, sprite, and marker manifests to platform frontends for PNG-backed map, unit, marker, HUD, briefing, status, and AAR presentation
+- hand map, sprite, marker, snapshot, draw-command, and pick data to platform frontends for PNG-backed map, unit, marker, HUD, briefing, status, and AAR presentation
 
-The first 100-cycle plan is complete. Next work should focus on final art replacement, deeper search/breach/rooftop rules, a native Mac frontend, a native Windows frontend, and platform packaging validation.
+The first 100-cycle plan is now in its final hardening milestone. Current work
+should focus on performance/debug polish, replay/save diagnostics, final art
+replacement, native Mac and Windows frontends, and platform packaging
+validation.
 
 ## Design Intent
 
