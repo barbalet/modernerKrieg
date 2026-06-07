@@ -40,6 +40,9 @@ SDL, Metal, Direct2D, or other presentation frameworks:
 - load the default Mosul 2003 scenario or a specific `.mkscenario` path
 - step fixed ticks with optional AI-only order emission
 - query `mk_demo_summary_t`, `mk_game_snapshot_t`, and performance counters
+- reset performance counters for profiling or repeatable frontend smoke checks
+- query after-action reports, scenario audits, session debug text, and topology
+  debug text
 - fit the board to a screen rectangle
 - collect stable draw commands for levels, units, civilians, soldiers,
   objectives, contacts, and tactical overlays

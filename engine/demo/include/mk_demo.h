@@ -68,6 +68,28 @@ typedef struct {
 } mk_demo_performance_counters_t;
 
 typedef struct {
+    uint32_t level_count;
+    uint32_t feature_count;
+    uint32_t region_count;
+    uint32_t topology_node_count;
+    uint32_t topology_portal_count;
+    uint32_t semantic_zone_count;
+    uint32_t objective_count;
+    uint32_t unit_count;
+    uint32_t civilian_count;
+    uint32_t missing_level_image_paths;
+    uint32_t empty_topology_node_ids;
+    uint32_t blocked_or_unsafe_portals;
+    uint32_t breached_portals;
+    uint32_t searched_portals;
+    uint32_t searched_semantic_zones;
+    uint32_t unit_route_failures;
+    uint32_t civilian_route_failures;
+    uint32_t warnings;
+    char summary[MK_AFTER_ACTION_SUMMARY_CAPACITY];
+} mk_demo_audit_report_t;
+
+typedef struct {
     mk_demo_pick_kind_t kind;
     uint32_t id;
     uint32_t secondary_id;
@@ -116,6 +138,25 @@ mk_result_t mk_demo_session_summary(mk_demo_session_t *session, mk_demo_summary_
 mk_result_t mk_demo_session_performance(
     const mk_demo_session_t *session,
     mk_demo_performance_counters_t *out_counters
+);
+mk_result_t mk_demo_session_reset_performance(mk_demo_session_t *session);
+mk_result_t mk_demo_session_after_action(
+    mk_demo_session_t *session,
+    mk_after_action_report_t *out_report
+);
+mk_result_t mk_demo_session_audit(
+    mk_demo_session_t *session,
+    mk_demo_audit_report_t *out_report
+);
+mk_result_t mk_demo_session_debug_text(
+    mk_demo_session_t *session,
+    char *out_text,
+    size_t capacity
+);
+mk_result_t mk_demo_session_topology_debug_text(
+    mk_demo_session_t *session,
+    char *out_text,
+    size_t capacity
 );
 
 mk_result_t mk_demo_session_fit_board(

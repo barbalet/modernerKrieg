@@ -62,6 +62,7 @@ static void test_session_draw_commands_and_picking(void) {
     mk_demo_draw_command_t commands[MK_DEMO_MAX_DRAW_COMMANDS];
     const mk_demo_draw_command_t *unit_command;
     const mk_demo_draw_command_t *level_command;
+    const mk_demo_draw_command_t *civilian_command;
     const mk_demo_draw_command_t *objective_command;
     mk_demo_pick_result_t pick;
     size_t command_count = 0;
@@ -78,9 +79,11 @@ static void test_session_draw_commands_and_picking(void) {
 
     unit_command = find_draw_command(commands, command_count, MK_DEMO_DRAW_UNIT);
     level_command = find_draw_command(commands, command_count, MK_DEMO_DRAW_LEVEL);
+    civilian_command = find_draw_command(commands, command_count, MK_DEMO_DRAW_CIVILIAN);
     objective_command = find_draw_command(commands, command_count, MK_DEMO_DRAW_OBJECTIVE);
     MK_TEST_ASSERT(unit_command != NULL);
     MK_TEST_ASSERT(level_command != NULL);
+    MK_TEST_ASSERT(civilian_command != NULL);
     MK_TEST_ASSERT(objective_command != NULL);
     MK_TEST_ASSERT(level_command->asset_path[0] != '\0');
 
@@ -123,6 +126,53 @@ static void test_session_ai_only_step_and_counters(void) {
     MK_TEST_ASSERT(counters.ai_order_batches == 2);
     MK_TEST_ASSERT(counters.ai_units_considered > 0);
     MK_TEST_ASSERT(counters.draw_queries == 0);
+    MK_TEST_ASSERT(mk_demo_session_reset_performance(session) == MK_OK);
+    MK_TEST_ASSERT(mk_demo_session_performance(session, &counters) == MK_OK);
+    MK_TEST_ASSERT(counters.fixed_ticks == 0);
+    MK_TEST_ASSERT(counters.ai_order_batches == 0);
+    MK_TEST_ASSERT(counters.ai_units_considered == 0);
+
+    mk_demo_session_destroy(session);
+}
+
+static void test_session_audit_and_debug_exports(void) {
+    mk_demo_session_t *session = make_loaded_session(true);
+    mk_demo_audit_report_t audit;
+    mk_after_action_report_t aar;
+    char debug_text[2048];
+    char topology_text[4096];
+
+    MK_TEST_ASSERT(mk_demo_session_step(session, 1) == MK_OK);
+    MK_TEST_ASSERT(mk_demo_session_audit(session, &audit) == MK_OK);
+    MK_TEST_ASSERT(audit.level_count >= 4);
+    MK_TEST_ASSERT(audit.feature_count > 0);
+    MK_TEST_ASSERT(audit.region_count > 0);
+    MK_TEST_ASSERT(audit.topology_node_count > 0);
+    MK_TEST_ASSERT(audit.topology_portal_count > 0);
+    MK_TEST_ASSERT(audit.semantic_zone_count > 0);
+    MK_TEST_ASSERT(audit.objective_count > 0);
+    MK_TEST_ASSERT(audit.unit_count >= 3);
+    MK_TEST_ASSERT(audit.civilian_count > 0);
+    MK_TEST_ASSERT(audit.missing_level_image_paths == 0);
+    MK_TEST_ASSERT(audit.empty_topology_node_ids == 0);
+    MK_TEST_ASSERT(audit.warnings == 0);
+    MK_TEST_ASSERT(strstr(audit.summary, "warnings=0") != NULL);
+
+    MK_TEST_ASSERT(mk_demo_session_after_action(session, &aar) == MK_OK);
+    MK_TEST_ASSERT(aar.summary[0] != '\0');
+    MK_TEST_ASSERT(aar.narrative[0] != '\0');
+    MK_TEST_ASSERT(strstr(aar.summary, "score=") != NULL);
+
+    MK_TEST_ASSERT(mk_demo_session_debug_text(session, debug_text, sizeof(debug_text)) == MK_OK);
+    MK_TEST_ASSERT(strstr(debug_text, "scenario=\"Market Commercial Streets 2003\"") != NULL);
+    MK_TEST_ASSERT(strstr(debug_text, "tick=1") != NULL);
+    MK_TEST_ASSERT(strstr(debug_text, "performance") != NULL);
+    MK_TEST_ASSERT(strstr(debug_text, "after_action") != NULL);
+    MK_TEST_ASSERT(strstr(debug_text, "civilian_sample") != NULL);
+
+    MK_TEST_ASSERT(mk_demo_session_topology_debug_text(session, topology_text, sizeof(topology_text)) == MK_OK);
+    MK_TEST_ASSERT(strstr(topology_text, "topology") != NULL);
+    MK_TEST_ASSERT(strstr(topology_text, "nodes=") != NULL);
 
     mk_demo_session_destroy(session);
 }
@@ -152,6 +202,7 @@ int main(void) {
     test_session_lifecycle_and_summary();
     test_session_draw_commands_and_picking();
     test_session_ai_only_step_and_counters();
+    test_session_audit_and_debug_exports();
     test_session_load_specific_scenario();
 
     puts("mk_demo_session_tests: ok");

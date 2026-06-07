@@ -233,10 +233,10 @@ Implementation approach:
 - Added budget from gameplay-area integration rebaseline: 20 cycles.
 - Planned cycle budget: 100 cycles.
 - Planned cycle shape: 10 milestones x 10 cycles each.
-- Completed cycles in this ledger: 91.
-- Current cycle: 91.
-- Remaining planned cycles: 9.
-- Next cycle batch: cycles 92-100, Demo Hardening, Performance, And Release Readiness.
+- Completed cycles in this ledger: 100.
+- Current cycle: 100.
+- Remaining planned cycles: 0.
+- Next cycle batch: none; the initial 100-cycle C demo engine plan is complete.
 
 Prior implementation work is captured in the current audit and is not counted
 against this rebaselined ledger. When a development batch is completed,
@@ -255,6 +255,7 @@ increment `Completed cycles in this ledger`, advance `Current cycle`, reduce
 | 2026-06-07 | 61 | 61 | 39 | Scenario Variants, Civilian AI, And Search Hook | Added seven compact Market 2003 scenario variants, C-level civilian intent/destination/path state, deterministic civilian AI movement, civilian instruction API, replay route exposure, search/cache reveal hooks, docs, and smoke tests. |
 | 2026-06-07 | 76 | 76 | 24 | Urban Interactions And AI Guardrails | Completed cycles 62-70 with persistent search state, breachable portal state, interaction scoring, rooftop/elevation fire modifiers, replay/contact support, and core tests; completed cycles 71-76 with player AI search/breach behavior, broader AI-battle stall signatures, and cache-search AI battle CTest coverage. |
 | 2026-06-07 | 91 | 91 | 9 | Tactical AI, Demo API, And Hardening Start | Completed cycles 77-80 with objective-aware AI, hidden topology defender overwatch, updated balance expectations, and AI tests; completed cycles 81-90 with the portable `modernerKriegDemo` C session API, draw-command export, screen picking, selected move helpers, lifecycle/performance counters, and C demo session tests; completed cycle 91 by adding demo counters and the expanded default/strict CTest matrix entry point. |
+| 2026-06-07 | 100 | 100 | 0 | Demo Hardening And Release Readiness | Completed cycles 92-100 with native-wrapper after-action export, scenario audit reports, session debug text, topology debug text, performance-counter reset, expanded demo session tests, and final README/architecture/ledger updates for the first 100-cycle C-engine plan. |
 
 ## Cycle Delta From Previous Plan
 
@@ -602,10 +603,13 @@ Exit criteria:
 
 ### Cycles 91-100: Demo Hardening, Performance, And Release Readiness
 
-Status: in progress. Cycle 91 completed on 2026-06-07 with demo session
-performance counters, CTest coverage for the native-wrapper contract, updated
-default replay/balance expectations after objective-aware AI, and documentation
-for frontend responsibilities.
+Status: completed on 2026-06-07. Cycle 91 completed demo session performance
+counters, CTest coverage for the native-wrapper contract, updated default
+replay/balance expectations after objective-aware AI, and documentation for
+frontend responsibilities. Cycles 92-100 completed native-wrapper after-action
+export, scenario audit reports, session debug text, topology debug text,
+performance-counter reset, expanded demo session tests, and final README,
+architecture, and ledger updates.
 
 Goal: finish the C engine side of a playable public demo.
 

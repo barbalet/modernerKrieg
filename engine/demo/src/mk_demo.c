@@ -3,6 +3,7 @@
 #include "mk_ai.h"
 #include "mk_mosul_demo.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,6 +40,113 @@ static void mk_demo_copy_text(char *destination, size_t capacity, const char *so
     }
 
     destination[index] = '\0';
+}
+
+static bool mk_demo_text_is_present(const char *text) {
+    return text != NULL && text[0] != '\0';
+}
+
+static bool mk_demo_append_text(char *out_text, size_t capacity, size_t *in_out_length, const char *format, ...) {
+    va_list args;
+    int written;
+
+    if (out_text == NULL || capacity == 0 || in_out_length == NULL || format == NULL) {
+        return false;
+    }
+    if (*in_out_length >= capacity) {
+        return false;
+    }
+
+    va_start(args, format);
+    written = vsnprintf(out_text + *in_out_length, capacity - *in_out_length, format, args);
+    va_end(args);
+    if (written < 0 || (size_t)written >= capacity - *in_out_length) {
+        out_text[capacity - 1] = '\0';
+        return false;
+    }
+
+    *in_out_length += (size_t)written;
+    return true;
+}
+
+static const char *mk_demo_side_name(mk_side_t side) {
+    switch (side) {
+        case MK_SIDE_PLAYER:
+            return "player";
+        case MK_SIDE_OPFOR:
+            return "opfor";
+        case MK_SIDE_CIVILIAN:
+            return "civilian";
+        case MK_SIDE_NEUTRAL:
+            return "neutral";
+        default:
+            return "unknown";
+    }
+}
+
+static const char *mk_demo_order_name(mk_order_t order) {
+    switch (order) {
+        case MK_ORDER_NONE:
+            return "none";
+        case MK_ORDER_MOVE:
+            return "move";
+        case MK_ORDER_ASSAULT_MOVE:
+            return "assault_move";
+        case MK_ORDER_FIRE:
+            return "fire";
+        case MK_ORDER_HOLD:
+            return "hold";
+        case MK_ORDER_BREACH:
+            return "breach";
+        case MK_ORDER_RALLY:
+            return "rally";
+        case MK_ORDER_OVERWATCH:
+            return "overwatch";
+        case MK_ORDER_SUPPRESS:
+            return "suppress";
+        case MK_ORDER_WITHDRAW:
+            return "withdraw";
+        case MK_ORDER_INVESTIGATE:
+            return "investigate";
+        default:
+            return "unknown";
+    }
+}
+
+static const char *mk_demo_unit_status_name(mk_unit_status_t status) {
+    switch (status) {
+        case MK_UNIT_READY:
+            return "ready";
+        case MK_UNIT_SUPPRESSED:
+            return "suppressed";
+        case MK_UNIT_PINNED:
+            return "pinned";
+        case MK_UNIT_BROKEN:
+            return "broken";
+        default:
+            return "unknown";
+    }
+}
+
+static const char *mk_demo_civilian_state_name(mk_civilian_state_t state) {
+    switch (state) {
+        case MK_CIVILIAN_SHELTERING:
+            return "sheltering";
+        case MK_CIVILIAN_FLEEING:
+            return "fleeing";
+        case MK_CIVILIAN_FROZEN:
+            return "frozen";
+        case MK_CIVILIAN_FOLLOWING_INSTRUCTIONS:
+            return "following_instructions";
+        case MK_CIVILIAN_WOUNDED:
+            return "wounded";
+        case MK_CIVILIAN_DEAD:
+            return "dead";
+        case MK_CIVILIAN_EVACUATED:
+            return "evacuated";
+        default:
+            return "unknown";
+    }
 }
 
 static bool mk_demo_make_project_path(
@@ -378,6 +486,279 @@ mk_result_t mk_demo_session_performance(
 
     *out_counters = session->counters;
     return MK_OK;
+}
+
+mk_result_t mk_demo_session_reset_performance(mk_demo_session_t *session) {
+    if (session == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    memset(&session->counters, 0, sizeof(session->counters));
+    return MK_OK;
+}
+
+mk_result_t mk_demo_session_after_action(
+    mk_demo_session_t *session,
+    mk_after_action_report_t *out_report
+) {
+    if (session == NULL || out_report == NULL || !session->has_game) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    return mk_game_after_action_report(&session->game, out_report);
+}
+
+mk_result_t mk_demo_session_audit(
+    mk_demo_session_t *session,
+    mk_demo_audit_report_t *out_report
+) {
+    const mk_gameplay_area_t *area;
+    size_t index;
+
+    if (session == NULL || out_report == NULL || !session->has_game) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    memset(out_report, 0, sizeof(*out_report));
+    area = &session->game.gameplay_area;
+    out_report->objective_count = (uint32_t)session->game.objective_count;
+    out_report->unit_count = (uint32_t)session->game.unit_count;
+    out_report->civilian_count = (uint32_t)session->game.civilian_count;
+
+    if (!mk_gameplay_area_is_loaded(area)) {
+        out_report->warnings += 1U;
+    } else {
+        out_report->level_count = (uint32_t)area->level_count;
+        out_report->feature_count = (uint32_t)area->feature_count;
+        out_report->region_count = (uint32_t)area->region_count;
+        out_report->topology_node_count = (uint32_t)area->topology_node_count;
+        out_report->topology_portal_count = (uint32_t)area->topology_portal_count;
+        out_report->semantic_zone_count = (uint32_t)area->semantic_zone_count;
+
+        if (area->level_count == 0U) {
+            out_report->warnings += 1U;
+        }
+        if (!mk_gameplay_area_topology_is_loaded(area)) {
+            out_report->warnings += 1U;
+        }
+        if (area->semantic_zone_count == 0U) {
+            out_report->warnings += 1U;
+        }
+
+        for (index = 0; index < area->level_count; ++index) {
+            if (!mk_demo_text_is_present(area->levels[index].image_path)) {
+                out_report->missing_level_image_paths += 1U;
+                out_report->warnings += 1U;
+            }
+        }
+
+        for (index = 0; index < area->topology_node_count; ++index) {
+            if (!mk_demo_text_is_present(area->topology_nodes[index].id)) {
+                out_report->empty_topology_node_ids += 1U;
+                out_report->warnings += 1U;
+            }
+        }
+
+        for (index = 0; index < area->topology_portal_count; ++index) {
+            const mk_gameplay_topology_portal_t *portal = &area->topology_portals[index];
+
+            if (strcmp(portal->state, "blocked") == 0
+                || strcmp(portal->state, "locked") == 0
+                || strcmp(portal->state, "unsafe") == 0) {
+                out_report->blocked_or_unsafe_portals += 1U;
+            }
+            if (portal->breached) {
+                out_report->breached_portals += 1U;
+            }
+            if (portal->searched) {
+                out_report->searched_portals += 1U;
+            }
+        }
+
+        for (index = 0; index < area->semantic_zone_count; ++index) {
+            if (area->semantic_zones[index].searched) {
+                out_report->searched_semantic_zones += 1U;
+            }
+        }
+    }
+
+    for (index = 0; index < session->game.unit_count; ++index) {
+        out_report->unit_route_failures += session->game.units[index].route_failure_count;
+    }
+    for (index = 0; index < session->game.civilian_count; ++index) {
+        out_report->civilian_route_failures += session->game.civilians[index].route_failure_count;
+    }
+
+    if (session->game.objective_count == 0U) {
+        out_report->warnings += 1U;
+    }
+    if (session->game.unit_count == 0U) {
+        out_report->warnings += 1U;
+    }
+    if (session->game.civilian_count == 0U) {
+        out_report->warnings += 1U;
+    }
+
+    (void)snprintf(
+        out_report->summary,
+        sizeof(out_report->summary),
+        "audit scenario=\"%s\" area=\"%s\" levels=%u features=%u regions=%u nodes=%u portals=%u zones=%u units=%u civilians=%u objectives=%u warnings=%u route_failures(unit=%u,civilian=%u)",
+        session->game.scenario_name,
+        area->id,
+        (unsigned)out_report->level_count,
+        (unsigned)out_report->feature_count,
+        (unsigned)out_report->region_count,
+        (unsigned)out_report->topology_node_count,
+        (unsigned)out_report->topology_portal_count,
+        (unsigned)out_report->semantic_zone_count,
+        (unsigned)out_report->unit_count,
+        (unsigned)out_report->civilian_count,
+        (unsigned)out_report->objective_count,
+        (unsigned)out_report->warnings,
+        (unsigned)out_report->unit_route_failures,
+        (unsigned)out_report->civilian_route_failures
+    );
+
+    return MK_OK;
+}
+
+mk_result_t mk_demo_session_debug_text(
+    mk_demo_session_t *session,
+    char *out_text,
+    size_t capacity
+) {
+    mk_demo_summary_t summary;
+    mk_after_action_report_t report;
+    size_t length = 0;
+    size_t index;
+    const mk_unit_t *selected_unit = NULL;
+
+    if (session == NULL || out_text == NULL || capacity == 0 || !session->has_game) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    out_text[0] = '\0';
+    if (mk_demo_session_summary(session, &summary) != MK_OK) {
+        return MK_ERROR_INVALID_DATA;
+    }
+    if (mk_game_after_action_report(&session->game, &report) != MK_OK) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    for (index = 0; index < session->snapshot.unit_count; ++index) {
+        if (session->snapshot.units[index].id == session->snapshot.selected_unit_id) {
+            selected_unit = &session->snapshot.units[index];
+            break;
+        }
+    }
+
+    if (!mk_demo_append_text(
+            out_text,
+            capacity,
+            &length,
+            "scenario=\"%s\" tick=%u score=%d outcome=%d map=\"%s\" area=\"%s\"\n",
+            summary.scenario_name,
+            (unsigned)summary.tick,
+            summary.score.total_score,
+            summary.score.outcome,
+            summary.map_name,
+            summary.gameplay_area_id
+        )
+        || !mk_demo_append_text(
+            out_text,
+            capacity,
+            &length,
+            "counts units=%u civilians=%u objectives=%u contacts=%u selected=%u\n",
+            (unsigned)summary.unit_count,
+            (unsigned)summary.civilian_count,
+            (unsigned)summary.objective_count,
+            (unsigned)summary.contact_report_count,
+            (unsigned)summary.selected_unit_id
+        )
+        || !mk_demo_append_text(
+            out_text,
+            capacity,
+            &length,
+            "performance ticks=%llu ai_batches=%llu snapshots=%llu draws=%llu picks=%llu orders=%llu\n",
+            (unsigned long long)session->counters.fixed_ticks,
+            (unsigned long long)session->counters.ai_order_batches,
+            (unsigned long long)session->counters.snapshot_queries,
+            (unsigned long long)session->counters.draw_queries,
+            (unsigned long long)session->counters.pick_queries,
+            (unsigned long long)session->counters.order_requests
+        )
+        || !mk_demo_append_text(
+            out_text,
+            capacity,
+            &length,
+            "after_action %s\n",
+            report.summary
+        )) {
+        return MK_ERROR_CAPACITY;
+    }
+
+    if (selected_unit != NULL) {
+        if (!mk_demo_append_text(
+                out_text,
+                capacity,
+                &length,
+                "selected_unit id=%u side=%s order=%s status=%s pos=(%.2f,%.2f) target=(%.2f,%.2f) level=\"%s\" node=\"%s\" route_failures=%u reason=\"%s\"\n",
+                (unsigned)selected_unit->id,
+                mk_demo_side_name(selected_unit->side),
+                mk_demo_order_name(selected_unit->order),
+                mk_demo_unit_status_name(selected_unit->status),
+                selected_unit->position_m.x,
+                selected_unit->position_m.y,
+                selected_unit->target_position_m.x,
+                selected_unit->target_position_m.y,
+                selected_unit->level_id,
+                selected_unit->topology_node_id,
+                (unsigned)selected_unit->route_failure_count,
+                selected_unit->route_failure_reason
+            )) {
+            return MK_ERROR_CAPACITY;
+        }
+    } else if (!mk_demo_append_text(out_text, capacity, &length, "selected_unit none\n")) {
+        return MK_ERROR_CAPACITY;
+    }
+
+    if (session->snapshot.civilian_count > 0U) {
+        const mk_civilian_t *civilian = &session->snapshot.civilians[0];
+
+        if (!mk_demo_append_text(
+                out_text,
+                capacity,
+                &length,
+                "civilian_sample id=%u state=%s intent=%s risk=%d stress=%d pos=(%.2f,%.2f) dest=(%.2f,%.2f) route_failures=%u reason=\"%s\"\n",
+                (unsigned)civilian->id,
+                mk_demo_civilian_state_name(civilian->state),
+                mk_civilian_intent_name(civilian->intent),
+                civilian->risk,
+                civilian->stress,
+                civilian->position_m.x,
+                civilian->position_m.y,
+                civilian->destination_m.x,
+                civilian->destination_m.y,
+                (unsigned)civilian->route_failure_count,
+                civilian->route_failure_reason
+            )) {
+            return MK_ERROR_CAPACITY;
+        }
+    }
+
+    return MK_OK;
+}
+
+mk_result_t mk_demo_session_topology_debug_text(
+    mk_demo_session_t *session,
+    char *out_text,
+    size_t capacity
+) {
+    if (session == NULL || out_text == NULL || capacity == 0 || !session->has_game) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    return mk_gameplay_area_topology_debug_dump(&session->game.gameplay_area, out_text, capacity);
 }
 
 mk_result_t mk_demo_session_fit_board(

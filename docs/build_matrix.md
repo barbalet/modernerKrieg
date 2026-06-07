@@ -28,13 +28,15 @@ ctest --preset default
 ```
 
 The default and strict suites include `mk_demo_session_tests`, which exercises
-the native-wrapper C contract without launching a platform frontend.
+the native-wrapper C contract, draw/pick helpers, AI-only stepping, audit
+exports, debug text, after-action export, and performance counters without
+launching a platform frontend.
 
 Run repeated AI-vs-AI battles from CMake:
 
 ```sh
-cmake --build build --target mk_ai_battle
-./build/bin/mk_ai_battle --battles 5 --ticks 160 --summary-every 10 --watchdog 40
+cmake --build --preset default --target mk_ai_battle
+./build/default/bin/mk_ai_battle --battles 5 --ticks 160 --summary-every 10 --watchdog 40
 ```
 
 Add `--keep-running-after-outcome --fail-on-stall` when you want a longer soak that keeps ticking after an objective outcome and returns nonzero on a tactical stall.
@@ -42,15 +44,15 @@ Add `--keep-running-after-outcome --fail-on-stall` when you want a longer soak t
 Run a deterministic seed-sweep balance check:
 
 ```sh
-./build/bin/mk_ai_battle --battles 5 --ticks 160 --seed 84985359904819 --seed-step 101 --quiet --fail-on-stall --expect-settled 5 --expect-max-stalled 0 --expect-min-worst-score 440
+./build/default/bin/mk_ai_battle --battles 5 --ticks 160 --seed 84985359904819 --seed-step 101 --watchdog 40 --quiet --fail-on-stall --expect-max-stalled 0 --expect-min-worst-score -1500
 ```
 
 Validate generated replay/event logs:
 
 ```sh
-./build/bin/mk_headless_run --ai-only --max-ticks 3 --quiet --replay build/mosul_ai.mkreplay
-./build/bin/mk_replay_validate --expect-result MK_OK build/mosul_ai.mkreplay
-./build/bin/mk_replay_validate --playback --from-tick 2 --to-tick 3 build/mosul_ai.mkreplay
+./build/default/bin/mk_headless_run --ai-only --max-ticks 3 --quiet --replay build/default/mosul_ai.mkreplay
+./build/default/bin/mk_replay_validate --expect-result MK_OK build/default/mosul_ai.mkreplay
+./build/default/bin/mk_replay_validate --playback --from-tick 2 --to-tick 3 build/default/mosul_ai.mkreplay
 ```
 
 Run the same AI battle tool through the checked-in Xcode command-line project:

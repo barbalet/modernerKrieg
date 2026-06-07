@@ -232,16 +232,18 @@ The core now supports deterministic board interaction without depending on a pla
 - map screen coordinates back to units, civilians, contacts, objectives, terrain, topology nodes, portals, and semantic zones
 - issue selected-unit move orders from screen coordinates
 - expose demo performance counters for fixed ticks, AI batches, draw queries, picks, snapshots, and order requests
+- reset demo performance counters during profiling/playtest sessions
+- expose after-action, scenario audit, session debug, and topology debug text from the native-wrapper C API
 - validate map, sprite, and marker manifests from portable C
 - load the 2003 scenario from data with parser-side and core-side validation
 - run a selected scenario through the headless tool with seed, tick-count, quiet, and transcript controls
 - run player and opposing tactical controllers as deterministic AI-only headless runs with move, investigate, overwatch, suppress, hold, civilian-risk restraint, and withdraw choices
 - hand map, sprite, marker, snapshot, draw-command, and pick data to platform frontends for PNG-backed map, unit, marker, HUD, briefing, status, and AAR presentation
 
-The first 100-cycle plan is now in its final hardening milestone. Current work
-should focus on performance/debug polish, replay/save diagnostics, final art
-replacement, native Mac and Windows frontends, and platform packaging
-validation.
+The first 100-cycle C-engine plan is complete. Current work should focus on
+native Mac and Windows frontends, final art replacement, platform packaging,
+and any follow-on content or replay/save diagnostics needed during manual
+playtesting.
 
 ## Design Intent
 
