@@ -26,13 +26,28 @@ The first map target is the 2003 Market / Commercial Streets demo, using the imp
 
 ## Sprite Manifests
 
-Sprite manifests describe source sheets and runtime sprite IDs. They record:
+Sprite manifests describe source sheets, source-angle sprites, generated runtime sprites, and runtime sprite IDs. They record:
 
 - sheet path and tile size
 - pivot point
 - scale in meters
 - side, role, state, facing, and runtime ID for each frame
 - fallback marker to use when a sprite is missing
+
+The compact C-validated sprite manifest is:
+
+- `assets/mosul/manifests/mosul_2003_sprites.spritemanifest`
+
+The full imported render-pipeline manifests are:
+
+- `assets/mosul/runtime/sprites/manifest.json`
+- `assets/mosul/runtime/sprites/rendered/render_manifest.json`
+
+The current runtime sprite set contains 896 PNGs:
+
+- 640 infantry sprites: 16 demo roles x 5 states x 8 facings.
+- 64 weapon sprites: 8 weapon types x 8 facings.
+- 192 vehicle sprites: 8 vehicle types x 3 damage states x 8 facings.
 
 ## Marker Manifests
 
@@ -65,3 +80,4 @@ Generated assets should be reproducible. Do not edit generated files by hand. Th
 Current runtime product:
 
 - `assets/mosul/runtime/maps/market_commercial_streets_2003/overview.png`: copied from the source `preview_1400.png` as the first runtime map overview.
+- `assets/mosul/runtime/sprites/rendered/`: copied from the MOSUL render pipeline as the first complete runtime-facing sprite set.

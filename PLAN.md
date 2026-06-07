@@ -101,9 +101,12 @@ Current source asset groups:
 
 - `assets/mosul/source/line_art/`: Mosul context, combatant, weapon, vehicle, and urban tactics plates.
 - `assets/mosul/source/sprite_sheets/`: 128 px combatant, stance, vehicle, and weapon source sheets.
+- `assets/mosul/source/sprite_sheets/source_angles/infantry_128/`: approved source-angle infantry PNGs for 16 demo roles across standing, crouch, prone, wounded, and dead states.
 - `assets/mosul/source/sprite_sheets/source_angles/weapons_128/`: approved source-angle weapon PNGs.
+- `assets/mosul/source/sprite_sheets/source_angles/vehicles_1024/`: approved source-angle vehicle PNGs across intact, damaged, and destroyed states.
 - `assets/mosul/source/maps/market_commercial_streets_demo_2003/`: Market / Commercial Streets map previews, layer manifest, and source map layers.
 - `assets/mosul/source/notes/`: provenance and demo asset selection notes.
+- `assets/mosul/runtime/sprites/rendered/`: generated runtime-facing sprites, currently 896 PNGs.
 
 Immediate asset work:
 

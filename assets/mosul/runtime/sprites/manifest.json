@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "source_root": "assets/mosul/source/sprite_sheets/source_angles",
+  "output_root": "assets/mosul/runtime/sprites/rendered",
+  "source_angles": ["north", "north_east", "east"],
+  "runtime_angles": {
+    "north": { "source": "north", "flip_horizontal": false, "flip_vertical": false },
+    "south": { "source": "north", "flip_horizontal": false, "flip_vertical": true },
+    "east": { "source": "east", "flip_horizontal": false, "flip_vertical": false },
+    "west": { "source": "east", "flip_horizontal": true, "flip_vertical": false },
+    "north_east": { "source": "north_east", "flip_horizontal": false, "flip_vertical": false },
+    "north_west": { "source": "north_east", "flip_horizontal": true, "flip_vertical": false },
+    "south_east": { "source": "north_east", "flip_horizontal": false, "flip_vertical": true },
+    "south_west": { "source": "north_east", "flip_horizontal": true, "flip_vertical": true }
+  },
+  "image_sets": {
+    "infantry_128": {
+      "kind": "infantry",
+      "pixel_size": [128, 128],
+      "states": ["standing", "crouch", "prone", "wounded", "dead"],
+      "factions": {
+        "allied": [
+          {
+            "id": "us_army_rifleman",
+            "display_name": "U.S. Army rifleman",
+            "allowed_weapons": ["m16_rifle", "fragmentation_grenade", "smoke_grenade"]
+          },
+          {
+            "id": "us_army_squad_leader",
+            "display_name": "U.S. Army squad leader",
+            "allowed_weapons": ["m4_carbine", "m9_pistol", "smoke_grenade"]
+          },
+          {
+            "id": "us_army_automatic_rifleman",
+            "display_name": "U.S. Army automatic rifleman",
+            "allowed_weapons": ["m249_saw", "m9_pistol"]
+          },
+          {
+            "id": "us_army_grenadier",
+            "display_name": "U.S. Army grenadier",
+            "allowed_weapons": ["m4_carbine", "m203_grenade_launcher", "fragmentation_grenade"]
+          },
+          {
+            "id": "us_army_marksman",
+            "display_name": "U.S. Army marksman",
+            "allowed_weapons": ["designated_marksman_rifle", "m9_pistol"]
+          },
+          {
+            "id": "us_army_medic",
+            "display_name": "U.S. Army medic",
+            "allowed_weapons": ["m4_carbine", "m9_pistol", "smoke_grenade", "medical_kit"]
+          },
+          {
+            "id": "us_army_engineer_breacher",
+            "display_name": "U.S. Army engineer / breacher",
+            "allowed_weapons": ["m4_carbine", "breaching_shotgun", "smoke_grenade"]
+          },
+          {
+            "id": "us_army_humvee_crew",
+            "display_name": "U.S. Army Humvee / vehicle crew",
+            "allowed_weapons": ["m4_carbine", "m9_pistol"]
+          }
+        ],
+        "opposing": [
+          {
+            "id": "baathist_regime_remnant",
+            "display_name": "Ba'athist regime remnant rifleman",
+            "allowed_weapons": ["ak_pattern_rifle", "fragmentation_grenade"]
+          },
+          {
+            "id": "fedayeen_irregular",
+            "display_name": "Fedayeen / irregular fighter",
+            "allowed_weapons": ["ak_pattern_rifle", "fragmentation_grenade"]
+          },
+          {
+            "id": "insurgent_cell_rifleman",
+            "display_name": "Insurgent cell rifleman",
+            "allowed_weapons": ["ak_pattern_rifle", "fragmentation_grenade"]
+          },
+          {
+            "id": "rpg_gunner",
+            "display_name": "RPG gunner",
+            "allowed_weapons": ["rpg7_launcher", "ak_pattern_rifle"]
+          },
+          {
+            "id": "machine_gunner",
+            "display_name": "Machine gunner",
+            "allowed_weapons": ["pkm_machine_gun", "rpk_light_machine_gun"]
+          },
+          {
+            "id": "sniper_marksman",
+            "display_name": "Sniper / marksman",
+            "allowed_weapons": ["svd_scoped_rifle", "m9_pistol"]
+          },
+          {
+            "id": "mortar_rocket_cell",
+            "display_name": "Mortar / rocket harassment cell",
+            "allowed_weapons": ["light_mortar", "ak_pattern_rifle"]
+          },
+          {
+            "id": "armed_looter",
+            "display_name": "Weapons looter / armed criminal",
+            "allowed_weapons": ["ak_pattern_rifle", "sks_rifle", "pistol"]
+          }
+        ]
+      }
+    },
+    "weapons_128": {
+      "kind": "weapon",
+      "pixel_size": [128, 128],
+      "items": [
+        { "id": "m16_rifle", "display_name": "M16 rifle" },
+        { "id": "m4_carbine", "display_name": "M4 carbine" },
+        { "id": "m249_saw", "display_name": "M249 SAW" },
+        { "id": "m203_grenade_launcher", "display_name": "M203 grenade launcher" },
+        { "id": "ak_pattern_rifle", "display_name": "AK-pattern rifle" },
+        { "id": "pkm_machine_gun", "display_name": "PKM machine gun" },
+        { "id": "rpg7_launcher", "display_name": "RPG-7 launcher" },
+        { "id": "svd_scoped_rifle", "display_name": "SVD / scoped rifle" }
+      ]
+    },
+    "vehicles_1024": {
+      "kind": "vehicle",
+      "pixel_size": [1024, 1024],
+      "states": ["intact", "damaged", "destroyed"],
+      "factions": {
+        "allied": [
+          { "id": "humvee", "display_name": "Humvee" },
+          { "id": "humvee_m2", "display_name": "Humvee with M2 heavy machine gun" },
+          { "id": "cargo_truck", "display_name": "U.S. cargo truck" },
+          { "id": "field_ambulance", "display_name": "Field ambulance / casualty vehicle" }
+        ],
+        "opposing": [
+          { "id": "civilian_pickup", "display_name": "Civilian pickup" },
+          { "id": "pickup_technical", "display_name": "Pickup technical" },
+          { "id": "iraqi_army_truck", "display_name": "Former Iraqi army truck" },
+          { "id": "armed_sedan", "display_name": "Armed sedan / irregular car" }
+        ]
+      }
+    }
+  }
+}
