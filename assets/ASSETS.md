@@ -3864,4 +3864,3 @@ Use the thumbnails for quick visual QA. Click any path to open the full asset in
 | Asset | Type | Size |
 | --- | --- | ---: |
 | [`mosul/sprites/weapons/README.md`](mosul/sprites/weapons/README.md) | `md` | 236 B |
-
