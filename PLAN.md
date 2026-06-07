@@ -9,19 +9,19 @@ The first public target is the 2003 Market / Commercial Streets demo. `derZweite
 - CMake project, portable C core, Mosul game module, renderer-independent board-view code, and headless tests exist.
 - The core already supports deterministic game state, unit selection, orders, movement ticks, line of sight, cover checks, unit fire, ammo spend, wounds, casualties, suppression, morale state changes, hidden-contact reveals, suspected/false contact reports, civilian-risk updates, objective control, scoring thresholds, and after-action summaries.
 - The core state model now includes controller slots, force records, command identities, map tiles with elevation/cover/movement costs, richer weapon/ammunition metadata, richer soldier state, standalone civilian records, contact reports, hidden unit fields, and snapshot/load support for those containers.
-- The render layer already projects map, terrain, objectives, units, soldier offsets, selection, movement targets, fire lanes, suppression, hidden contacts, casualties, civilian-risk overlays, and visible unit order-status overlays into screen space.
+- The render layer already projects map, terrain, objectives, units, soldier offsets, selection, movement targets, fire lanes, suppression, hidden contacts, casualties, civilian-risk overlays, visible unit order-status overlays, and interaction-zone overlays into screen space.
 - Deterministic headless runners exist for smoke tests, replay generation/validation, and AI-vs-AI/autoplay work.
 - CMake presets exist for default, headless, and strict warning-as-error builds.
 - Asset pipeline documentation, the first Market / Commercial Streets map manifest, the first 2003 sprite manifest, the first marker manifest, and C manifest validation tests exist.
 - The 2003 Market / Commercial Streets scenario now loads from a validated `.mkscenario` data file, with a C fixture retained for parity tests.
 - `mk_headless_run` can load an explicit scenario path, override the seed, run for a fixed tick budget, suppress console output, write a transcript with contact/risk counters, briefing, debug lines, versioned replay/event files, balance expectations, and after-action output, and run both non-civilian tactical sides under basic AI.
 - `mk_replay_validate` can validate versioned `.mkreplay` event files, assert final result/outcome fields, and print compact tick-range playback summaries.
-- The SDL app can read the map, sprite, and marker manifests and, when SDL3_image is available, load the manifest PNG assets; otherwise it keeps fallback map/unit/overlay rendering. It now draws a compact score/objective/risk HUD, order-status glyphs, and supports deterministic smoke-frame runs.
+- The SDL app can read the map, sprite, and marker manifests and, when SDL3_image is available, load the manifest PNG assets; otherwise it keeps fallback map/unit/overlay rendering. It now draws a compact score/objective/risk HUD, mission/status/AAR panels, order-status and interaction-zone glyphs, supports deterministic smoke-frame runs, and can watch both tactical sides under AI.
 - The first runtime map overview exists at `assets/mosul/runtime/maps/market_commercial_streets_2003/overview.png`.
 - The SDL3 app shell is optional and experimental. If SDL3 is available, it provides the current launchable app path; if not, the core and tests still build.
 - Source art for the 2003 demo is imported under `assets/mosul/source/`.
 - Public source art includes line-art references, 128 px top-down sprite sheets, source-angle weapon sprites, and Market / Commercial Streets map/layer assets.
-- The remaining public-demo work is now scenario interaction data, final player-facing presentation, and packaging focused.
+- The first 100-cycle public-demo plan is complete; remaining work is now final art replacement, deeper interaction rules, cross-platform packaging validation, and playtesting.
 
 ## Runtime Shape
 
@@ -185,10 +185,10 @@ Cycle accounting starts from the current checked-in PNG-backed Mosul demo plan s
 - Ledger baseline date: 2026-06-06.
 - Planned cycle budget: 100 cycles.
 - Planned cycle shape: 5 milestones x 20 cycles each.
-- Completed cycles in this ledger: 90.
-- Current cycle: 90.
-- Remaining planned cycles: 10.
-- Next cycle batch: cycles 91-100.
+- Completed cycles in this ledger: 100.
+- Current cycle: 100.
+- Remaining planned cycles: 0.
+- Next cycle batch: complete; start a new ledger for post-plan work.
 
 When a development batch is completed, increment `Completed cycles in this ledger`, advance `Current cycle`, reduce `Remaining planned cycles`, and update `Next cycle batch`. Add one log row describing the cycle range, milestone focus, completed work, and verification.
 
@@ -204,6 +204,7 @@ When a development batch is completed, increment `Completed cycles in this ledge
 | 2026-06-07 | 70 | 70 | 30 | Milestone E / Replay Validation + Balance | Added standalone `.mkreplay` validation tooling, end-to-end replay validation CTest coverage with an invalid replay negative check, richer headless expectations for final outcome/contested objectives/civilian risk, and a contested civilian-risk AI-only smoke scenario. Verified default CTest, direct replay validation, and direct contested-risk balance run. |
 | 2026-06-07 | 80 | 80 | 20 | Milestone E / SDL Presentation + Smoke | Added renderer-independent order-status overlays, explicit order marker manifest records, SDL score/objective/risk HUD bars, SDL order-status glyphs, `--smoke-frames`, an SDL dummy-video smoke CTest, and an Apple Silicon `default-arm64` preset for Homebrew SDL3. Verified `default-arm64` build and CTest, including the SDL smoke test. |
 | 2026-06-07 | 90 | 90 | 10 | Milestone E / Replay Playback + Seed Sweeps | Added `.mkreplay` tick-range playback summaries, replay playback CTest coverage, AI battle seed-step sweeps, batch settlement/stall/worst-score expectations, a deterministic five-seed AI-only balance CTest, and matching Xcode scheme launch arguments. Verified direct seed sweep expectations, replay playback, default-arm64 CTest, strict warning-as-error CTest, and Xcode project build. |
+| 2026-06-07 | 100 | 100 | 0 | Milestone E / Interaction Data + Package | Added first-pass breach/search, cache/search, and rooftop/stair terrain zones; renderer-independent interaction-zone overlays; SDL mission/status/AAR panels; SDL `--project-root`, `--scenario`, and `--ai-only` launch controls; an SDL smoke CTest using the new controls; and a macOS smoke-tested package target. Verified direct SDL AI-only smoke, package creation, default-arm64 CTest, strict warning-as-error CTest, and package smoke. |
 
 ## Milestones
 
@@ -254,16 +255,17 @@ When a development batch is completed, increment `Completed cycles in this ledge
 - Complete: add first SDL score/objective/risk HUD, order-status glyphs, and dummy-video SDL smoke test.
 - Complete: add replay playback for versioned `.mkreplay` event files.
 - Complete: broaden AI-only balance coverage into seed sweeps with batch summary expectations.
-- Continue: add player-facing briefing and after-action UI presentation.
-- Package one macOS-first smoke-tested build.
-- Document how to build, run, test, and regenerate runtime assets.
+- Complete: add scenario data for first-pass breach/search, cache/search, and rooftop/stair access points.
+- Complete: add player-facing briefing and after-action UI presentation inside the SDL shell.
+- Complete: package one macOS-first smoke-tested build.
+- Complete: document how to build, run, test, and package the current runtime assets.
 
-## Immediate Next Steps
+## Post-Plan Next Steps
 
-1. Add scenario data for search/cache/breach points and rooftop/stair access once the art pass identifies locations.
-2. Add player-facing briefing and after-action presentation inside the SDL shell.
-3. Package one macOS-first smoke-tested build.
-4. Document how to build, run, test, and regenerate runtime assets.
+1. Replace provisional source art with the uniform art pass and regenerate runtime products.
+2. Deepen breach/search/cache/rooftop affordances into rules, commands, AI choices, and AAR scoring.
+3. Validate packaging on Windows and Linux in addition to the macOS smoke package.
+4. Add a new post-plan cycle ledger for playtest, usability, and deployment work.
 5. Keep all manifest/scenario/render/AI changes covered by CTest, including missing asset and invalid-reference failures.
 
 ## Quality Bar

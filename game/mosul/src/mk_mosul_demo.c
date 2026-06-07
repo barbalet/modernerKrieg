@@ -63,6 +63,30 @@ static mk_result_t mk_mosul_add_core_terrain(mk_scenario_definition_t *scenario)
         3,
         true
     );
+    mk_terrain_zone_t breach = mk_make_terrain_zone(
+        "Shopfront Breach Point",
+        MK_TERRAIN_BREACH_POINT,
+        mk_mosul_rect(286.0f, 214.0f, 18.0f, 24.0f),
+        2,
+        3,
+        false
+    );
+    mk_terrain_zone_t rooftop = mk_make_terrain_zone(
+        "Roof Stair Access",
+        MK_TERRAIN_ROOFTOP,
+        mk_mosul_rect(352.0f, 154.0f, 24.0f, 24.0f),
+        2,
+        2,
+        false
+    );
+    mk_terrain_zone_t cache = mk_make_terrain_zone(
+        "Possible Weapons Cache",
+        MK_TERRAIN_SUSPECTED_IED,
+        mk_mosul_rect(210.0f, 316.0f, 28.0f, 24.0f),
+        1,
+        2,
+        false
+    );
     mk_result_t result;
 
     result = mk_map_add_terrain(&scenario->map, &road, NULL);
@@ -75,7 +99,22 @@ static mk_result_t mk_mosul_add_core_terrain(mk_scenario_definition_t *scenario)
         return result;
     }
 
-    return mk_map_add_terrain(&scenario->map, &rubble, NULL);
+    result = mk_map_add_terrain(&scenario->map, &rubble, NULL);
+    if (result != MK_OK) {
+        return result;
+    }
+
+    result = mk_map_add_terrain(&scenario->map, &breach, NULL);
+    if (result != MK_OK) {
+        return result;
+    }
+
+    result = mk_map_add_terrain(&scenario->map, &rooftop, NULL);
+    if (result != MK_OK) {
+        return result;
+    }
+
+    return mk_map_add_terrain(&scenario->map, &cache, NULL);
 }
 
 static mk_result_t mk_mosul_configure_tiles(mk_scenario_definition_t *scenario) {

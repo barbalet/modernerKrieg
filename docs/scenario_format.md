@@ -53,7 +53,26 @@ The loader rejects:
 - out-of-bounds map tiles, terrain, civilians, objectives, and units
 - scenarios that the portable C core refuses to load
 
-CTest covers the default 2003 data file, fixture parity, objective labels, briefing/after-action text, score thresholds and weights, hidden-contact fields, missing asset references, invalid force references, invalid threshold ordering, impossible objective bounds, the compact AI-only control smoke scenario, and a contested civilian-risk smoke scenario.
+CTest covers the default 2003 data file, fixture parity, objective labels, briefing/after-action text, score thresholds and weights, hidden-contact fields, interaction terrain zones, missing asset references, invalid force references, invalid threshold ordering, impossible objective bounds, the compact AI-only control smoke scenario, and a contested civilian-risk smoke scenario.
+
+## Interaction Terrain
+
+Terrain zones can carry first-pass interaction affordances before final interaction art and rules are complete. The SDL shell projects these zones through the marker manifest:
+
+- `breach_point`: breach/search affordance at a door, shopfront, gate, or wall segment.
+- `rooftop`: rooftop or stair access affordance.
+- `suspected_ied`: possible cache/search hazard affordance.
+
+Example:
+
+```text
+terrain.3.name=Shopfront Breach Point
+terrain.3.kind=breach_point
+terrain.3.bounds=286,214,18,24
+terrain.3.cover=2
+terrain.3.movement_cost=3
+terrain.3.blocks_line_of_sight=false
+```
 
 ## Briefing And Outcome Text
 

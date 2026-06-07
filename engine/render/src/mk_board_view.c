@@ -74,6 +74,40 @@ static bool mk_board_view_unit_should_show_order_status(const mk_unit_t *unit) {
         && unit->order != MK_ORDER_NONE;
 }
 
+static bool mk_board_view_interaction_overlay_kind(
+    mk_terrain_kind_t terrain_kind,
+    mk_tactical_overlay_kind_t *out_overlay_kind
+) {
+    if (out_overlay_kind == NULL) {
+        return false;
+    }
+
+    if (terrain_kind == MK_TERRAIN_BREACH_POINT) {
+        *out_overlay_kind = MK_TACTICAL_OVERLAY_BREACH_SEARCH;
+        return true;
+    }
+
+    if (terrain_kind == MK_TERRAIN_ROOFTOP) {
+        *out_overlay_kind = MK_TACTICAL_OVERLAY_ROOFTOP_ACCESS;
+        return true;
+    }
+
+    if (terrain_kind == MK_TERRAIN_SUSPECTED_IED) {
+        *out_overlay_kind = MK_TACTICAL_OVERLAY_SEARCH_CACHE;
+        return true;
+    }
+
+    return false;
+}
+
+static mk_vec2_t mk_board_view_rect_center(mk_rect_t rect) {
+    mk_vec2_t center;
+
+    center.x = rect.x + rect.width * 0.5f;
+    center.y = rect.y + rect.height * 0.5f;
+    return center;
+}
+
 static void mk_board_view_clamp_origin(mk_board_view_t *view, const mk_map_t *map) {
     float visible_width_m;
     float visible_height_m;
@@ -137,6 +171,7 @@ mk_result_t mk_board_view_collect_tactical_overlays(
     size_t needed = 0;
     size_t overlay_index = 0;
     size_t objective_index;
+    size_t terrain_index;
     size_t unit_index;
     size_t civilian_index;
     size_t contact_index;
@@ -148,6 +183,14 @@ mk_result_t mk_board_view_collect_tactical_overlays(
     needed += snapshot->objective_count;
     for (objective_index = 0; objective_index < snapshot->objective_count; ++objective_index) {
         if (snapshot->objectives[objective_index].controlling_side != MK_SIDE_NEUTRAL) {
+            needed += 1;
+        }
+    }
+
+    for (terrain_index = 0; terrain_index < snapshot->map.terrain_count; ++terrain_index) {
+        mk_tactical_overlay_kind_t ignored_kind;
+
+        if (mk_board_view_interaction_overlay_kind(snapshot->map.terrain[terrain_index].kind, &ignored_kind)) {
             needed += 1;
         }
     }
@@ -207,6 +250,29 @@ mk_result_t mk_board_view_collect_tactical_overlays(
 
     if (overlay_capacity < needed) {
         return MK_ERROR_CAPACITY;
+    }
+
+    for (terrain_index = 0; terrain_index < snapshot->map.terrain_count; ++terrain_index) {
+        const mk_terrain_zone_t *terrain = &snapshot->map.terrain[terrain_index];
+        mk_tactical_overlay_kind_t overlay_kind;
+
+        if (mk_board_view_interaction_overlay_kind(terrain->kind, &overlay_kind)) {
+            float radius_m = mk_render_min_float(terrain->bounds_m.width, terrain->bounds_m.height) * 0.5f;
+            mk_tactical_overlay_t overlay = mk_board_view_make_overlay(
+                view,
+                overlay_kind,
+                mk_board_view_rect_center(terrain->bounds_m),
+                radius_m
+            );
+            mk_result_t result;
+
+            overlay.terrain_id = terrain->id;
+            overlay.intensity = terrain->cover + terrain->movement_cost;
+            result = mk_board_view_push_overlay(out_overlays, overlay_capacity, &overlay_index, &overlay);
+            if (result != MK_OK) {
+                return result;
+            }
+        }
     }
 
     for (contact_index = 0; contact_index < snapshot->contact_report_count; ++contact_index) {

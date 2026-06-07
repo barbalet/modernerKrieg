@@ -269,7 +269,11 @@ if(MK_BUILD_SDL_APP)
     add_executable(modernerKrieg
       engine/platform/sdl3/main.c
     )
-    target_link_libraries(modernerKrieg PRIVATE modernerKriegAssets modernerKriegRender modernerKriegMosul SDL3::SDL3)
+    target_link_libraries(modernerKrieg PRIVATE modernerKriegAi modernerKriegRender modernerKriegMosul SDL3::SDL3)
+    target_compile_definitions(modernerKrieg
+      PRIVATE
+        MK_PROJECT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    )
 
     find_package(SDL3_image CONFIG QUIET)
     if(SDL3_image_FOUND)
@@ -282,13 +286,27 @@ if(MK_BUILD_SDL_APP)
     mk_apply_warnings(modernerKrieg)
 
     if(MK_BUILD_TESTS)
-      add_test(NAME modernerKrieg_sdl_smoke COMMAND modernerKrieg --smoke-frames 2)
+      add_test(
+        NAME modernerKrieg_sdl_smoke
+        COMMAND modernerKrieg --project-root ${CMAKE_CURRENT_SOURCE_DIR} --ai-only --smoke-frames 2
+      )
       set_tests_properties(
         modernerKrieg_sdl_smoke
         PROPERTIES
           ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software"
       )
     endif()
+
+    add_custom_target(
+      modernerKrieg_macos_smoke_package
+      COMMAND ${CMAKE_COMMAND}
+        -DMK_APP=$<TARGET_FILE:modernerKrieg>
+        -DMK_PROJECT_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -DMK_PACKAGE_ROOT=${CMAKE_CURRENT_BINARY_DIR}/package
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/PackageMacSmoke.cmake
+      DEPENDS modernerKrieg
+      COMMENT "Creating smoke-tested macOS SDL package"
+    )
   else()
     message(STATUS "SDL3 was not found; skipping the modernerKrieg SDL app target.")
     message(STATUS "Install SDL3 or set SDL3_DIR to enable the app target.")

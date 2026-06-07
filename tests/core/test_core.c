@@ -226,7 +226,7 @@ static void test_scenario_loading_populates_core_state(void) {
     assert(game.map.tile_columns == 10);
     assert(game.map.tile_rows == 10);
     assert(game.map.tiles[46].kind == MK_TERRAIN_BUILDING);
-    assert(game.map.terrain_count == 3);
+    assert(game.map.terrain_count == 6);
     assert(game.controller_count == 3);
     assert(game.faction_count == 3);
     assert(game.force_count == 3);
@@ -407,7 +407,9 @@ static void test_investigate_resolves_contact_reports(void) {
     mk_game_step(&game);
     assert(game.contact_reports[0].resolved);
     assert(game.contact_reports[0].confidence == 0);
-    assert(game.contact_report_count == 1);
+    assert(game.contact_report_count == 2);
+    assert(game.contact_reports[1].kind == MK_CONTACT_REPORT_FALSE_CONTACT);
+    assert(game.contact_reports[1].terrain_id == 6);
 }
 
 static void test_interaction_errors_are_reported(void) {
@@ -459,7 +461,7 @@ static void test_line_of_sight_reports_blocking_terrain(void) {
         true
     );
     assert(mk_map_add_terrain(&scenario.map, &wall, &wall_id) == MK_OK);
-    assert(wall_id == 4);
+    assert(wall_id == 7);
 
     assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
     assert(mk_game_unit_line_of_sight(&game, 1, 2, &line_of_sight) == MK_OK);
@@ -638,16 +640,18 @@ static void test_false_contact_records_noisy_terrain(void) {
     assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
     game.units[0].position_m = make_vec2(220.0f, 330.0f);
     assert(mk_game_update_hidden_contacts(&game) == MK_OK);
-    assert(game.contact_report_count == 1);
+    assert(game.contact_report_count == 2);
     assert(game.contact_reports[0].kind == MK_CONTACT_REPORT_FALSE_CONTACT);
     assert(game.contact_reports[0].attacker_unit_id == 1);
     assert(game.contact_reports[0].terrain_id == 3);
     assert(game.contact_reports[0].target_unit_id == 0);
     assert(game.contact_reports[0].confidence > 0);
     assert(!game.contact_reports[0].resolved);
+    assert(game.contact_reports[1].kind == MK_CONTACT_REPORT_FALSE_CONTACT);
+    assert(game.contact_reports[1].terrain_id == 6);
 
     assert(mk_game_update_hidden_contacts(&game) == MK_OK);
-    assert(game.contact_report_count == 1);
+    assert(game.contact_report_count == 2);
 }
 
 static void test_civilian_risk_tracks_close_armed_units(void) {

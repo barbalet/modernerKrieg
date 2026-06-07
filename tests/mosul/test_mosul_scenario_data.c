@@ -64,6 +64,11 @@ static void test_default_scenario_data_matches_fixture_shape(void) {
     MK_TEST_ASSERT(strcmp(loaded.map.name, fixture.map.name) == 0);
     MK_TEST_ASSERT_CLOSE(loaded.map.width_m, fixture.map.width_m);
     MK_TEST_ASSERT_CLOSE(loaded.map.height_m, fixture.map.height_m);
+    MK_TEST_ASSERT(loaded.map.terrain_count == 6);
+    MK_TEST_ASSERT(loaded.map.terrain_count == fixture.map.terrain_count);
+    MK_TEST_ASSERT(loaded.map.terrain[3].kind == MK_TERRAIN_BREACH_POINT);
+    MK_TEST_ASSERT(loaded.map.terrain[4].kind == MK_TERRAIN_ROOFTOP);
+    MK_TEST_ASSERT(loaded.map.terrain[5].kind == MK_TERRAIN_SUSPECTED_IED);
     MK_TEST_ASSERT(loaded.map.tile_count == fixture.map.tile_count);
     MK_TEST_ASSERT(loaded.map.tiles[46].kind == fixture.map.tiles[46].kind);
     MK_TEST_ASSERT(loaded.controller_count == fixture.controller_count);

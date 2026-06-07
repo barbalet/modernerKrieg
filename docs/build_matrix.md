@@ -38,8 +38,16 @@ ctest --preset default-arm64
 The SDL app has a deterministic smoke mode:
 
 ```sh
-SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software ./build/default-arm64/bin/modernerKrieg --smoke-frames 2
+SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software ./build/default-arm64/bin/modernerKrieg --project-root . --ai-only --smoke-frames 2
 ```
+
+Create the current macOS-first smoke-tested package:
+
+```sh
+cmake --build --preset default-arm64 --target modernerKrieg_macos_smoke_package
+```
+
+The package target copies the SDL binary, scenario file, manifests, and the referenced PNG assets into `build/default-arm64/package/modernerKrieg-macos-smoke/`, smoke-tests that copied layout with dummy video, and writes `build/default-arm64/package/modernerKrieg-macos-smoke.zip`.
 
 Run repeated AI-vs-AI battles from CMake:
 

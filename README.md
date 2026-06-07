@@ -10,7 +10,7 @@ The project starts fresh as an SDL3 + CMake codebase. `derZweiteWeltkrieg` remai
 - `engine/render/` contains renderer-independent board-view, pan/zoom, and marker projection code.
 - `engine/assets/` contains manifest parsing and validation for map, sprite, and marker metadata.
 - `engine/ai/` contains controller policies that emit normal core orders.
-- `engine/platform/sdl3/` contains the optional SDL3 app shell.
+- `engine/platform/sdl3/` contains the optional SDL3 app shell with PNG-backed map/sprite loading, tactical overlays, briefing/status/AAR panels, and smoke-frame launch controls.
 - `engine/tools/autoplay/` contains deterministic headless run, replay validation/playback, and AI-vs-AI battle tools.
 - `game/mosul/` contains Mosul-specific scenario/content code built above the reusable core.
 - `tests/autoplay/` contains fixed-step/headless runner tests.
@@ -162,8 +162,16 @@ ctest --preset default-arm64
 Run the SDL shell for a deterministic smoke check without opening a normal app session:
 
 ```sh
-SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software ./build/default-arm64/bin/modernerKrieg --smoke-frames 2
+SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software ./build/default-arm64/bin/modernerKrieg --project-root . --ai-only --smoke-frames 2
 ```
+
+Build a macOS-first smoke-tested package folder and zip:
+
+```sh
+cmake --build --preset default-arm64 --target modernerKrieg_macos_smoke_package
+```
+
+The package target writes `build/default-arm64/package/modernerKrieg-macos-smoke/` and `build/default-arm64/package/modernerKrieg-macos-smoke.zip`. The copied package is smoke-tested with its own asset/scenario layout before the archive is created.
 
 If SDL3 is not available, CMake still builds the portable core and tests.
 
@@ -241,11 +249,11 @@ The core now supports deterministic board interaction without depending on SDL:
 - load the 2003 scenario from data with parser-side and core-side validation
 - run a selected scenario through the headless tool with seed, tick-count, quiet, and transcript controls
 - run player and opposing tactical controllers as deterministic AI-only headless runs with move, investigate, overwatch, suppress, hold, civilian-risk restraint, and withdraw choices
-- hand map, sprite, and marker manifests to the SDL app, which can load PNGs when SDL3_image is available, draw a compact score/objective/risk HUD, render order-status glyphs, and fall back otherwise
+- hand map, sprite, and marker manifests to the SDL app, which can load PNGs when SDL3_image is available, draw compact HUD plus briefing/status/AAR panels, render order-status and interaction-zone glyphs, and fall back otherwise
 
-The next implementation push is scenario interaction data for search/cache/breach or rooftop access points, player-facing briefing/AAR presentation, and a macOS-first smoke-tested package.
+The first 100-cycle plan is complete. Next work should focus on final art replacement, deeper search/breach/rooftop rules, and Windows/Linux packaging validation.
 
-When the SDL3 app target is available, left-click selects a unit, right-click gives the selected unit a move order, right-clicking a suspected/false contact gives an investigate order, arrow keys pan the board, and plus/minus zoom the board.
+When the SDL3 app target is available, left-click selects a unit, right-click gives the selected unit a move order, right-clicking a suspected/false contact gives an investigate order, arrow keys pan the board, and plus/minus zoom the board. Pass `--ai-only` to watch both tactical sides play the scenario.
 
 ## Design Intent
 

@@ -130,6 +130,9 @@ static void test_tactical_overlays_from_snapshot(void) {
     bool saw_civilian_risk = false;
     bool saw_suspected_contact = false;
     bool saw_false_contact = false;
+    bool saw_breach_search = false;
+    bool saw_rooftop_access = false;
+    bool saw_search_cache = false;
     size_t index;
 
     assert(mk_mosul_make_east_block_scenario(&scenario) == MK_OK);
@@ -168,9 +171,9 @@ static void test_tactical_overlays_from_snapshot(void) {
     assert(mk_board_view_fit_map(&view, &snapshot.map, 960.0f, 640.0f, 48.0f) == MK_OK);
 
     assert(mk_board_view_collect_tactical_overlays(&view, &snapshot, NULL, 0, &overlay_count) == MK_OK);
-    assert(overlay_count == 13);
+    assert(overlay_count == 16);
     assert(mk_board_view_collect_tactical_overlays(&view, &snapshot, overlays, 3, &overlay_count) == MK_ERROR_CAPACITY);
-    assert(overlay_count == 13);
+    assert(overlay_count == 16);
     assert(mk_board_view_collect_tactical_overlays(
         &view,
         &snapshot,
@@ -178,7 +181,7 @@ static void test_tactical_overlays_from_snapshot(void) {
         sizeof(overlays) / sizeof(overlays[0]),
         &overlay_count
     ) == MK_OK);
-    assert(overlay_count == 13);
+    assert(overlay_count == 16);
 
     for (index = 0; index < overlay_count; ++index) {
         const mk_tactical_overlay_t *overlay = &overlays[index];
@@ -237,6 +240,21 @@ static void test_tactical_overlays_from_snapshot(void) {
             saw_false_contact = true;
             assert(overlay->terrain_id == 3);
             assert(overlay->intensity == 30);
+        } else if (overlay->kind == MK_TACTICAL_OVERLAY_BREACH_SEARCH) {
+            saw_breach_search = true;
+            assert(overlay->terrain_id == 4);
+            assert_close(overlay->position_m.x, 295.0f);
+            assert_close(overlay->position_m.y, 226.0f);
+        } else if (overlay->kind == MK_TACTICAL_OVERLAY_ROOFTOP_ACCESS) {
+            saw_rooftop_access = true;
+            assert(overlay->terrain_id == 5);
+            assert_close(overlay->position_m.x, 364.0f);
+            assert_close(overlay->position_m.y, 166.0f);
+        } else if (overlay->kind == MK_TACTICAL_OVERLAY_SEARCH_CACHE) {
+            saw_search_cache = true;
+            assert(overlay->terrain_id == 6);
+            assert_close(overlay->position_m.x, 224.0f);
+            assert_close(overlay->position_m.y, 328.0f);
         }
     }
 
@@ -253,6 +271,9 @@ static void test_tactical_overlays_from_snapshot(void) {
     assert(saw_civilian_risk);
     assert(saw_suspected_contact);
     assert(saw_false_contact);
+    assert(saw_breach_search);
+    assert(saw_rooftop_access);
+    assert(saw_search_cache);
 }
 
 int main(void) {

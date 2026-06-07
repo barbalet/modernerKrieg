@@ -1,4 +1,5 @@
 #include "mk_asset_manifest.h"
+#include "mk_ai.h"
 #include "mk_core.h"
 #include "mk_board_view.h"
 #include "mk_log.h"
@@ -15,9 +16,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef MK_PROJECT_SOURCE_DIR
+#define MK_PROJECT_SOURCE_DIR "."
+#endif
+
 #define MK_SDL_MAP_MANIFEST_PATH "assets/mosul/manifests/market_commercial_streets_2003.mapmanifest"
 #define MK_SDL_SPRITE_MANIFEST_PATH "assets/mosul/manifests/mosul_2003_sprites.spritemanifest"
 #define MK_SDL_MARKER_MANIFEST_PATH "assets/mosul/manifests/mosul_2003_markers.markermanifest"
+#define MK_SDL_TEXT_SCALE 2.0f
 
 typedef struct {
     char id[MK_NAME_CAPACITY];
@@ -49,6 +55,13 @@ typedef struct {
     bool order_pressed;
     mk_vec2_t mouse_screen_position;
 } mk_sdl_input_t;
+
+typedef struct {
+    const char *project_root;
+    const char *scenario_path;
+    uint32_t smoke_frames;
+    bool ai_only;
+} mk_sdl_config_t;
 
 static SDL_FRect mk_sdl_rect(mk_rect_t rect) {
     SDL_FRect output;
@@ -85,6 +98,34 @@ static void mk_sdl_copy_name(char *destination, size_t capacity, const char *sou
     destination[index] = '\0';
 }
 
+static bool mk_sdl_make_project_path(
+    const char *project_root,
+    const char *relative_path,
+    char *out_path,
+    size_t capacity
+) {
+    const char *root = project_root == NULL || project_root[0] == '\0' ? "." : project_root;
+    int written;
+
+    if (relative_path == NULL || out_path == NULL || capacity == 0) {
+        return false;
+    }
+
+    if (relative_path[0] == '/') {
+        size_t length = strlen(relative_path);
+
+        if (length >= capacity) {
+            return false;
+        }
+
+        memcpy(out_path, relative_path, length + 1);
+        return true;
+    }
+
+    written = snprintf(out_path, capacity, "%s/%s", root, relative_path);
+    return written > 0 && (size_t)written < capacity;
+}
+
 static bool mk_sdl_parse_u32(const char *text, uint32_t *out_value) {
     char *end = NULL;
     unsigned long parsed;
@@ -106,9 +147,9 @@ static bool mk_sdl_parse_u32(const char *text, uint32_t *out_value) {
 static void mk_sdl_print_usage(const char *program_name) {
     fprintf(
         stderr,
-        "usage: %s [--smoke-frames N]\n"
+        "usage: %s [--project-root PATH] [--scenario PATH] [--ai-only] [--smoke-frames N]\n"
         "\n"
-        "Runs the SDL3 MOSUL demo shell. --smoke-frames exits after N rendered frames.\n",
+        "Runs the SDL3 MOSUL demo shell. --ai-only watches both tactical sides, and --smoke-frames exits after N rendered frames.\n",
         program_name
     );
 }
@@ -243,8 +284,14 @@ static void mk_set_terrain_color(SDL_Renderer *renderer, mk_terrain_kind_t kind)
         case MK_TERRAIN_RUBBLE:
             SDL_SetRenderDrawColor(renderer, 111, 103, 89, 255);
             break;
+        case MK_TERRAIN_BREACH_POINT:
+            SDL_SetRenderDrawColor(renderer, 92, 112, 87, 190);
+            break;
+        case MK_TERRAIN_ROOFTOP:
+            SDL_SetRenderDrawColor(renderer, 78, 104, 116, 175);
+            break;
         case MK_TERRAIN_SUSPECTED_IED:
-            SDL_SetRenderDrawColor(renderer, 116, 87, 62, 255);
+            SDL_SetRenderDrawColor(renderer, 116, 87, 62, 190);
             break;
         default:
             SDL_SetRenderDrawColor(renderer, 54, 60, 57, 255);
@@ -348,6 +395,11 @@ static const char *mk_sdl_overlay_marker_id(const mk_tactical_overlay_t *overlay
             return "civilian_risk";
         case MK_TACTICAL_OVERLAY_OBJECTIVE_CONTROL:
             return "objective";
+        case MK_TACTICAL_OVERLAY_BREACH_SEARCH:
+        case MK_TACTICAL_OVERLAY_SEARCH_CACHE:
+            return "breach_search";
+        case MK_TACTICAL_OVERLAY_ROOFTOP_ACCESS:
+            return "rooftop_access";
         case MK_TACTICAL_OVERLAY_ORDER_STATUS:
             return mk_sdl_order_marker_id(overlay->order);
         default:
@@ -497,6 +549,267 @@ static mk_color_t mk_sdl_outcome_color(mk_outcome_t outcome) {
         case MK_OUTCOME_IN_PROGRESS:
         default:
             return mk_make_color(154, 172, 142, 245);
+    }
+}
+
+static char mk_sdl_upper_ascii(char ch) {
+    if (ch >= 'a' && ch <= 'z') {
+        return (char)(ch - ('a' - 'A'));
+    }
+
+    return ch;
+}
+
+static const uint8_t *mk_sdl_glyph_rows(char ch) {
+    static const uint8_t glyph_space[7] = {0, 0, 0, 0, 0, 0, 0};
+    static const uint8_t glyph_a[7] = {14, 17, 17, 31, 17, 17, 17};
+    static const uint8_t glyph_b[7] = {30, 17, 17, 30, 17, 17, 30};
+    static const uint8_t glyph_c[7] = {15, 16, 16, 16, 16, 16, 15};
+    static const uint8_t glyph_d[7] = {30, 17, 17, 17, 17, 17, 30};
+    static const uint8_t glyph_e[7] = {31, 16, 16, 30, 16, 16, 31};
+    static const uint8_t glyph_f[7] = {31, 16, 16, 30, 16, 16, 16};
+    static const uint8_t glyph_g[7] = {15, 16, 16, 19, 17, 17, 15};
+    static const uint8_t glyph_h[7] = {17, 17, 17, 31, 17, 17, 17};
+    static const uint8_t glyph_i[7] = {31, 4, 4, 4, 4, 4, 31};
+    static const uint8_t glyph_j[7] = {1, 1, 1, 1, 17, 17, 14};
+    static const uint8_t glyph_k[7] = {17, 18, 20, 24, 20, 18, 17};
+    static const uint8_t glyph_l[7] = {16, 16, 16, 16, 16, 16, 31};
+    static const uint8_t glyph_m[7] = {17, 27, 21, 21, 17, 17, 17};
+    static const uint8_t glyph_n[7] = {17, 25, 21, 19, 17, 17, 17};
+    static const uint8_t glyph_o[7] = {14, 17, 17, 17, 17, 17, 14};
+    static const uint8_t glyph_p[7] = {30, 17, 17, 30, 16, 16, 16};
+    static const uint8_t glyph_q[7] = {14, 17, 17, 17, 21, 18, 13};
+    static const uint8_t glyph_r[7] = {30, 17, 17, 30, 20, 18, 17};
+    static const uint8_t glyph_s[7] = {15, 16, 16, 14, 1, 1, 30};
+    static const uint8_t glyph_t[7] = {31, 4, 4, 4, 4, 4, 4};
+    static const uint8_t glyph_u[7] = {17, 17, 17, 17, 17, 17, 14};
+    static const uint8_t glyph_v[7] = {17, 17, 17, 17, 17, 10, 4};
+    static const uint8_t glyph_w[7] = {17, 17, 17, 21, 21, 27, 17};
+    static const uint8_t glyph_x[7] = {17, 10, 4, 4, 4, 10, 17};
+    static const uint8_t glyph_y[7] = {17, 10, 4, 4, 4, 4, 4};
+    static const uint8_t glyph_z[7] = {31, 1, 2, 4, 8, 16, 31};
+    static const uint8_t glyph_0[7] = {14, 17, 19, 21, 25, 17, 14};
+    static const uint8_t glyph_1[7] = {4, 12, 4, 4, 4, 4, 14};
+    static const uint8_t glyph_2[7] = {14, 17, 1, 2, 4, 8, 31};
+    static const uint8_t glyph_3[7] = {30, 1, 1, 14, 1, 1, 30};
+    static const uint8_t glyph_4[7] = {2, 6, 10, 18, 31, 2, 2};
+    static const uint8_t glyph_5[7] = {31, 16, 16, 30, 1, 1, 30};
+    static const uint8_t glyph_6[7] = {14, 16, 16, 30, 17, 17, 14};
+    static const uint8_t glyph_7[7] = {31, 1, 2, 4, 8, 8, 8};
+    static const uint8_t glyph_8[7] = {14, 17, 17, 14, 17, 17, 14};
+    static const uint8_t glyph_9[7] = {14, 17, 17, 15, 1, 1, 14};
+    static const uint8_t glyph_period[7] = {0, 0, 0, 0, 0, 12, 12};
+    static const uint8_t glyph_colon[7] = {0, 12, 12, 0, 12, 12, 0};
+    static const uint8_t glyph_dash[7] = {0, 0, 0, 31, 0, 0, 0};
+    static const uint8_t glyph_slash[7] = {1, 2, 2, 4, 8, 8, 16};
+    static const uint8_t glyph_comma[7] = {0, 0, 0, 0, 0, 12, 8};
+    static const uint8_t glyph_apostrophe[7] = {12, 12, 8, 0, 0, 0, 0};
+    static const uint8_t glyph_paren_open[7] = {2, 4, 8, 8, 8, 4, 2};
+    static const uint8_t glyph_paren_close[7] = {8, 4, 2, 2, 2, 4, 8};
+
+    switch (mk_sdl_upper_ascii(ch)) {
+        case 'A': return glyph_a;
+        case 'B': return glyph_b;
+        case 'C': return glyph_c;
+        case 'D': return glyph_d;
+        case 'E': return glyph_e;
+        case 'F': return glyph_f;
+        case 'G': return glyph_g;
+        case 'H': return glyph_h;
+        case 'I': return glyph_i;
+        case 'J': return glyph_j;
+        case 'K': return glyph_k;
+        case 'L': return glyph_l;
+        case 'M': return glyph_m;
+        case 'N': return glyph_n;
+        case 'O': return glyph_o;
+        case 'P': return glyph_p;
+        case 'Q': return glyph_q;
+        case 'R': return glyph_r;
+        case 'S': return glyph_s;
+        case 'T': return glyph_t;
+        case 'U': return glyph_u;
+        case 'V': return glyph_v;
+        case 'W': return glyph_w;
+        case 'X': return glyph_x;
+        case 'Y': return glyph_y;
+        case 'Z': return glyph_z;
+        case '0': return glyph_0;
+        case '1': return glyph_1;
+        case '2': return glyph_2;
+        case '3': return glyph_3;
+        case '4': return glyph_4;
+        case '5': return glyph_5;
+        case '6': return glyph_6;
+        case '7': return glyph_7;
+        case '8': return glyph_8;
+        case '9': return glyph_9;
+        case '.': return glyph_period;
+        case ':': return glyph_colon;
+        case '-': return glyph_dash;
+        case '/': return glyph_slash;
+        case ',': return glyph_comma;
+        case '\'': return glyph_apostrophe;
+        case '(': return glyph_paren_open;
+        case ')': return glyph_paren_close;
+        case ' ':
+        default:
+            return glyph_space;
+    }
+}
+
+static void mk_sdl_render_glyph(
+    SDL_Renderer *renderer,
+    char ch,
+    float x,
+    float y,
+    float scale,
+    mk_color_t color
+) {
+    const uint8_t *rows = mk_sdl_glyph_rows(ch);
+    int row;
+    int column;
+
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+    for (row = 0; row < 7; ++row) {
+        for (column = 0; column < 5; ++column) {
+            if ((rows[row] & (uint8_t)(1U << (4 - column))) != 0U) {
+                SDL_FRect pixel;
+
+                pixel.x = x + (float)column * scale;
+                pixel.y = y + (float)row * scale;
+                pixel.w = scale;
+                pixel.h = scale;
+                SDL_RenderFillRect(renderer, &pixel);
+            }
+        }
+    }
+}
+
+static void mk_sdl_render_wrapped_text(
+    SDL_Renderer *renderer,
+    const char *text,
+    SDL_FRect bounds,
+    float scale,
+    mk_color_t color
+) {
+    const char *cursor = text != NULL ? text : "";
+    float char_advance = 6.0f * scale;
+    float line_advance = 9.0f * scale;
+    float x = bounds.x;
+    float y = bounds.y;
+    uint32_t column = 0;
+    uint32_t max_columns = bounds.w > char_advance ? (uint32_t)(bounds.w / char_advance) : 1U;
+
+    while (*cursor != '\0' && y + 7.0f * scale <= bounds.y + bounds.h) {
+        char ch = *cursor++;
+
+        if (ch == '\n') {
+            x = bounds.x;
+            y += line_advance;
+            column = 0;
+            continue;
+        }
+
+        if (column >= max_columns) {
+            x = bounds.x;
+            y += line_advance;
+            column = 0;
+            if (ch == ' ') {
+                continue;
+            }
+        }
+
+        mk_sdl_render_glyph(renderer, ch, x, y, scale, color);
+        x += char_advance;
+        column += 1;
+    }
+}
+
+static void mk_sdl_render_text_panel(
+    SDL_Renderer *renderer,
+    SDL_FRect panel,
+    const char *title,
+    const char *body
+) {
+    SDL_FRect title_bounds;
+    SDL_FRect body_bounds;
+
+    SDL_SetRenderDrawColor(renderer, 18, 22, 24, 218);
+    SDL_RenderFillRect(renderer, &panel);
+    SDL_SetRenderDrawColor(renderer, 86, 96, 92, 255);
+    SDL_RenderRect(renderer, &panel);
+
+    title_bounds.x = panel.x + 8.0f;
+    title_bounds.y = panel.y + 8.0f;
+    title_bounds.w = panel.w - 16.0f;
+    title_bounds.h = 16.0f;
+    body_bounds.x = panel.x + 8.0f;
+    body_bounds.y = panel.y + 28.0f;
+    body_bounds.w = panel.w - 16.0f;
+    body_bounds.h = panel.h - 34.0f;
+
+    mk_sdl_render_wrapped_text(renderer, title, title_bounds, MK_SDL_TEXT_SCALE, mk_make_color(216, 210, 145, 245));
+    mk_sdl_render_wrapped_text(renderer, body, body_bounds, MK_SDL_TEXT_SCALE, mk_make_color(218, 224, 213, 235));
+}
+
+static void mk_render_briefing_and_aar(
+    SDL_Renderer *renderer,
+    const mk_game_t *game,
+    const mk_board_view_t *view
+) {
+    mk_after_action_report_t report;
+    SDL_FRect briefing_panel;
+    SDL_FRect status_panel;
+    char status_text[MK_AFTER_ACTION_SUMMARY_CAPACITY + MK_SCENARIO_TEXT_CAPACITY];
+
+    if (renderer == NULL || game == NULL || view == NULL) {
+        return;
+    }
+
+    briefing_panel.x = view->screen_rect_px.x + 12.0f;
+    briefing_panel.y = view->screen_rect_px.y + 12.0f;
+    briefing_panel.w = 330.0f;
+    briefing_panel.h = 92.0f;
+    mk_sdl_render_text_panel(
+        renderer,
+        briefing_panel,
+        "MISSION",
+        game->briefing[0] != '\0' ? game->briefing : "No briefing loaded."
+    );
+
+    memset(&report, 0, sizeof(report));
+    if (mk_game_after_action_report(game, &report) == MK_OK) {
+        if (report.score.outcome == MK_OUTCOME_PLAYER_SUCCESS || report.score.outcome == MK_OUTCOME_PLAYER_PARTIAL) {
+            (void)snprintf(
+                status_text,
+                sizeof(status_text),
+                "%s %s",
+                report.summary,
+                report.narrative
+            );
+            status_panel.x = view->screen_rect_px.x + 12.0f;
+            status_panel.y = view->screen_rect_px.y + view->screen_rect_px.height - 104.0f;
+            status_panel.w = 460.0f;
+            status_panel.h = 92.0f;
+            mk_sdl_render_text_panel(renderer, status_panel, "AFTER ACTION", status_text);
+        } else {
+            (void)snprintf(
+                status_text,
+                sizeof(status_text),
+                "Score %d. Objectives %u. Contested %u. Civilian risk %d. Tick %u.",
+                report.score.total_score,
+                (unsigned)report.score.controlled_objectives,
+                (unsigned)report.score.contested_objectives,
+                report.score.civilian_risk,
+                game->tick
+            );
+            status_panel.x = view->screen_rect_px.x + 12.0f;
+            status_panel.y = view->screen_rect_px.y + view->screen_rect_px.height - 76.0f;
+            status_panel.w = 420.0f;
+            status_panel.h = 64.0f;
+            mk_sdl_render_text_panel(renderer, status_panel, "CURRENT STATUS", status_text);
+        }
     }
 }
 
@@ -840,14 +1153,21 @@ static void mk_render(
     }
 
     mk_render_status_hud(renderer, game, view);
+    mk_render_briefing_and_aar(renderer, game, view);
     SDL_RenderPresent(renderer);
 }
 
-static SDL_Texture *mk_load_manifest_map_texture(SDL_Renderer *renderer) {
+static SDL_Texture *mk_load_manifest_map_texture(SDL_Renderer *renderer, const char *project_root) {
     mk_asset_map_manifest_t manifest;
+    char manifest_path[512];
     mk_result_t result;
 
-    result = mk_asset_load_map_manifest(MK_SDL_MAP_MANIFEST_PATH, ".", &manifest);
+    if (!mk_sdl_make_project_path(project_root, MK_SDL_MAP_MANIFEST_PATH, manifest_path, sizeof(manifest_path))) {
+        SDL_Log("Map manifest path is too long.");
+        return NULL;
+    }
+
+    result = mk_asset_load_map_manifest(manifest_path, project_root, &manifest);
     if (result != MK_OK) {
         SDL_Log("Map manifest unavailable: %s", mk_result_name(result));
         return NULL;
@@ -855,10 +1175,16 @@ static SDL_Texture *mk_load_manifest_map_texture(SDL_Renderer *renderer) {
 
 #ifdef MK_HAS_SDL3_IMAGE
     {
-        SDL_Texture *texture = IMG_LoadTexture(renderer, manifest.runtime_overview_path);
+        char texture_path[512];
+        SDL_Texture *texture = NULL;
 
-        if (texture == NULL) {
-            texture = IMG_LoadTexture(renderer, manifest.overview_path);
+        if (mk_sdl_make_project_path(project_root, manifest.runtime_overview_path, texture_path, sizeof(texture_path))) {
+            texture = IMG_LoadTexture(renderer, texture_path);
+        }
+
+        if (texture == NULL
+            && mk_sdl_make_project_path(project_root, manifest.overview_path, texture_path, sizeof(texture_path))) {
+            texture = IMG_LoadTexture(renderer, texture_path);
         }
 
         if (texture == NULL) {
@@ -876,7 +1202,8 @@ static SDL_Texture *mk_load_manifest_map_texture(SDL_Renderer *renderer) {
 #endif
 }
 
-static void mk_sdl_load_sprite_assets(SDL_Renderer *renderer, mk_sdl_sprite_assets_t *assets) {
+static void mk_sdl_load_sprite_assets(SDL_Renderer *renderer, const char *project_root, mk_sdl_sprite_assets_t *assets) {
+    char manifest_path[512];
     mk_result_t result;
     size_t index;
 
@@ -885,7 +1212,12 @@ static void mk_sdl_load_sprite_assets(SDL_Renderer *renderer, mk_sdl_sprite_asse
     }
 
     memset(assets, 0, sizeof(*assets));
-    result = mk_asset_load_sprite_manifest(MK_SDL_SPRITE_MANIFEST_PATH, ".", &assets->manifest);
+    if (!mk_sdl_make_project_path(project_root, MK_SDL_SPRITE_MANIFEST_PATH, manifest_path, sizeof(manifest_path))) {
+        SDL_Log("Sprite manifest path is too long.");
+        return;
+    }
+
+    result = mk_asset_load_sprite_manifest(manifest_path, project_root, &assets->manifest);
     if (result != MK_OK) {
         SDL_Log("Sprite manifest unavailable: %s", mk_result_name(result));
         return;
@@ -897,9 +1229,16 @@ static void mk_sdl_load_sprite_assets(SDL_Renderer *renderer, mk_sdl_sprite_asse
 #ifdef MK_HAS_SDL3_IMAGE
     for (index = 0; index < assets->manifest.sheet_count; ++index) {
         const mk_asset_sprite_sheet_t *sheet = &assets->manifest.sheets[index];
+        char sheet_path[512];
 
         mk_sdl_copy_name(assets->sheets[index].id, sizeof(assets->sheets[index].id), sheet->id);
-        assets->sheets[index].texture = IMG_LoadTexture(renderer, sheet->path);
+        if (!mk_sdl_make_project_path(project_root, sheet->path, sheet_path, sizeof(sheet_path))) {
+            SDL_Log("Sprite sheet path is too long: %s", sheet->path);
+            assets->textures_loaded = false;
+            return;
+        }
+
+        assets->sheets[index].texture = IMG_LoadTexture(renderer, sheet_path);
         if (assets->sheets[index].texture == NULL) {
             SDL_Log("Failed to load sprite sheet \"%s\": %s", sheet->path, SDL_GetError());
             assets->textures_loaded = false;
@@ -935,7 +1274,8 @@ static void mk_sdl_destroy_sprite_assets(mk_sdl_sprite_assets_t *assets) {
     }
 }
 
-static void mk_sdl_load_marker_assets(mk_sdl_marker_assets_t *assets) {
+static void mk_sdl_load_marker_assets(const char *project_root, mk_sdl_marker_assets_t *assets) {
+    char manifest_path[512];
     mk_result_t result;
 
     if (assets == NULL) {
@@ -943,7 +1283,12 @@ static void mk_sdl_load_marker_assets(mk_sdl_marker_assets_t *assets) {
     }
 
     memset(assets, 0, sizeof(*assets));
-    result = mk_asset_load_marker_manifest(MK_SDL_MARKER_MANIFEST_PATH, &assets->manifest);
+    if (!mk_sdl_make_project_path(project_root, MK_SDL_MARKER_MANIFEST_PATH, manifest_path, sizeof(manifest_path))) {
+        SDL_Log("Marker manifest path is too long.");
+        return;
+    }
+
+    result = mk_asset_load_marker_manifest(manifest_path, &assets->manifest);
     if (result != MK_OK) {
         SDL_Log("Marker manifest unavailable: %s", mk_result_name(result));
         return;
@@ -959,14 +1304,17 @@ int main(int argc, char **argv) {
     SDL_Texture *map_texture = NULL;
     mk_sdl_sprite_assets_t sprite_assets;
     mk_sdl_marker_assets_t marker_assets;
+    mk_sdl_config_t config;
     bool running = true;
-    uint32_t smoke_frames = 0;
     uint32_t rendered_frames = 0;
     int arg_index;
     mk_game_t game;
     mk_scenario_definition_t scenario;
     mk_board_view_t view;
     mk_result_t result;
+
+    memset(&config, 0, sizeof(config));
+    config.project_root = MK_PROJECT_SOURCE_DIR;
 
     for (arg_index = 1; arg_index < argc; ++arg_index) {
         const char *argument = argv[arg_index];
@@ -976,8 +1324,35 @@ int main(int argc, char **argv) {
             return 0;
         }
 
+        if (strcmp(argument, "--project-root") == 0) {
+            if (arg_index + 1 >= argc) {
+                mk_sdl_print_usage(argv[0]);
+                return 2;
+            }
+
+            config.project_root = argv[arg_index + 1];
+            arg_index += 1;
+            continue;
+        }
+
+        if (strcmp(argument, "--scenario") == 0) {
+            if (arg_index + 1 >= argc) {
+                mk_sdl_print_usage(argv[0]);
+                return 2;
+            }
+
+            config.scenario_path = argv[arg_index + 1];
+            arg_index += 1;
+            continue;
+        }
+
+        if (strcmp(argument, "--ai-only") == 0) {
+            config.ai_only = true;
+            continue;
+        }
+
         if (strcmp(argument, "--smoke-frames") == 0) {
-            if (arg_index + 1 >= argc || !mk_sdl_parse_u32(argv[arg_index + 1], &smoke_frames)) {
+            if (arg_index + 1 >= argc || !mk_sdl_parse_u32(argv[arg_index + 1], &config.smoke_frames)) {
                 mk_sdl_print_usage(argv[0]);
                 return 2;
             }
@@ -1010,7 +1385,22 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    result = mk_mosul_make_market_2003_scenario(&scenario);
+    {
+        char scenario_path[512];
+        const char *relative_scenario_path = config.scenario_path != NULL
+            ? config.scenario_path
+            : MK_MOSUL_DEFAULT_SCENARIO_PATH;
+
+        if (!mk_sdl_make_project_path(config.project_root, relative_scenario_path, scenario_path, sizeof(scenario_path))) {
+            SDL_Log("Scenario path is too long.");
+            SDL_DestroyRenderer(renderer);
+            SDL_DestroyWindow(window);
+            SDL_Quit();
+            return 1;
+        }
+
+        result = mk_mosul_load_scenario_file(scenario_path, config.project_root, &scenario);
+    }
     if (result == MK_OK) {
         result = mk_game_load_scenario(&game, &scenario);
     }
@@ -1035,9 +1425,9 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    map_texture = mk_load_manifest_map_texture(renderer);
-    mk_sdl_load_sprite_assets(renderer, &sprite_assets);
-    mk_sdl_load_marker_assets(&marker_assets);
+    map_texture = mk_load_manifest_map_texture(renderer, config.project_root);
+    mk_sdl_load_sprite_assets(renderer, config.project_root, &sprite_assets);
+    mk_sdl_load_marker_assets(config.project_root, &marker_assets);
 
     while (running) {
         SDL_Event event;
@@ -1054,11 +1444,14 @@ int main(int argc, char **argv) {
         }
 
         mk_sdl_apply_input(&game, &view, &input);
+        if (config.ai_only) {
+            (void)mk_ai_issue_basic_orders(&game);
+        }
         (void)mk_game_run_fixed_steps(&game, 1, NULL, NULL);
         mk_sdl_update_window_title(window, &game);
         mk_render(renderer, &game, &view, map_texture, &sprite_assets, &marker_assets);
         rendered_frames += 1;
-        if (smoke_frames > 0 && rendered_frames >= smoke_frames) {
+        if (config.smoke_frames > 0 && rendered_frames >= config.smoke_frames) {
             running = false;
         }
         SDL_Delay(16);
