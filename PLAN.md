@@ -1,284 +1,365 @@
-# modernerKrieg Plan
+# modernerKrieg Technical Plan
 
-`modernerKrieg` is the portable tactical engine and runtime for the public MOSUL demo. The engine should now be developed as a PNG-backed tactical loader and renderer with deterministic gameplay behind it: the player sees authored Mosul map art, sprites, and tactical markers, while the portable C core owns movement, line of sight, fire, suppression, casualties, civilian risk, scenario state, AI, and replayable outcomes.
+`modernerKrieg` is the portable C engine for the MOSUL 2003 public demo. The app layer should be a native SwiftUI wrapper over stable C interfaces; all rules, scenario state, movement, combat, civilian behavior, replay, and deterministic validation stay in C.
 
-The first public target is the 2003 Market / Commercial Streets demo. `derZweiteWeltkrieg` remains useful design memory for deterministic rules, tests, and thin presentation layers, but it is not a dependency, submodule, naming model, or era model for MOSUL.
+The first fully fledged demo target is the 2003 Market / Commercial Streets battle slice: a 500 m x 500 m urban security fight with U.S. patrol forces, irregular armed threats, protected civilians, multistorey buildings, roof access, shops, alleys, courtyards, rubble, search/cache points, and civilian-risk consequences.
 
-## Current Baseline
+## Current Audit
 
-- CMake project, portable C core, Mosul game module, renderer-independent board-view code, and headless tests exist.
-- The core already supports deterministic game state, unit selection, orders, movement ticks, line of sight, cover checks, unit fire, ammo spend, wounds, casualties, suppression, morale state changes, hidden-contact reveals, suspected/false contact reports, civilian-risk updates, objective control, scoring thresholds, and after-action summaries.
-- The core state model now includes controller slots, force records, command identities, map tiles with elevation/cover/movement costs, richer weapon/ammunition metadata, richer soldier state, standalone civilian records, contact reports, hidden unit fields, and snapshot/load support for those containers.
-- The render layer already projects map, terrain, objectives, units, soldier offsets, selection, movement targets, fire lanes, suppression, hidden contacts, casualties, civilian-risk overlays, visible unit order-status overlays, and interaction-zone overlays into screen space.
-- Deterministic headless runners exist for smoke tests, replay generation/validation, and AI-vs-AI/autoplay work.
-- CMake presets exist for default, headless, and strict warning-as-error builds.
-- Asset pipeline documentation, the first Market / Commercial Streets map manifest, the first 2003 sprite manifest, the first marker manifest, and C manifest validation tests exist.
-- The 2003 Market / Commercial Streets scenario now loads from a validated `.mkscenario` data file, with a C fixture retained for parity tests.
-- `mk_headless_run` can load an explicit scenario path, override the seed, run for a fixed tick budget, suppress console output, write a transcript with contact/risk counters, briefing, debug lines, versioned replay/event files, balance expectations, and after-action output, and run both non-civilian tactical sides under basic AI.
-- `mk_replay_validate` can validate versioned `.mkreplay` event files, assert final result/outcome fields, and print compact tick-range playback summaries.
-- The first runtime map overview exists at `assets/mosul/runtime/maps/market_commercial_streets_2003/overview.png`.
-- The SDL prototype has been removed after evaluation. No SDL app target, SDL package target, or SDL development dependency remains in the active build.
-- The next launchable interfaces should be platform-native shells over the same C libraries: a Mac frontend first, then a Windows frontend.
-- Source art for the 2003 demo is imported under `assets/mosul/source/`.
-- Public source art includes line-art references, 128 px top-down sprite sheets, source-angle civilian/weapon sprites, and Market / Commercial Streets map/layer assets.
-- The first 100-cycle public-demo plan is complete; remaining work is now final art replacement, deeper interaction rules, cross-platform packaging validation, and playtesting.
+### Map Availability
 
-## Runtime Shape
+The repository has an effective visual map foundation for the 2003 demo:
 
-The playable app should behave primarily as a PNG loader and renderer with gameplay state behind it.
+- `assets/mosul/source/maps/market_commercial_streets_demo_2003/assets/map_data/market_commercial_streets_demo_7000/01_ground_level.png`
+- `assets/mosul/source/maps/market_commercial_streets_demo_2003/assets/map_data/market_commercial_streets_demo_7000/02_level_2_alpha.png`
+- `assets/mosul/source/maps/market_commercial_streets_demo_2003/assets/map_data/market_commercial_streets_demo_7000/03_level_3_alpha.png`
+- `assets/mosul/source/maps/market_commercial_streets_demo_2003/assets/map_data/market_commercial_streets_demo_7000/04_roof_access_alpha.png`
+- `assets/mosul/source/maps/market_commercial_streets_demo_2003/assets/map_data/market_commercial_streets_demo_7000/05_multistorey_mask.png`
+- `assets/mosul/source/maps/market_commercial_streets_demo_2003/imgs/market_commercial_streets_demo_7000/preview_1400.png`
+- `assets/mosul/runtime/maps/market_commercial_streets_2003/overview.png`
 
-- Load map art, tactical sprites, markers, and metadata from manifests.
-- Render the map as image layers or generated tiles, not as colored terrain rectangles.
-- Render units from sprite metadata, facing, role, side, stance, casualty state, and selection state.
-- Render tactical overlays for orders, routes, line of sight, objectives, suppression, hidden contacts, civilian risk, breach/search points, and rooftop access.
-- Keep native frontend code as presentation and input handling only.
-- Keep rules, scenario state, combat, AI, and scoring in portable C.
+The map manifest describes a 500 m x 500 m world at 14 px/m overview scale. The source map layers are 7000 x 7000 pixels. The art is good enough as a first visual battle map: roads, market stalls, vehicles, alleys, courtyards, roof masses, stair-like features, and dense cover are visible.
 
-This separation keeps the first app simple: art on screen, gameplay in the core, and a thin bridge between them.
+What is missing is gameplay-grade map data:
 
-## Demo Target
+- no generated collision mask exists at `assets/mosul/maps/market_commercial_streets_2003_collision.mask`
+- no generated navigation grid exists at `assets/mosul/maps/market_commercial_streets_2003_navigation.grid`
+- no room/interior graph exists for shop interiors, courtyards, doorways, windows, or internal movement
+- no vertical connectivity graph exists for level 2, level 3, rooftops, stairs, or roof access
+- no per-building metadata exists for enterable, locked, breached, searched, occupied, or civilian shelter state
+- current scenario terrain is still coarse: 10 x 10 tiles and six hand-authored terrain zones
 
-The first playable demo is a compact scenario, not the whole city.
+Conclusion: the visual map is effective for the demo, but the engine still needs an interior/navigation layer before building interiors can matter tactically.
 
-- Era: 2003, after Mosul's fall during Operation Iraqi Freedom.
-- Area: 500 m x 500 m Market / Commercial Streets cluster.
-- Player force: U.S. Army patrol/security element with squad-level control.
-- Opposing force: regime remnants, irregular fighters, weapons looters, early insurgent cells, and hidden armed threats.
-- Civilians: protected non-combatants whose location and movement affect player choices.
-- Terrain: streets, shopfronts, courtyards, rooftops, upper floors, checkpoints, rubble, blocked routes, cache/search zones, and breach points.
+### Sprite And Asset Availability
 
-The demo is playable when the user can launch one scenario, inspect the PNG map, select units, issue orders, resolve contact, see suppression/casualties/civilian risk, and reach a clear after-action outcome.
+The runtime sprite set now contains 1,064 rendered PNGs:
 
-## Repository Direction
+- 640 infantry sprites: 16 combatant roles x 5 body states x 8 facings
+- 168 civilian sprites: 7 civilian archetypes x 3 body states x 8 facings
+- 64 weapon sprites: 8 weapon types x 8 facings
+- 192 vehicle sprites: 8 vehicle types x 3 damage states x 8 facings
 
-```text
-modernerKrieg/
-  CMakeLists.txt
-  PLAN.md
-  README.md
-  assets/
-    mosul/
-      source/       unmodified source art and provenance notes
-      runtime/      generated runtime assets, safe to rebuild
-      manifests/    map, sprite, marker, and scenario-art metadata
-      maps/         playable map products and tile metadata
-      atlases/      packed atlas images and metadata
-  docs/
-    asset_pipeline.md
-    build_matrix.md
-    engine_architecture.md
-    milestone_0_review.md
-    milestone_1_progress.md
-    scenario_format.md
-    third_party.md
-  engine/
-    ai/             controller policies that emit core orders
-    core/           portable rules and state
-    render/         renderer-independent board projection
-    tools/
-      autoplay/     headless runs, future AI-vs-AI batches
-      assets/       asset/scenario validation and generation
-  game/
-    mosul/
-      data/
-      scenarios/
-      src/
-  tests/
-    autoplay/
-    core/
-    render/
-    mosul/
-    assets/
-```
+The C asset layer validates map, sprite, marker, and runtime render manifests. The SwiftUI layer should consume validated render-manifest entries from the C engine, not rediscover assets independently.
 
-`engine/core` must not depend on frontend frameworks, graphics APIs, operating-system UI, or Mosul-specific art files. The Mosul game module can depend on the engine. The app/frontend can depend on both.
+### Current Engine Capability
 
-## Asset Pipeline
+Already present:
 
-Source assets stay unmodified. Runtime files should be generated, validated, and rebuildable.
+- deterministic C core with game state, fixed-step simulation, snapshots, scenario loading, scoring, AAR text, and replay/event tooling
+- units, soldiers, weapons, wounds, suppression, morale states, hidden contacts, suspected/false contacts, objectives, civilians, civilian risk, and basic AI order emission
+- renderer-independent board projection and tactical overlays
+- headless AI-vs-AI tools and CTest balance smoke coverage
+- CMake presets for default, headless, and strict warning-as-error builds
+- Xcode command-line AI battle project
 
-Current source asset groups:
+Important gaps:
 
-- `assets/mosul/source/line_art/`: Mosul context, combatant, weapon, vehicle, and urban tactics plates.
-- `assets/mosul/source/sprite_sheets/`: 128 px combatant, stance, vehicle, and weapon source sheets.
-- `assets/mosul/source/sprite_sheets/source_angles/infantry_128/`: approved source-angle infantry PNGs for 16 demo roles across standing, crouch, prone, wounded, and dead states.
-- `assets/mosul/source/sprite_sheets/source_angles/civilians_128/`: approved source-angle civilian PNGs for 7 archetypes across standing, wounded, and dead states.
-- `assets/mosul/source/sprite_sheets/source_angles/weapons_128/`: approved source-angle weapon PNGs.
-- `assets/mosul/source/sprite_sheets/source_angles/vehicles_1024/`: approved source-angle vehicle PNGs across intact, damaged, and destroyed states.
-- `assets/mosul/source/maps/market_commercial_streets_demo_2003/`: Market / Commercial Streets map previews, layer manifest, and source map layers.
-- `assets/mosul/source/notes/`: provenance and demo asset selection notes.
-- `assets/mosul/runtime/sprites/rendered/`: generated runtime-facing sprites, currently 1,064 PNGs.
+- civilian records are passive risk/stress entities, not full movement agents
+- no civilian AI route planning, panic, compliance, crowd behavior, shelter seeking, evacuation, or instructions model
+- unit movement is direct target movement, not nav-graph/path movement
+- line of sight and cover use coarse terrain, not interior walls, windows, doors, floors, or roofs
+- breach/search/cache/roof systems are mostly affordances, not full rules
+- SwiftUI wrapper boundary is not yet a stable C ABI
+- the demo scenario has only one civilian in the main 2003 file, despite the new civilian art set
 
-Immediate asset work:
+## Product Goal
 
-- Define a map manifest that records source image path, world size, pixels per meter, origin, layer kind, z order, alpha behavior, and collision/pathfinding output paths.
-- Define a sprite manifest that records source sheet path, tile size, pivot, role, side, state, facing, scale, and runtime id.
-- Define marker assets for selection, move routes, fire orders, overwatch, suppression, casualty, objective, hidden contact, breach/search, rooftop/stair access, and civilian risk.
-- Generate runtime map products outside `source/`: first a single overview image, then tiles when the image size becomes too large for smooth rendering.
-- Generate runtime sprite/atlas products outside `source/` and keep the source sheets untouched.
+After 80 development cycles, the repository should contain a fully fledged demo engine for the MOSUL 2003 battle:
 
-Additional art probably needed for the first demo:
+- one deterministic playable scenario loaded entirely from data
+- visual map, multistorey map metadata, collision, navigation, and interior/roof topology
+- unit-scale commands with soldier-level consequences
+- moving civilian population with deterministic AI
+- opposing-force AI, player-side tactical AI for AI-only tests, and civilian AI running together
+- combat, suppression, concealment, breach/search, rooftop, and civilian-risk rules that work on the map topology
+- stable C API for a SwiftUI wrapper
+- headless and Xcode AI-only battle checks that catch stalls, bad balance, broken assets, and invalid maps
 
-- order and status UI icons
-- hidden-contact and suspected-danger markers
-- breach, search/cache, checkpoint, rooftop, stair, and blocked-route markers
-- collision/pathfinding masks for roads, interiors, rooftops, rubble, and upper-floor access
+## Architecture Rules
 
-Do not block gameplay development on a large new art pass. Add missing assets only when the playable slice needs them.
+- `engine/core` owns deterministic rules, state, orders, movement, LOS, combat, civilians, scoring, replay, and validation.
+- `engine/assets` owns manifest parsing and validation for map, sprite, marker, render, collision, navigation, and topology products.
+- `engine/render` owns renderer-independent projection, sprite/marker selection, and frontend draw-command preparation.
+- `engine/ai` owns player/opfor/civilian policies that emit ordinary C orders or civilian intent updates.
+- `game/mosul` owns scenario data, Mosul-specific templates, map topology data, and demo tuning.
+- SwiftUI owns windowing, input, presentation, image upload/cache, panels, and platform packaging only.
+- No gameplay rule should exist only in Swift.
 
-## Scenario Data
+## Civilian Movement Model
 
-Move Mosul content out of hard-coded C constants.
+Civilian AI should be deterministic, cheap, and legible.
 
-Start with a compact validated data format for:
+State per civilian:
 
-- scenario metadata and briefing
-- factions and sides
-- controller assignments
-- forces and command identities
-- weapons and ammunition
-- soldier templates
-- unit templates
-- initial unit placement and hidden state
-- civilian placement and civilian state
-- terrain/navigation regions
-- map image/layer manifests
-- sprite/marker manifests
-- objective definitions
-- civilian-risk rules
-- opposing AI plan
-- scoring and after-action text
+- archetype, group id, protected/non-protected flag
+- current state: sheltering, fleeing, frozen, following instructions, wounded, dead
+- current floor/area/node, map position, facing, speed, path, destination
+- stress, risk, confidence in nearby friendly force, compliance, panic threshold
+- last threat source, last safe node, assigned shelter/exit, and movement cooldown
 
-The C core should load validated runtime structs. Tests should reject invalid ids, invalid map bounds, missing assets, invalid faction references, impossible objectives, and unsupported weapon/unit combinations.
+Inputs:
 
-## Gameplay Systems
+- nearby gunfire, explosions, armed movement, visible casualties, fire lanes, objectives, blocked paths
+- player instructions, safe corridors, breach/search events, building entry/exit, roof/stair access
+- civilian group cohesion, family separation, wounded civilians, and crowd density
 
-The demo should prove the modern urban problem before broadening scope.
+Actions:
 
-- Orders: move, hold, fire, suppress, overwatch, breach/search, rally, withdraw.
-- Combat: line of sight, cover, small arms, machine-gun suppression, RPG/direct threat, wounds, casualties, ammo, and stress.
-- Urban movement: road, alley, interior, rooftop, stair, rubble, blocked route, and breach/search interactions.
-- Civilians: presence, risk, harm scoring, movement constraints, and consequences.
-- Uncertainty: hidden contacts, suspected threats, reveal logic, and false certainty.
-- AI: defend, ambush, displace, flee, and protect hidden positions.
-- Outcome: objective state, civilian harm, force preservation, time/turn pressure, and after-action summary.
+- stay sheltered, freeze, flee, move to shelter, move to exit, follow instructions, disperse from fire lane, avoid armed units, assist/cluster near family, or become casualty/incapacitated
 
-## Frontend Choice
+Implementation approach:
 
-The SDL experiment is closed. The engine should now favor platform-native presentation while preserving a shared C simulation, asset, render-projection, AI, replay, and validation core.
+- build a civilian navigation graph from the map topology
+- update civilian intent at a lower cadence than unit ticks to keep behavior stable
+- use deterministic weighted choices from the scenario seed
+- prefer safe graph routes over straight-line motion
+- expose civilian intent, path, stress, and risk in snapshots and replay events
+- add CTests for every state transition and every path/risk rule
 
-- Build the Mac frontend as the first platform-native interface over the existing C libraries.
-- Build the Windows frontend against the same C-facing contracts rather than forking gameplay logic.
-- Keep command-line AI battles, replay validation, and CTest as the fastest diagnostic surface.
-- Do not put rules, scenario decisions, or asset interpretation exclusively in frontend code.
+## Map And Building Interior Model
 
-## Completed Foundation
+The current art supports a multistorey demo, but not yet a real interior simulation. The engine should add generated or authored map products:
 
-The following baseline work is complete and should be preserved while the plan pivots to PNG-backed public-demo work:
+- collision mask: blocked/open movement at tactical resolution
+- navigation grid: movement costs and blocked cells
+- topology graph: rooms, shops, alleys, courtyards, rooftops, stairs, doors, windows, breach points, exits
+- floor graph: ground, level 2, level 3, roof with vertical connectors
+- LOS occluders: exterior walls, interior walls, parapets, vehicles, rubble, smoke/future effects
+- semantic zones: market stalls, shopfronts, civilian shelter areas, caches, rooftops, danger areas, objectives
 
-- Milestone 0 skeleton: CMake, an experimental app shell since removed, headless runner, fixed-step loop, test helper layer, build presets, CI notes, asset folder stubs, core/frontend-boundary smoke test, and architecture/third-party docs.
-- Milestone 1 core-state first half: stable containers for controllers, forces, command identities, terrain tiles, civilians, units, soldiers, weapons, objectives, snapshots, scenario loading, and validation.
-- Asset/data foundation pass: source-safe asset pipeline docs, map manifest, sprite manifest, manifest parser/validator, manifest CTests, frontend manifest handoff, and 2003 scenario entry point.
-- Current tests cover deterministic RNG, scenario loading, scenario data validation, snapshots, movement, LOS, firing, suppression, board-view transforms, fixed-step runs, asset manifests, and the portable-core boundary.
+The first implementation can be partly authored data over the visual map. Do not wait for perfect computer-vision extraction. The demo needs reliable tactical topology more than clever extraction.
 
 ## Development Cycle Ledger
 
-Cycle accounting starts from the current checked-in PNG-backed Mosul demo plan state, after the completed foundation above. Earlier foundation work is preserved as baseline work and is not renumbered into this ledger.
+- Ledger baseline date: 2026-06-07.
+- Planned cycle budget: 80 cycles.
+- Planned cycle shape: 8 milestones x 10 cycles each.
+- Completed cycles in this ledger: 0.
+- Current cycle: 0.
+- Remaining planned cycles: 80.
+- Next cycle batch: cycles 1-10, Map Data Foundation.
 
-- Ledger baseline date: 2026-06-06.
-- Planned cycle budget: 100 cycles.
-- Planned cycle shape: 5 milestones x 20 cycles each.
-- Completed cycles in this ledger: 100.
-- Current cycle: 100.
-- Remaining planned cycles: 0.
-- Next cycle batch: complete; start a new ledger for post-plan work.
+When a development batch is completed, increment `Completed cycles in this ledger`, advance `Current cycle`, reduce `Remaining planned cycles`, update `Next cycle batch`, and add a log row.
 
-When a development batch is completed, increment `Completed cycles in this ledger`, advance `Current cycle`, reduce `Remaining planned cycles`, and update `Next cycle batch`. Add one log row describing the cycle range, milestone focus, completed work, and verification.
-
-| Date | Cycles Completed | Current Cycle | Remaining Cycles | Milestone Focus | Notes |
+| Date | Cycles Completed | Current Cycle | Remaining Cycles | Focus | Notes |
 | --- | ---: | ---: | ---: | --- | --- |
-| 2026-06-06 | 0 | 0 | 100 | Baseline | Ledger added after the completed foundation pass; next work starts at cycles 1-10. |
-| 2026-06-06 | 10 | 10 | 90 | Milestone C / Autoplay | Added the 2003 `.mkscenario` file, scenario parser, fixture parity and invalid-reference tests, default data-backed Mosul loader, and headless scenario/seed/tick/quiet/transcript controls. Verified default CTest and direct transcript run. |
-| 2026-06-06 | 20 | 20 | 80 | Milestone B / Autoplay | Added marker metadata and validation, renderer-independent tactical overlays, SDL sprite/marker fallback rendering, copied the first runtime map overview, introduced basic AI order emission, and added AI-only headless smoke coverage. Verified default CTest and direct AI transcript run. |
-| 2026-06-06 | 30 | 30 | 70 | Milestone D / Contact | Added contact reports for fire/reveal/civilian risk, hidden-contact scenario fields and reveal checks, civilian-risk updates from fire and proximity, fire/hidden overlays, smarter AI suppress/withdraw choices, and deterministic AI transcript assertions. Verified default CTest and direct AI transcript run. |
-| 2026-06-06 | 40 | 40 | 60 | Milestone D/E / Outcome | Added persistent objective-control state, deterministic score math for objectives/civilian risk/casualties/time, after-action summary data, `mk_headless_run --aar`, player AI civilian-risk restraint, revealed-opfor withdrawal behavior, and deterministic tests for scoring/AAR/AI caution. Verified default CTest and direct AI-only AAR transcript run. |
-| 2026-06-06 | 50 | 50 | 50 | Milestone D/E / Uncertainty + Replay | Added suspected-danger and false-contact records with confidence/terrain metadata, objective-control/suspected/false overlays, scenario briefing/AAR text and score thresholds, headless `--briefing`, `--debug-log`, `--expect-objective`, and `--expect-min-score`, plus CTest coverage for the new debug/balance path. Verified default CTest and direct briefing/debug/AAR transcript run. |
-| 2026-06-06 | 60 | 60 | 40 | Milestone D/E / Replay + Commands | Added versioned headless replay/event files, investigate and assault-move command APIs, cautious investigate movement, contact picking for suspected/false reports, suspected-contact AI investigate/overwatch behavior, objective labels, scenario score-weight overrides, a compact AI-only control-balance scenario, and CTest coverage for replay output and balance expectations. Verified default CTest, strict warning-as-error CTest, and direct AI-only replay/transcript run. |
-| 2026-06-07 | 70 | 70 | 30 | Milestone E / Replay Validation + Balance | Added standalone `.mkreplay` validation tooling, end-to-end replay validation CTest coverage with an invalid replay negative check, richer headless expectations for final outcome/contested objectives/civilian risk, and a contested civilian-risk AI-only smoke scenario. Verified default CTest, direct replay validation, and direct contested-risk balance run. |
-| 2026-06-07 | 80 | 80 | 20 | Milestone E / SDL Presentation + Smoke | Added renderer-independent order-status overlays, explicit order marker manifest records, SDL score/objective/risk HUD bars, SDL order-status glyphs, `--smoke-frames`, an SDL dummy-video smoke CTest, and an Apple Silicon `default-arm64` preset for Homebrew SDL3. Verified `default-arm64` build and CTest, including the SDL smoke test. |
-| 2026-06-07 | 90 | 90 | 10 | Milestone E / Replay Playback + Seed Sweeps | Added `.mkreplay` tick-range playback summaries, replay playback CTest coverage, AI battle seed-step sweeps, batch settlement/stall/worst-score expectations, a deterministic five-seed AI-only balance CTest, and matching Xcode scheme launch arguments. Verified direct seed sweep expectations, replay playback, default-arm64 CTest, strict warning-as-error CTest, and Xcode project build. |
-| 2026-06-07 | 100 | 100 | 0 | Milestone E / Interaction Data + Package | Added first-pass breach/search, cache/search, and rooftop/stair terrain zones; renderer-independent interaction-zone overlays; SDL mission/status/AAR panels; SDL `--project-root`, `--scenario`, and `--ai-only` launch controls; an SDL smoke CTest using the new controls; and a macOS smoke-tested package target. Verified direct SDL AI-only smoke, package creation, default-arm64 CTest, strict warning-as-error CTest, and package smoke. |
+| 2026-06-07 | 0 | 0 | 80 | Baseline | New 80-cycle technical plan created after the larger asset-base update. |
 
-Historical ledger rows can mention the removed SDL experiment. Current and future development should use native frontends over the portable C core.
+## Planned Cycle Batches
 
-## Milestones
+### Cycles 1-10: Map Data Foundation
 
-### Milestone A: PNG Map On Screen
+Goal: turn the visual 2003 map into validated map data that the engine can reason about.
 
-- Complete: add map asset metadata.
-- Complete: load a Market / Commercial Streets PNG map source or generated runtime image.
-- Complete: project it through the current board view with pan/zoom data for native frontends.
-- Complete: preserve map-to-screen and screen-to-map picking.
-- Keep headless tests passing.
+Deliverables:
 
-### Milestone B: Real Unit Sprites
+- Add map-product schema for collision masks, navigation grids, floor layers, room ids, portals, and vertical connectors.
+- Extend `mk_asset_map_manifest_t` or add dedicated map-product manifests without bloating the old simple map loader.
+- Add validation for manifest paths, dimensions, world scale, layer ids, and required map products.
+- Create first authored `market_commercial_streets_2003` topology data over the existing map art.
+- Generate or hand-author initial collision and navigation products under `assets/mosul/maps/`.
+- Represent streets, stalls, alleys, courtyards, shop interiors, rooftops, blocked routes, stairs, and breach points.
+- Add tests that fail when collision/navigation/topology files are missing or dimensionally inconsistent.
+- Keep map products source-safe: generated/runtime products stay outside `assets/mosul/source/`.
+- Update docs with map product provenance and rebuild rules.
+- Verify default, strict, Xcode AI battle, and direct map-validation tests.
 
-- Complete: add sprite metadata for the first U.S. patrol and one opposing cell.
-- Complete: expose unit sprite choices from role/side/state for frontend rendering.
-- Complete: render selection rings, movement targets, order lines, suppression, casualty, objective, and civilian-risk overlays from renderer-independent data.
-- Complete: render visible unit order-status glyphs from renderer-independent overlay data.
-- Complete: add fallback markers for missing sprite assets or unavailable image backends.
-- Continue: add finalized sprite art and packed runtime atlases when the art pass settles.
+Exit criteria:
 
-### Milestone C: 2003 Scenario Data
+- The engine can load a map topology graph for the 2003 demo.
+- The map manifest no longer points at nonexistent collision/navigation products.
+- Tests prove the topology covers roads, buildings, interiors, roofs, and exits.
 
-- Complete: create the first Market / Commercial Streets scenario data file.
-- Complete: load controller slots, factions, forces, units, civilians, objectives, map metadata, and asset references from data.
-- Complete: add parser/validation tests.
-- Continue: expand the format only when new gameplay systems need new fields.
+### Cycles 11-20: Navigation, Movement, And LOS
 
-### Milestone D: Playable Contact
+Goal: replace straight-line movement assumptions with topology-aware tactical movement.
 
-- Complete: add visible fire/suppression/casualty feedback records and overlays.
-- Complete: add hidden-contact state, reveal checks, and suspected-contact overlays.
-- Complete: add suspected-danger and false-contact records.
-- Complete: make investigate/search resolve suspected-danger and false-contact reports, including reveal/no-threat outcomes.
-- Complete: add first civilian-risk scoring and a non-combatant proximity/fire constraint.
-- Complete: add a basic opposing AI response.
-- Complete: turn the first contact systems into scenario outcome scoring and after-action text.
-- Complete: make uncertainty influence first-pass AI and player-facing investigate commands rather than only reports/overlays.
-- Continue: deepen uncertainty into search/breach/cache systems once those scenario locations exist.
+Deliverables:
 
-### Milestone E: Demo Polish
+- Add C pathfinding over grid/topology data with deterministic A* or equivalent.
+- Add per-area movement costs, blocked cells, dynamic blocked states, and route validation.
+- Add unit movement along paths with route progress, stuck detection, and cancellation.
+- Add civilian-compatible path requests with safe-route weighting.
+- Add floor-aware movement and vertical transitions through stairs/roof access points.
+- Add LOS over map occluders, doors/windows, rooftops, elevation, parapets, and interior walls.
+- Add cover evaluation from room/wall/window/vehicle/rubble topology.
+- Update board-view overlays to project routes, floor selection, visible areas, and blocked path reasons.
+- Add replay events for path assignment, path failure, and vertical movement.
+- Add deterministic tests for pathfinding, vertical transitions, LOS, and cover.
 
-- Complete: add deterministic after-action summary data and headless transcript output.
-- Complete: add first deterministic debug transcript lines and balance assertions.
-- Complete: broaden deterministic replay/debug logging into versioned replay/event files.
-- Complete: add first player-facing investigate command affordance for suspected and false contacts.
-- Complete: add replay validation tooling and invalid-replay coverage for versioned replay/event files.
-- Complete: add first contested-objective and civilian-risk AI-only balance smoke coverage.
-- Complete: add first score/objective/risk HUD, order-status glyphs, and app smoke-test prototype during the SDL evaluation.
-- Complete: add replay playback for versioned `.mkreplay` event files.
-- Complete: broaden AI-only balance coverage into seed sweeps with batch summary expectations.
-- Complete: add scenario data for first-pass breach/search, cache/search, and rooftop/stair access points.
-- Complete: add player-facing briefing and after-action UI presentation during the SDL evaluation.
-- Complete: package one macOS-first smoke-tested prototype before the SDL path was retired.
-- Complete: document how to build, run, test, and package the current runtime assets.
+Exit criteria:
 
-## Post-Plan Next Steps
+- Units can move through streets, alleys, interiors, and rooftops by path.
+- LOS and cover match authored building topology.
+- Headless smoke tests detect stalled movement.
 
-1. Replace provisional source art with the uniform art pass and regenerate runtime products.
-2. Deepen breach/search/cache/rooftop affordances into rules, commands, AI choices, and AAR scoring.
-3. Build a native Mac frontend over the portable C contracts and use it to replace the retired SDL launch path.
-4. Build a native Windows frontend against the same contracts.
-5. Add a new post-plan cycle ledger for playtest, usability, and deployment work.
-6. Keep all manifest/scenario/render/AI changes covered by CTest, including missing asset and invalid-reference failures.
+### Cycles 21-30: Scenario Data Expansion
 
-## Quality Bar
+Goal: make the 2003 battle scenario data-rich enough for a real demo.
 
-- Every new rule gets a deterministic test.
-- Every manifest or scenario file gets validation.
-- Missing art should produce a readable fallback, not a crash.
-- Source assets remain unmodified.
-- Runtime assets are reproducible.
-- The demo must be playable at unit scale while preserving meaningful soldier-level consequences.
+Deliverables:
+
+- Expand `.mkscenario` or introduce companion data files for forces, civilian groups, spawn zones, AI plans, and map topology references.
+- Add reusable templates for soldiers, squads, weapons, civilian archetypes, vehicles, and hidden threat groups.
+- Replace single-civilian placeholder with a small market population using the 168 civilian runtime sprites.
+- Add civilian groups: vendors, shoppers, families, bystanders, wounded/incapacitated civilians.
+- Add opfor groups: hidden cell, rooftop watcher, armed looter, machine-gunner, RPG threat, cache guard.
+- Add player force templates for patrol, support weapons, breacher, medic, marksman, and vehicle crew.
+- Add validation for template ids, asset ids, spawn bounds, pathable starts, faction references, and impossible loadouts.
+- Add scenario variants for smoke tests: empty map, interior contact, civilian panic, rooftop threat, cache search, evacuation.
+- Add deterministic fixture parity where useful, then reduce hard-coded Mosul fixture reliance.
+- Update docs for scenario format v2.
+
+Exit criteria:
+
+- Main 2003 scenario loads a credible population and opposing force from data.
+- Scenario validation rejects unpathable starts, missing sprite ids, invalid civilian groups, and impossible force templates.
+
+### Cycles 31-40: Civilian Movement And Civilian AI
+
+Goal: turn civilians into deterministic moving agents whose behavior affects tactics and scoring.
+
+Deliverables:
+
+- Extend `mk_civilian_t` with profile, group id, floor/topology node, destination, path, speed, compliance, panic, and intent fields.
+- Add civilian intent update step separate from tactical unit orders.
+- Implement shelter, freeze, flee, follow-instructions, disperse, assist-group, wounded, and dead states.
+- Add safe-zone, exit-zone, shelter-zone, and danger-zone data to map/scenario files.
+- Compute threat maps from gunfire, visible armed units, explosions/future events, casualties, and blocked routes.
+- Add civilian pathfinding that avoids fire lanes, armed units, hidden threat zones when known, and blocked interiors.
+- Add group cohesion behavior so civilians do not scatter randomly unless panic breaks cohesion.
+- Add player instructions as orders/events that civilians may follow based on stress and trust.
+- Add replay/debug transcript lines for civilian state changes and route choices.
+- Add CTests for every civilian state transition, path choice, risk change, and scoring effect.
+
+Exit criteria:
+
+- AI-only battle runs include moving civilians.
+- Civilian movement can create meaningful tactical constraints without random nondeterminism.
+- Civilian harm/risk is explainable in replay/AAR output.
+
+### Cycles 41-50: Urban Combat, Breach, Search, And Rooftops
+
+Goal: make the modern urban systems mechanically real.
+
+Deliverables:
+
+- Implement breach/search/cache actions on topology nodes and semantic zones.
+- Add door/window/portal states: closed, open, breached, blocked, searched.
+- Add hidden threat reveal rules for interiors, rooftops, caches, and line-of-sight proximity.
+- Add rooftop/elevation combat modifiers, exposure, vertical LOS, and roof access restrictions.
+- Add suppression and casualty effects that interact with rooms, cover, windows, and civilian proximity.
+- Add non-lethal restraint/hold-fire pressure when civilians cross fire lanes.
+- Add search outcomes: no threat, cache found, enemy revealed, booby trap/future hook, civilian found.
+- Add opfor displacement and ambush behavior using rooms, roofs, and caches.
+- Add after-action scoring for breach/search success, civilian protection, cache handling, force preservation, and time.
+- Add tests for every interaction, including invalid actions and replay determinism.
+
+Exit criteria:
+
+- The demo can produce contact inside buildings, on rooftops, and around civilians.
+- Search/breach choices affect objectives and AAR scoring.
+
+### Cycles 51-60: Tactical AI And Autoplay Balance
+
+Goal: make AI-only runs meaningful enough to expose engine problems early.
+
+Deliverables:
+
+- Expand player-side tactical AI for movement, cover use, investigate/search, breach, restraint, casualty response, and objective control.
+- Expand opfor AI for defend, ambush, displace, hide, threaten civilians, avoid suicidal exposure, and exploit interiors/roofs.
+- Add civilian AI into the same fixed-step autoplay loop.
+- Add batch AI battle scenarios with deterministic seeds and expected outcome envelopes.
+- Add stall detection for units and civilians separately.
+- Add coverage for path failures, endless civilian panic loops, no-contact battles, over-lethal fire, and score collapse.
+- Add replay diff tooling for AI-only regressions.
+- Add performance counters for pathfinding, LOS, civilian updates, and replay output.
+- Tune scoring weights and scenario starts against multi-seed runs.
+- Keep Xcode command-line project aligned with the CMake AI battle runner.
+
+Exit criteria:
+
+- AI-only runs exercise player, opfor, and civilian behavior together.
+- Batch tests catch stalls, impossible paths, broken civilian behavior, and bad scoring.
+
+### Cycles 61-70: SwiftUI Wrapper Contract
+
+Goal: give the SwiftUI app a stable, minimal C boundary without moving gameplay into Swift.
+
+Deliverables:
+
+- Define public C API headers for creating/destroying a game session, loading scenario data, stepping fixed ticks, issuing orders, querying snapshots, and reading render commands.
+- Add C ABI-safe structs for snapshot summaries, units, soldiers, civilians, contacts, objectives, terrain overlays, routes, sprites, and AAR text.
+- Add stable ids for map assets, sprite render entries, markers, rooms, topology nodes, civilians, units, and contacts.
+- Add draw-command export from `engine/render` so SwiftUI can render map layers, sprites, markers, overlays, routes, text labels, and selection state.
+- Add input mapping helpers for map picking, selected unit/civilian/contact/objective ids, and command preview.
+- Add SwiftUI sample wrapper or Xcode target that links the C libraries and opens the 2003 demo without owning rules.
+- Add smoke tests for C ABI calls from C and, if feasible, a Swift build smoke.
+- Add memory ownership rules and session lifecycle tests.
+- Add replay playback API for SwiftUI debugging and AAR review.
+- Document frontend responsibilities and forbidden gameplay responsibilities.
+
+Exit criteria:
+
+- SwiftUI can load the demo, step it, issue orders, query snapshots, and draw from C-owned state.
+- The frontend boundary is stable enough for UI work to proceed independently.
+
+### Cycles 71-80: Demo Hardening, Performance, And Release Readiness
+
+Goal: finish the engine side of a playable public demo.
+
+Deliverables:
+
+- Profile and optimize map topology lookup, pathfinding, LOS, civilian updates, AI, and render-command generation.
+- Add scenario start/end conditions for public demo flow.
+- Add save/replay/load support sufficient for bug reports and AAR reproduction.
+- Add deterministic replay validation for civilian movement and topology events.
+- Add asset and scenario audit tools for missing files, bad paths, unreferenced runtime sprites, unreachable topology nodes, and invalid exits.
+- Add full demo test matrix: default, strict, headless, Xcode AI battle, scenario validation, map topology validation, asset validation, replay validation, and AI batch.
+- Add debug output for SwiftUI: selected entity dump, path debug, LOS debug, civilian intent debug, and scoring breakdown.
+- Tune the 2003 demo for a readable first playable experience.
+- Update README, docs, scenario format, build matrix, and asset pipeline docs.
+- Freeze the engine demo contract and mark the next plan for UI polish and content expansion.
+
+Exit criteria:
+
+- The C engine can run the complete MOSUL 2003 demo deterministically in headless and SwiftUI-wrapped modes.
+- Map interiors, civilians, combatants, AI, scoring, replay, and AAR all interact coherently.
+- The demo is stable enough for repeated AI-only battles and manual playtesting.
+
+## Testing Policy
+
+Every cycle batch must keep these checks green:
+
+- `cmake --preset default`
+- `cmake --build --preset default`
+- `ctest --preset default --output-on-failure`
+- `cmake --preset strict`
+- `cmake --build --preset strict`
+- `ctest --preset strict --output-on-failure`
+- direct `mk_ai_battle` seed batch for the main scenario
+- Xcode command-line AI battle build when Xcode project files change
+
+Add focused tests before or with each system:
+
+- map product validation tests
+- topology/pathfinding tests
+- LOS/cover/elevation tests
+- civilian AI state-transition tests
+- civilian path/risk/scoring tests
+- breach/search/roof tests
+- replay determinism tests
+- SwiftUI C ABI smoke tests
+
+## Definition Of Done
+
+The 80-cycle plan is done when:
+
+- the 2003 demo uses validated visual map layers plus gameplay-grade collision, navigation, topology, and interior/roof data
+- civilians move, react, flee, freeze, shelter, follow instructions, create risk, and affect scoring through deterministic C logic
+- combatants use interiors, rooftops, cover, breach/search actions, suppression, hidden contacts, and objective logic
+- AI-only runs include both tactical sides and civilians
+- SwiftUI can wrap the C engine without owning gameplay rules
+- all public demo assets referenced by the scenario are validated by C tests
+- replay/AAR output explains the outcome well enough to debug bad battles
