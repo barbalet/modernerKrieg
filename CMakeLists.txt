@@ -266,6 +266,15 @@ if(MK_BUILD_SDL_APP)
     endif()
 
     mk_apply_warnings(modernerKrieg)
+
+    if(MK_BUILD_TESTS)
+      add_test(NAME modernerKrieg_sdl_smoke COMMAND modernerKrieg --smoke-frames 2)
+      set_tests_properties(
+        modernerKrieg_sdl_smoke
+        PROPERTIES
+          ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software"
+      )
+    endif()
   else()
     message(STATUS "SDL3 was not found; skipping the modernerKrieg SDL app target.")
     message(STATUS "Install SDL3 or set SDL3_DIR to enable the app target.")

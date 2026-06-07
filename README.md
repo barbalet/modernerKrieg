@@ -130,6 +130,20 @@ cmake -S . -B build -DSDL3_DIR=/path/to/sdl3/lib/cmake/SDL3
 cmake --build build
 ```
 
+On Apple Silicon with Homebrew SDL3, use the arm64 preset:
+
+```sh
+cmake --preset default-arm64
+cmake --build --preset default-arm64
+ctest --preset default-arm64
+```
+
+Run the SDL shell for a deterministic smoke check without opening a normal app session:
+
+```sh
+SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software ./build/default-arm64/bin/modernerKrieg --smoke-frames 2
+```
+
 If SDL3 is not available, CMake still builds the portable core and tests.
 
 ## Xcode AI Battles
@@ -200,14 +214,14 @@ The core now supports deterministic board interaction without depending on SDL:
 - fit the tactical map to a screen rectangle
 - pan and zoom a board view
 - project terrain, objectives, units, and soldier offsets into screen space
-- project tactical overlays for selection, movement, fire, suppression, hidden contacts, suspected/false contacts, casualties, objectives, objective control, and civilian risk
+- project tactical overlays for selection, movement, fire, suppression, hidden contacts, suspected/false contacts, casualties, objectives, objective control, civilian risk, and visible unit order status
 - validate map, sprite, and marker manifests without SDL
 - load the 2003 scenario from data with parser-side and core-side validation
 - run a selected scenario through the headless tool with seed, tick-count, quiet, and transcript controls
 - run player and opposing tactical controllers as deterministic AI-only headless runs with move, investigate, overwatch, suppress, hold, civilian-risk restraint, and withdraw choices
-- hand map, sprite, and marker manifests to the SDL app, which can load PNGs when SDL3_image is available and fall back otherwise
+- hand map, sprite, and marker manifests to the SDL app, which can load PNGs when SDL3_image is available, draw a compact score/objective/risk HUD, render order-status glyphs, and fall back otherwise
 
-The next implementation push is replay playback, SDL-facing score/objective presentation, and clearer order/status markers for the public demo shell.
+The next implementation push is replay playback, broader AI-only seed sweeps, and scenario data for search/cache/breach or rooftop access points once the art pass identifies locations.
 
 When the SDL3 app target is available, left-click selects a unit, right-click gives the selected unit a move order, right-clicking a suspected/false contact gives an investigate order, arrow keys pan the board, and plus/minus zoom the board.
 

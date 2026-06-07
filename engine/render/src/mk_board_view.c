@@ -67,6 +67,13 @@ static mk_result_t mk_board_view_push_overlay(
     return MK_OK;
 }
 
+static bool mk_board_view_unit_should_show_order_status(const mk_unit_t *unit) {
+    return unit != NULL
+        && unit->side != MK_SIDE_CIVILIAN
+        && !(unit->hidden && !unit->revealed)
+        && unit->order != MK_ORDER_NONE;
+}
+
 static void mk_board_view_clamp_origin(mk_board_view_t *view, const mk_map_t *map) {
     float visible_width_m;
     float visible_height_m;
@@ -160,6 +167,10 @@ mk_result_t mk_board_view_collect_tactical_overlays(
         size_t soldier_index;
 
         if (unit->hidden && !unit->revealed) {
+            needed += 1;
+        }
+
+        if (mk_board_view_unit_should_show_order_status(unit)) {
             needed += 1;
         }
 
@@ -299,6 +310,26 @@ mk_result_t mk_board_view_collect_tactical_overlays(
             overlay.unit_id = unit->id;
             overlay.side = unit->side;
             overlay.intensity = unit->concealment;
+            result = mk_board_view_push_overlay(out_overlays, overlay_capacity, &overlay_index, &overlay);
+            if (result != MK_OK) {
+                return result;
+            }
+        }
+
+        if (mk_board_view_unit_should_show_order_status(unit)) {
+            mk_tactical_overlay_t overlay = mk_board_view_make_overlay(
+                view,
+                MK_TACTICAL_OVERLAY_ORDER_STATUS,
+                unit->position_m,
+                5.0f
+            );
+            mk_result_t result;
+
+            overlay.unit_id = unit->id;
+            overlay.side = unit->side;
+            overlay.order = unit->order;
+            overlay.screen_position_px.y -= 14.0f;
+            overlay.target_screen_position_px = overlay.screen_position_px;
             result = mk_board_view_push_overlay(out_overlays, overlay_capacity, &overlay_index, &overlay);
             if (result != MK_OK) {
                 return result;

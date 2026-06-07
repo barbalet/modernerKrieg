@@ -111,7 +111,7 @@ static void test_marker_manifest_loads_tactical_markers(void) {
     make_project_path(path, sizeof(path), "assets/mosul/manifests/mosul_2003_markers.markermanifest");
     MK_TEST_ASSERT(mk_asset_load_marker_manifest(path, &manifest) == MK_OK);
     MK_TEST_ASSERT(strcmp(manifest.id, "mosul_2003_markers") == 0);
-    MK_TEST_ASSERT(manifest.marker_count == 12);
+    MK_TEST_ASSERT(manifest.marker_count == 18);
 
     marker = mk_asset_find_marker(&manifest, "selection_ring");
     MK_TEST_ASSERT(marker != NULL);
@@ -126,6 +126,12 @@ static void test_marker_manifest_loads_tactical_markers(void) {
     MK_TEST_ASSERT(marker != NULL);
     MK_TEST_ASSERT(strcmp(marker->kind, "civilian_risk") == 0);
     MK_TEST_ASSERT(strcmp(marker->shape, "halo") == 0);
+
+    marker = mk_asset_find_marker(&manifest, "order_investigate");
+    MK_TEST_ASSERT(marker != NULL);
+    MK_TEST_ASSERT(strcmp(marker->kind, "order_investigate") == 0);
+    MK_TEST_ASSERT(strcmp(marker->shape, "diamond") == 0);
+    MK_TEST_ASSERT(marker->line_width_px == 2);
 }
 
 static void test_missing_map_layer_is_rejected(void) {

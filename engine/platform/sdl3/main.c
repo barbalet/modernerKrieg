@@ -8,8 +8,11 @@
 #ifdef MK_HAS_SDL3_IMAGE
 #include <SDL3_image/SDL_image.h>
 #endif
+#include <errno.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define MK_SDL_MAP_MANIFEST_PATH "assets/mosul/manifests/market_commercial_streets_2003.mapmanifest"
@@ -80,6 +83,34 @@ static void mk_sdl_copy_name(char *destination, size_t capacity, const char *sou
     }
 
     destination[index] = '\0';
+}
+
+static bool mk_sdl_parse_u32(const char *text, uint32_t *out_value) {
+    char *end = NULL;
+    unsigned long parsed;
+
+    if (text == NULL || out_value == NULL || text[0] == '\0') {
+        return false;
+    }
+
+    errno = 0;
+    parsed = strtoul(text, &end, 10);
+    if (errno != 0 || end == text || *end != '\0' || parsed > UINT32_MAX) {
+        return false;
+    }
+
+    *out_value = (uint32_t)parsed;
+    return true;
+}
+
+static void mk_sdl_print_usage(const char *program_name) {
+    fprintf(
+        stderr,
+        "usage: %s [--smoke-frames N]\n"
+        "\n"
+        "Runs the SDL3 MOSUL demo shell. --smoke-frames exits after N rendered frames.\n",
+        program_name
+    );
 }
 
 static void mk_sdl_input_begin_frame(mk_sdl_input_t *input) {
@@ -259,8 +290,40 @@ static const char *mk_sdl_role_name(mk_soldier_role_t role) {
     }
 }
 
-static const char *mk_sdl_overlay_marker_id(mk_tactical_overlay_kind_t kind) {
-    switch (kind) {
+static const char *mk_sdl_order_marker_id(mk_order_t order) {
+    switch (order) {
+        case MK_ORDER_INVESTIGATE:
+            return "order_investigate";
+        case MK_ORDER_OVERWATCH:
+            return "order_overwatch";
+        case MK_ORDER_BREACH:
+            return "order_breach_search";
+        case MK_ORDER_FIRE:
+        case MK_ORDER_SUPPRESS:
+            return "order_suppress";
+        case MK_ORDER_WITHDRAW:
+        case MK_ORDER_RALLY:
+            return "order_withdraw";
+        case MK_ORDER_MOVE:
+        case MK_ORDER_ASSAULT_MOVE:
+            return "move_target";
+        case MK_ORDER_HOLD:
+        case MK_ORDER_NONE:
+        default:
+            return "order_hold";
+    }
+}
+
+static const char *mk_sdl_overlay_marker_id(const mk_tactical_overlay_t *overlay) {
+    if (overlay == NULL) {
+        return "selection_ring";
+    }
+
+    if (overlay->kind == MK_TACTICAL_OVERLAY_ORDER_STATUS) {
+        return mk_sdl_order_marker_id(overlay->order);
+    }
+
+    switch (overlay->kind) {
         case MK_TACTICAL_OVERLAY_SELECTION:
             return "selection_ring";
         case MK_TACTICAL_OVERLAY_MOVE_ROUTE:
@@ -285,6 +348,8 @@ static const char *mk_sdl_overlay_marker_id(mk_tactical_overlay_kind_t kind) {
             return "civilian_risk";
         case MK_TACTICAL_OVERLAY_OBJECTIVE_CONTROL:
             return "objective";
+        case MK_TACTICAL_OVERLAY_ORDER_STATUS:
+            return mk_sdl_order_marker_id(overlay->order);
         default:
             return "selection_ring";
     }
@@ -308,8 +373,65 @@ static void mk_sdl_set_side_color(SDL_Renderer *renderer, mk_side_t side, bool c
     }
 }
 
+static void mk_sdl_set_side_status_color(SDL_Renderer *renderer, mk_side_t side, bool contested) {
+    if (contested) {
+        SDL_SetRenderDrawColor(renderer, 210, 156, 68, 235);
+    } else if (side == MK_SIDE_PLAYER) {
+        SDL_SetRenderDrawColor(renderer, 91, 143, 186, 235);
+    } else if (side == MK_SIDE_OPFOR) {
+        SDL_SetRenderDrawColor(renderer, 153, 83, 67, 235);
+    } else if (side == MK_SIDE_CIVILIAN) {
+        SDL_SetRenderDrawColor(renderer, 180, 166, 120, 235);
+    } else {
+        SDL_SetRenderDrawColor(renderer, 112, 122, 116, 235);
+    }
+}
+
 static float mk_sdl_max_float(float first, float second) {
     return first > second ? first : second;
+}
+
+static float mk_sdl_clamp_float(float value, float minimum, float maximum) {
+    if (value < minimum) {
+        return minimum;
+    }
+
+    if (value > maximum) {
+        return maximum;
+    }
+
+    return value;
+}
+
+static int mk_sdl_total_civilian_risk(const mk_game_t *game) {
+    int risk = 0;
+    size_t index;
+
+    if (game == NULL) {
+        return 0;
+    }
+
+    for (index = 0; index < game->civilian_count; ++index) {
+        risk += game->civilians[index].risk;
+    }
+
+    return risk;
+}
+
+static const mk_unit_t *mk_sdl_selected_unit(const mk_game_t *game) {
+    size_t index;
+
+    if (game == NULL || game->selected_unit_id == 0) {
+        return NULL;
+    }
+
+    for (index = 0; index < game->unit_count; ++index) {
+        if (game->units[index].id == game->selected_unit_id) {
+            return &game->units[index];
+        }
+    }
+
+    return NULL;
 }
 
 static void mk_sdl_update_window_title(SDL_Window *window, const mk_game_t *game) {
@@ -334,12 +456,151 @@ static void mk_sdl_update_window_title(SDL_Window *window, const mk_game_t *game
     (void)snprintf(
         title,
         sizeof(title),
-        "modernerKrieg Mosul Demo | score %d | %s %s",
+        "modernerKrieg Mosul Demo | score %d | %s %s | contested %u | risk %d",
         score.total_score,
         objective_label,
-        objective_side
+        objective_side,
+        (unsigned)score.contested_objectives,
+        score.civilian_risk
     );
     SDL_SetWindowTitle(window, title);
+}
+
+static void mk_render_hud_bar(
+    SDL_Renderer *renderer,
+    SDL_FRect frame,
+    float fill_ratio,
+    mk_color_t fill_color
+) {
+    SDL_FRect fill = frame;
+
+    SDL_SetRenderDrawColor(renderer, 36, 42, 43, 235);
+    SDL_RenderFillRect(renderer, &frame);
+    SDL_SetRenderDrawColor(renderer, 96, 104, 101, 255);
+    SDL_RenderRect(renderer, &frame);
+
+    fill.w = mk_sdl_clamp_float(fill_ratio, 0.0f, 1.0f) * frame.w;
+    if (fill.w > 0.0f) {
+        SDL_SetRenderDrawColor(renderer, fill_color.r, fill_color.g, fill_color.b, fill_color.a);
+        SDL_RenderFillRect(renderer, &fill);
+    }
+}
+
+static mk_color_t mk_sdl_outcome_color(mk_outcome_t outcome) {
+    switch (outcome) {
+        case MK_OUTCOME_PLAYER_SUCCESS:
+            return mk_make_color(91, 143, 186, 245);
+        case MK_OUTCOME_PLAYER_PARTIAL:
+            return mk_make_color(210, 156, 68, 245);
+        case MK_OUTCOME_PLAYER_FAILURE:
+            return mk_make_color(153, 83, 67, 245);
+        case MK_OUTCOME_IN_PROGRESS:
+        default:
+            return mk_make_color(154, 172, 142, 245);
+    }
+}
+
+static void mk_render_order_glyph(SDL_Renderer *renderer, mk_vec2_t center, float radius, mk_order_t order) {
+    SDL_FRect rect;
+
+    rect.x = center.x - radius;
+    rect.y = center.y - radius;
+    rect.w = radius * 2.0f;
+    rect.h = radius * 2.0f;
+
+    if (order == MK_ORDER_INVESTIGATE) {
+        SDL_RenderLine(renderer, center.x, rect.y, rect.x + rect.w, center.y);
+        SDL_RenderLine(renderer, rect.x + rect.w, center.y, center.x, rect.y + rect.h);
+        SDL_RenderLine(renderer, center.x, rect.y + rect.h, rect.x, center.y);
+        SDL_RenderLine(renderer, rect.x, center.y, center.x, rect.y);
+    } else if (order == MK_ORDER_OVERWATCH) {
+        SDL_RenderLine(renderer, rect.x, rect.y + rect.h, center.x, rect.y);
+        SDL_RenderLine(renderer, center.x, rect.y, rect.x + rect.w, rect.y + rect.h);
+    } else if (order == MK_ORDER_WITHDRAW || order == MK_ORDER_RALLY) {
+        SDL_RenderLine(renderer, rect.x + rect.w, rect.y, rect.x, center.y);
+        SDL_RenderLine(renderer, rect.x, center.y, rect.x + rect.w, rect.y + rect.h);
+    } else if (order == MK_ORDER_FIRE || order == MK_ORDER_SUPPRESS) {
+        SDL_RenderLine(renderer, rect.x, center.y, rect.x + rect.w, center.y);
+        SDL_RenderLine(renderer, center.x, rect.y, center.x, rect.y + rect.h);
+    } else if (order == MK_ORDER_BREACH) {
+        SDL_RenderRect(renderer, &rect);
+        SDL_RenderLine(renderer, rect.x, center.y, rect.x + rect.w, center.y);
+    } else {
+        SDL_RenderRect(renderer, &rect);
+    }
+}
+
+static void mk_render_status_hud(SDL_Renderer *renderer, const mk_game_t *game, const mk_board_view_t *view) {
+    mk_score_t score;
+    SDL_FRect panel;
+    SDL_FRect score_bar;
+    SDL_FRect risk_bar;
+    SDL_FRect objective_rect;
+    mk_color_t score_color;
+    float score_ratio;
+    float risk_ratio;
+    size_t objective_index;
+    int civilian_risk;
+    const mk_unit_t *selected_unit;
+
+    if (renderer == NULL || game == NULL || view == NULL) {
+        return;
+    }
+
+    if (mk_game_score(game, &score) != MK_OK) {
+        memset(&score, 0, sizeof(score));
+    }
+
+    civilian_risk = mk_sdl_total_civilian_risk(game);
+    panel.x = view->screen_rect_px.x;
+    panel.y = 12.0f;
+    panel.w = view->screen_rect_px.width;
+    panel.h = 24.0f;
+
+    SDL_SetRenderDrawColor(renderer, 22, 27, 28, 230);
+    SDL_RenderFillRect(renderer, &panel);
+    SDL_SetRenderDrawColor(renderer, 76, 84, 81, 255);
+    SDL_RenderRect(renderer, &panel);
+
+    score_ratio = ((float)score.total_score + 100.0f) / 600.0f;
+    score_color = mk_sdl_outcome_color(score.outcome);
+    score_bar.x = panel.x + 10.0f;
+    score_bar.y = panel.y + 8.0f;
+    score_bar.w = 190.0f;
+    score_bar.h = 8.0f;
+    mk_render_hud_bar(renderer, score_bar, score_ratio, score_color);
+
+    risk_ratio = (float)civilian_risk / 40.0f;
+    risk_bar.x = score_bar.x + score_bar.w + 18.0f;
+    risk_bar.y = score_bar.y;
+    risk_bar.w = 120.0f;
+    risk_bar.h = 8.0f;
+    mk_render_hud_bar(renderer, risk_bar, risk_ratio, mk_make_color(206, 181, 109, 245));
+
+    objective_rect.x = risk_bar.x + risk_bar.w + 18.0f;
+    objective_rect.y = panel.y + 6.0f;
+    objective_rect.w = 12.0f;
+    objective_rect.h = 12.0f;
+    for (objective_index = 0; objective_index < game->objective_count && objective_index < 16; ++objective_index) {
+        const mk_objective_t *objective = &game->objectives[objective_index];
+        bool contested = objective->controlling_side == MK_SIDE_NEUTRAL && score.contested_objectives > 0;
+
+        mk_sdl_set_side_status_color(renderer, objective->controlling_side, contested);
+        SDL_RenderFillRect(renderer, &objective_rect);
+        SDL_SetRenderDrawColor(renderer, 18, 22, 24, 255);
+        SDL_RenderRect(renderer, &objective_rect);
+        objective_rect.x += 16.0f;
+    }
+
+    selected_unit = mk_sdl_selected_unit(game);
+    if (selected_unit != NULL) {
+        mk_vec2_t center;
+
+        center.x = panel.x + panel.w - 22.0f;
+        center.y = panel.y + panel.h * 0.5f;
+        mk_sdl_set_side_status_color(renderer, selected_unit->side, false);
+        mk_render_order_glyph(renderer, center, 6.0f, selected_unit->order);
+    }
 }
 
 static void mk_render_map_background(
@@ -462,7 +723,7 @@ static void mk_render_overlay(
     const mk_sdl_marker_assets_t *marker_assets,
     const mk_tactical_overlay_t *overlay
 ) {
-    const char *marker_id = mk_sdl_overlay_marker_id(overlay->kind);
+    const char *marker_id = mk_sdl_overlay_marker_id(overlay);
     const mk_asset_marker_t *marker = marker_assets != NULL && marker_assets->loaded
         ? mk_asset_find_marker(&marker_assets->manifest, marker_id)
         : NULL;
@@ -486,6 +747,11 @@ static void mk_render_overlay(
             overlay->target_screen_position_px.x,
             overlay->target_screen_position_px.y
         );
+        return;
+    }
+
+    if (overlay->kind == MK_TACTICAL_OVERLAY_ORDER_STATUS) {
+        mk_render_order_glyph(renderer, overlay->screen_position_px, radius_px, overlay->order);
         return;
     }
 
@@ -573,6 +839,7 @@ static void mk_render(
         }
     }
 
+    mk_render_status_hud(renderer, game, view);
     SDL_RenderPresent(renderer);
 }
 
@@ -693,13 +960,35 @@ int main(int argc, char **argv) {
     mk_sdl_sprite_assets_t sprite_assets;
     mk_sdl_marker_assets_t marker_assets;
     bool running = true;
+    uint32_t smoke_frames = 0;
+    uint32_t rendered_frames = 0;
+    int arg_index;
     mk_game_t game;
     mk_scenario_definition_t scenario;
     mk_board_view_t view;
     mk_result_t result;
 
-    (void)argc;
-    (void)argv;
+    for (arg_index = 1; arg_index < argc; ++arg_index) {
+        const char *argument = argv[arg_index];
+
+        if (strcmp(argument, "--help") == 0) {
+            mk_sdl_print_usage(argv[0]);
+            return 0;
+        }
+
+        if (strcmp(argument, "--smoke-frames") == 0) {
+            if (arg_index + 1 >= argc || !mk_sdl_parse_u32(argv[arg_index + 1], &smoke_frames)) {
+                mk_sdl_print_usage(argv[0]);
+                return 2;
+            }
+
+            arg_index += 1;
+            continue;
+        }
+
+        mk_sdl_print_usage(argv[0]);
+        return 2;
+    }
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
@@ -768,6 +1057,10 @@ int main(int argc, char **argv) {
         (void)mk_game_run_fixed_steps(&game, 1, NULL, NULL);
         mk_sdl_update_window_title(window, &game);
         mk_render(renderer, &game, &view, map_texture, &sprite_assets, &marker_assets);
+        rendered_frames += 1;
+        if (smoke_frames > 0 && rendered_frames >= smoke_frames) {
+            running = false;
+        }
         SDL_Delay(16);
     }
 

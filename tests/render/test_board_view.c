@@ -125,6 +125,7 @@ static void test_tactical_overlays_from_snapshot(void) {
     bool saw_casualty = false;
     bool saw_objective = false;
     bool saw_objective_control = false;
+    bool saw_order_status = false;
     bool saw_hidden_contact = false;
     bool saw_civilian_risk = false;
     bool saw_suspected_contact = false;
@@ -167,9 +168,9 @@ static void test_tactical_overlays_from_snapshot(void) {
     assert(mk_board_view_fit_map(&view, &snapshot.map, 960.0f, 640.0f, 48.0f) == MK_OK);
 
     assert(mk_board_view_collect_tactical_overlays(&view, &snapshot, NULL, 0, &overlay_count) == MK_OK);
-    assert(overlay_count == 12);
+    assert(overlay_count == 13);
     assert(mk_board_view_collect_tactical_overlays(&view, &snapshot, overlays, 3, &overlay_count) == MK_ERROR_CAPACITY);
-    assert(overlay_count == 12);
+    assert(overlay_count == 13);
     assert(mk_board_view_collect_tactical_overlays(
         &view,
         &snapshot,
@@ -177,7 +178,7 @@ static void test_tactical_overlays_from_snapshot(void) {
         sizeof(overlays) / sizeof(overlays[0]),
         &overlay_count
     ) == MK_OK);
-    assert(overlay_count == 12);
+    assert(overlay_count == 13);
 
     for (index = 0; index < overlay_count; ++index) {
         const mk_tactical_overlay_t *overlay = &overlays[index];
@@ -215,6 +216,11 @@ static void test_tactical_overlays_from_snapshot(void) {
             assert(overlay->objective_id == 1);
             assert(overlay->side == MK_SIDE_PLAYER);
             assert_close(overlay->radius_m, 14.0f);
+        } else if (overlay->kind == MK_TACTICAL_OVERLAY_ORDER_STATUS) {
+            saw_order_status = true;
+            assert(overlay->unit_id == 1);
+            assert(overlay->order == MK_ORDER_MOVE);
+            assert(overlay->side == MK_SIDE_PLAYER);
         } else if (overlay->kind == MK_TACTICAL_OVERLAY_HIDDEN_CONTACT) {
             saw_hidden_contact = true;
             assert(overlay->unit_id == 2);
@@ -242,6 +248,7 @@ static void test_tactical_overlays_from_snapshot(void) {
     assert(saw_casualty);
     assert(saw_objective);
     assert(saw_objective_control);
+    assert(saw_order_status);
     assert(saw_hidden_contact);
     assert(saw_civilian_risk);
     assert(saw_suspected_contact);

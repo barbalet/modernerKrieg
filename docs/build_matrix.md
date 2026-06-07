@@ -27,6 +27,20 @@ cmake --build --preset default
 ctest --preset default
 ```
 
+On Apple Silicon with Homebrew SDL3, prefer the arm64 default preset:
+
+```sh
+cmake --preset default-arm64
+cmake --build --preset default-arm64
+ctest --preset default-arm64
+```
+
+The SDL app has a deterministic smoke mode:
+
+```sh
+SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software ./build/default-arm64/bin/modernerKrieg --smoke-frames 2
+```
+
 Run repeated AI-vs-AI battles from CMake:
 
 ```sh
@@ -51,7 +65,7 @@ xcodebuild -project modernerKriegAIBattles.xcodeproj -scheme mk_ai_battle -confi
 
 ## Platform Notes
 
-- macOS: install CMake and optionally SDL3 through Homebrew. The headless preset should work without SDL3. The `modernerKriegAIBattles.xcodeproj` project builds a command-line AI battle runner directly in Xcode without SDL.
+- macOS: install CMake and optionally SDL3 through Homebrew. The headless preset should work without SDL3. On Apple Silicon, Homebrew SDL libraries are arm64, so use `default-arm64` for the SDL-enabled CMake app build. The `modernerKriegAIBattles.xcodeproj` project builds a command-line AI battle runner directly in Xcode without SDL.
 - Windows: use a C compiler supported by CMake, such as MSVC. SDL3 should provide `SDL3Config.cmake` or be passed through `SDL3_DIR`.
 - Linux: install CMake, a C compiler, and optionally SDL3 development packages that provide the CMake config file.
 
