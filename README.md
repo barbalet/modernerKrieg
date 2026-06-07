@@ -105,6 +105,12 @@ Write a versioned replay/event file for deterministic validation:
   --replay build/mosul_ai.mkreplay
 ```
 
+Validate a replay/event file:
+
+```sh
+./build/bin/mk_replay_validate --expect-result MK_OK build/mosul_ai.mkreplay
+```
+
 Add simple balance expectations to fail a headless run when the expected state is not reached:
 
 ```sh
@@ -112,6 +118,7 @@ Add simple balance expectations to fail a headless run when the expected state i
   --ai-only \
   --max-ticks 3 \
   --expect-objective opfor \
+  --expect-outcome failure \
   --expect-min-score -10 \
   --quiet
 ```
@@ -186,7 +193,7 @@ The core now supports deterministic board interaction without depending on SDL:
 - track civilian risk and stress from dangerous fire lanes and close armed movement
 - update objective-control state and score outcomes from objective control, civilian risk, casualties, time, scenario thresholds, and scenario score weights
 - carry scenario briefing and after-action text through data loading, snapshots, and headless output
-- produce deterministic debug transcript lines and versioned replay/event files for headless runs and future replay tooling
+- produce deterministic debug transcript lines plus versioned replay/event files that can be validated by `mk_replay_validate`
 - track ready, suppressed, pinned, and broken unit states from live strength, training, and suppression
 - slow or halt movement under suppression and apply fire penalties from combat stress
 - represent richer soldier state, including stance, wound state, ammo capacity, stress, exposure, equipment flags, sensor flags, and reload/cooldown timers
@@ -200,7 +207,7 @@ The core now supports deterministic board interaction without depending on SDL:
 - run player and opposing tactical controllers as deterministic AI-only headless runs with move, investigate, overwatch, suppress, hold, civilian-risk restraint, and withdraw choices
 - hand map, sprite, and marker manifests to the SDL app, which can load PNGs when SDL3_image is available and fall back otherwise
 
-The next implementation push is replay playback and contact resolution: make investigate/search resolve suspected and false contacts, validate replay files end to end, and continue improving score/objective presentation in the SDL shell.
+The next implementation push is replay playback, SDL-facing score/objective presentation, and clearer order/status markers for the public demo shell.
 
 When the SDL3 app target is available, left-click selects a unit, right-click gives the selected unit a move order, right-clicking a suspected/false contact gives an investigate order, arrow keys pan the board, and plus/minus zoom the board.
 

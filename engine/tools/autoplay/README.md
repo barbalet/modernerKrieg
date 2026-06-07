@@ -6,6 +6,8 @@ The first tool, `mk_headless_run`, loads a MOSUL scenario and advances it for a 
 
 The `mk_ai_battle` tool runs repeated MOSUL AI-vs-AI battles with both tactical sides controlled by AI. It is available from CMake and from the checked-in `modernerKriegAIBattles.xcodeproj` command-line project.
 
+The `mk_replay_validate` tool validates the first line-oriented `.mkreplay` event format and can assert final replay result/outcome fields.
+
 Useful options:
 
 - `--scenario PATH`: load a specific `.mkscenario` file.
@@ -20,11 +22,18 @@ Useful options:
 - `--briefing`: print or record the scenario briefing before the first tick.
 - `--debug-log`: print or record replay-oriented debug lines after each tick.
 - `--expect-objective SIDE`: fail the run unless at least one objective is controlled by `player`, `opfor`, `civilian`, or `neutral`.
+- `--expect-outcome OUTCOME`: fail unless the final outcome is `success`, `partial`, `failure`, or `in_progress`.
+- `--expect-contested N`: fail unless the final score reports exactly `N` contested objectives.
+- `--expect-min-civilian-risk N`: fail unless final civilian risk is at least `N`.
 - `--expect-min-score N`: fail the run unless the final deterministic score is at least `N`.
 
-The first replay format is line-oriented text headed by `mk_replay version=1`. It is intended for deterministic validation first, then future playback tooling.
+The first replay format is line-oriented text headed by `mk_replay version=1`. Validate one with:
 
-Future cycles should extend this into richer AI-vs-AI autoplay with controller assignment, replay playback/validation, score-threshold checks, and batch balance summaries.
+```sh
+mk_replay_validate --expect-result MK_OK --expect-outcome failure build/mosul_ai.mkreplay
+```
+
+Future cycles should extend this into richer AI-vs-AI autoplay with controller assignment, replay playback, score-threshold checks, and batch balance summaries.
 
 `mk_ai_battle` useful options:
 

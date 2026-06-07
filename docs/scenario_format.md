@@ -53,7 +53,7 @@ The loader rejects:
 - out-of-bounds map tiles, terrain, civilians, objectives, and units
 - scenarios that the portable C core refuses to load
 
-CTest covers the default 2003 data file, fixture parity, objective labels, briefing/after-action text, score thresholds and weights, hidden-contact fields, missing asset references, invalid force references, invalid threshold ordering, impossible objective bounds, and the compact AI-only control smoke scenario.
+CTest covers the default 2003 data file, fixture parity, objective labels, briefing/after-action text, score thresholds and weights, hidden-contact fields, missing asset references, invalid force references, invalid threshold ordering, impossible objective bounds, the compact AI-only control smoke scenario, and a contested civilian-risk smoke scenario.
 
 ## Briefing And Outcome Text
 

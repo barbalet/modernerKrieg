@@ -123,6 +123,34 @@ static const char *mk_headless_outcome_name(mk_outcome_t outcome) {
     }
 }
 
+static bool mk_headless_parse_outcome(const char *text, mk_outcome_t *out_outcome) {
+    if (text == NULL || out_outcome == NULL) {
+        return false;
+    }
+
+    if (strcmp(text, "success") == 0) {
+        *out_outcome = MK_OUTCOME_PLAYER_SUCCESS;
+        return true;
+    }
+
+    if (strcmp(text, "partial") == 0) {
+        *out_outcome = MK_OUTCOME_PLAYER_PARTIAL;
+        return true;
+    }
+
+    if (strcmp(text, "failure") == 0) {
+        *out_outcome = MK_OUTCOME_PLAYER_FAILURE;
+        return true;
+    }
+
+    if (strcmp(text, "in_progress") == 0) {
+        *out_outcome = MK_OUTCOME_IN_PROGRESS;
+        return true;
+    }
+
+    return false;
+}
+
 static const char *mk_headless_status_name(mk_unit_status_t status) {
     switch (status) {
         case MK_UNIT_READY:
@@ -437,7 +465,7 @@ static bool mk_headless_parse_i32(const char *text, int *out_value) {
 static void mk_headless_print_usage(const char *program_name) {
     fprintf(
         stderr,
-        "usage: %s [--scenario PATH] [--project-root PATH] [--steps N|--max-ticks N] [--seed N] [--quiet] [--transcript PATH] [--replay PATH] [--ai-only] [--aar] [--briefing] [--debug-log] [--expect-objective SIDE] [--expect-min-score N]\n"
+        "usage: %s [--scenario PATH] [--project-root PATH] [--steps N|--max-ticks N] [--seed N] [--quiet] [--transcript PATH] [--replay PATH] [--ai-only] [--aar] [--briefing] [--debug-log] [--expect-objective SIDE] [--expect-outcome OUTCOME] [--expect-contested N] [--expect-min-civilian-risk N] [--expect-min-score N]\n"
         "\n"
         "Runs a MOSUL scenario headlessly for deterministic smoke tests and AI-only runs.\n",
         program_name
@@ -603,8 +631,14 @@ int main(int argc, char **argv) {
     bool print_aar = false;
     bool print_briefing = false;
     bool expect_objective = false;
+    bool expect_outcome = false;
+    bool expect_contested = false;
+    bool expect_min_civilian_risk = false;
     bool expect_min_score = false;
     mk_side_t expected_objective_side = MK_SIDE_NEUTRAL;
+    mk_outcome_t expected_outcome = MK_OUTCOME_IN_PROGRESS;
+    uint32_t expected_contested = 0;
+    int expected_min_civilian_risk = 0;
     int expected_min_score = 0;
     int arg_index;
     mk_result_t result;
@@ -724,6 +758,39 @@ int main(int argc, char **argv) {
             continue;
         }
 
+        if (strcmp(argument, "--expect-outcome") == 0) {
+            if (arg_index + 1 >= argc || !mk_headless_parse_outcome(argv[arg_index + 1], &expected_outcome)) {
+                mk_headless_print_usage(argv[0]);
+                return 2;
+            }
+
+            expect_outcome = true;
+            arg_index += 1;
+            continue;
+        }
+
+        if (strcmp(argument, "--expect-contested") == 0) {
+            if (arg_index + 1 >= argc || !mk_headless_parse_u32(argv[arg_index + 1], &expected_contested)) {
+                mk_headless_print_usage(argv[0]);
+                return 2;
+            }
+
+            expect_contested = true;
+            arg_index += 1;
+            continue;
+        }
+
+        if (strcmp(argument, "--expect-min-civilian-risk") == 0) {
+            if (arg_index + 1 >= argc || !mk_headless_parse_i32(argv[arg_index + 1], &expected_min_civilian_risk)) {
+                mk_headless_print_usage(argv[0]);
+                return 2;
+            }
+
+            expect_min_civilian_risk = true;
+            arg_index += 1;
+            continue;
+        }
+
         if (strcmp(argument, "--expect-min-score") == 0) {
             if (arg_index + 1 >= argc || !mk_headless_parse_i32(argv[arg_index + 1], &expected_min_score)) {
                 mk_headless_print_usage(argv[0]);
@@ -812,14 +879,55 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (expect_min_score) {
+    if (expect_outcome || expect_contested || expect_min_civilian_risk || expect_min_score) {
         mk_score_t score;
 
         result = mk_game_score(&game, &score);
-        if (result != MK_OK || score.total_score < expected_min_score) {
+        if (result != MK_OK) {
+            fprintf(stderr, "failed to score final state: %s\n", mk_result_name(result));
+            if (observer.replay != NULL) {
+                mk_headless_print_replay_end(observer.replay, &game, result);
+            }
+            mk_headless_close_outputs(&observer);
+            return 1;
+        }
+
+        if (expect_outcome && score.outcome != expected_outcome) {
+            fprintf(
+                stderr,
+                "expected outcome %s but saw %s\n",
+                mk_headless_outcome_name(expected_outcome),
+                mk_headless_outcome_name(score.outcome)
+            );
+            if (observer.replay != NULL) {
+                mk_headless_print_replay_end(observer.replay, &game, MK_ERROR_INVALID_DATA);
+            }
+            mk_headless_close_outputs(&observer);
+            return 1;
+        }
+
+        if (expect_contested && score.contested_objectives != expected_contested) {
+            fprintf(stderr, "expected contested objectives == %u\n", (unsigned)expected_contested);
+            if (observer.replay != NULL) {
+                mk_headless_print_replay_end(observer.replay, &game, MK_ERROR_INVALID_DATA);
+            }
+            mk_headless_close_outputs(&observer);
+            return 1;
+        }
+
+        if (expect_min_civilian_risk && score.civilian_risk < expected_min_civilian_risk) {
+            fprintf(stderr, "expected civilian risk >= %d\n", expected_min_civilian_risk);
+            if (observer.replay != NULL) {
+                mk_headless_print_replay_end(observer.replay, &game, MK_ERROR_INVALID_DATA);
+            }
+            mk_headless_close_outputs(&observer);
+            return 1;
+        }
+
+        if (expect_min_score && score.total_score < expected_min_score) {
             fprintf(stderr, "expected score >= %d\n", expected_min_score);
             if (observer.replay != NULL) {
-                mk_headless_print_replay_end(observer.replay, &game, result == MK_OK ? MK_ERROR_INVALID_DATA : result);
+                mk_headless_print_replay_end(observer.replay, &game, MK_ERROR_INVALID_DATA);
             }
             mk_headless_close_outputs(&observer);
             return 1;

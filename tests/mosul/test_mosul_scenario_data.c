@@ -109,6 +109,20 @@ static void test_control_smoke_scenario_loads(void) {
     MK_TEST_ASSERT(mk_game_load_scenario(&game, &scenario) == MK_OK);
 }
 
+static void test_contested_risk_smoke_scenario_loads(void) {
+    char path[512];
+    mk_scenario_definition_t scenario;
+    mk_game_t game;
+
+    make_project_path(path, sizeof(path), "game/mosul/scenarios/market_contested_risk_smoke_2003.mkscenario");
+    MK_TEST_ASSERT(mk_mosul_load_scenario_file(path, MK_TEST_PROJECT_ROOT, &scenario) == MK_OK);
+    MK_TEST_ASSERT(strcmp(scenario.name, "Market Contested Risk Smoke 2003") == 0);
+    MK_TEST_ASSERT(scenario.objective_count == 1);
+    MK_TEST_ASSERT(scenario.civilian_count == 1);
+    MK_TEST_ASSERT(scenario.unit_count == 2);
+    MK_TEST_ASSERT(mk_game_load_scenario(&game, &scenario) == MK_OK);
+}
+
 static void test_missing_asset_manifest_is_rejected(void) {
     char path[512];
     mk_scenario_definition_t scenario;
@@ -264,6 +278,7 @@ int main(void) {
     test_default_scenario_data_matches_fixture_shape();
     test_public_default_scenario_uses_data_file();
     test_control_smoke_scenario_loads();
+    test_contested_risk_smoke_scenario_loads();
     test_missing_asset_manifest_is_rejected();
     test_invalid_force_reference_is_rejected();
     test_impossible_objective_bounds_are_rejected();

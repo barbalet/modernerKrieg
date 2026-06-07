@@ -127,6 +127,11 @@ target_compile_definitions(mk_ai_battle
 )
 mk_apply_warnings(mk_ai_battle)
 
+add_executable(mk_replay_validate
+  engine/tools/autoplay/mk_replay_validate.c
+)
+mk_apply_warnings(mk_replay_validate)
+
 if(MK_BUILD_TESTS)
   enable_testing()
 
@@ -192,6 +197,7 @@ if(MK_BUILD_TESTS)
   add_test(NAME mk_headless_run_smoke COMMAND mk_headless_run --steps 3 --quiet)
   add_test(NAME mk_headless_run_ai_smoke COMMAND mk_headless_run --steps 3 --quiet --ai-only)
   add_test(NAME mk_ai_battle_smoke COMMAND mk_ai_battle --battles 1 --ticks 5 --quiet)
+  add_test(NAME mk_replay_validate_usage COMMAND mk_replay_validate --help)
   add_test(
     NAME mk_headless_run_debug_balance
     COMMAND mk_headless_run
@@ -207,6 +213,7 @@ if(MK_BUILD_TESTS)
     NAME mk_headless_run_replay_output
     COMMAND ${CMAKE_COMMAND}
       -DMK_HEADLESS_RUN=$<TARGET_FILE:mk_headless_run>
+      -DMK_REPLAY_VALIDATE=$<TARGET_FILE:mk_replay_validate>
       -DMK_REPLAY_PATH=${CMAKE_CURRENT_BINARY_DIR}/mosul_replay.mkreplay
       -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckHeadlessReplay.cmake
   )
@@ -219,6 +226,19 @@ if(MK_BUILD_TESTS)
       --ai-only
       --expect-objective player
       --expect-min-score 490
+  )
+  add_test(
+    NAME mk_headless_run_contested_risk_balance
+    COMMAND mk_headless_run
+      --scenario game/mosul/scenarios/market_contested_risk_smoke_2003.mkscenario
+      --steps 3
+      --quiet
+      --ai-only
+      --expect-objective neutral
+      --expect-outcome failure
+      --expect-contested 1
+      --expect-min-civilian-risk 3
+      --expect-min-score -40
   )
   add_test(
     NAME mk_core_no_sdl_headers

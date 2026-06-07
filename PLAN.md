@@ -10,17 +10,18 @@ The first public target is the 2003 Market / Commercial Streets demo. `derZweite
 - The core already supports deterministic game state, unit selection, orders, movement ticks, line of sight, cover checks, unit fire, ammo spend, wounds, casualties, suppression, morale state changes, hidden-contact reveals, suspected/false contact reports, civilian-risk updates, objective control, scoring thresholds, and after-action summaries.
 - The core state model now includes controller slots, force records, command identities, map tiles with elevation/cover/movement costs, richer weapon/ammunition metadata, richer soldier state, standalone civilian records, contact reports, hidden unit fields, and snapshot/load support for those containers.
 - The render layer already projects map, terrain, objectives, units, soldier offsets, selection, movement targets, fire lanes, suppression, hidden contacts, casualties, and civilian-risk overlays into screen space.
-- A deterministic headless runner exists for smoke tests and AI-vs-AI/autoplay work.
+- Deterministic headless runners exist for smoke tests, replay generation/validation, and AI-vs-AI/autoplay work.
 - CMake presets exist for default, headless, and strict warning-as-error builds.
 - Asset pipeline documentation, the first Market / Commercial Streets map manifest, the first 2003 sprite manifest, the first marker manifest, and C manifest validation tests exist.
 - The 2003 Market / Commercial Streets scenario now loads from a validated `.mkscenario` data file, with a C fixture retained for parity tests.
 - `mk_headless_run` can load an explicit scenario path, override the seed, run for a fixed tick budget, suppress console output, write a transcript with contact/risk counters, briefing, debug lines, versioned replay/event files, balance expectations, and after-action output, and run both non-civilian tactical sides under basic AI.
+- `mk_replay_validate` can validate versioned `.mkreplay` event files and assert final result/outcome fields.
 - The SDL app can read the map, sprite, and marker manifests and, when SDL3_image is available, load the manifest PNG assets; otherwise it keeps fallback map/unit/overlay rendering.
 - The first runtime map overview exists at `assets/mosul/runtime/maps/market_commercial_streets_2003/overview.png`.
 - The SDL3 app shell is optional and experimental. If SDL3 is available, it provides the current launchable app path; if not, the core and tests still build.
 - Source art for the 2003 demo is imported under `assets/mosul/source/`.
 - Public source art includes line-art references, 128 px top-down sprite sheets, source-angle weapon sprites, and Market / Commercial Streets map/layer assets.
-- The remaining public-demo work is now presentation, marker, contact, AI, scoring, and packaging focused.
+- The remaining public-demo work is now presentation, marker, AI balance, replay playback, scoring, and packaging focused.
 
 ## Runtime Shape
 
@@ -184,10 +185,10 @@ Cycle accounting starts from the current checked-in PNG-backed Mosul demo plan s
 - Ledger baseline date: 2026-06-06.
 - Planned cycle budget: 100 cycles.
 - Planned cycle shape: 5 milestones x 20 cycles each.
-- Completed cycles in this ledger: 60.
-- Current cycle: 60.
-- Remaining planned cycles: 40.
-- Next cycle batch: cycles 61-70.
+- Completed cycles in this ledger: 70.
+- Current cycle: 70.
+- Remaining planned cycles: 30.
+- Next cycle batch: cycles 71-80.
 
 When a development batch is completed, increment `Completed cycles in this ledger`, advance `Current cycle`, reduce `Remaining planned cycles`, and update `Next cycle batch`. Add one log row describing the cycle range, milestone focus, completed work, and verification.
 
@@ -200,6 +201,7 @@ When a development batch is completed, increment `Completed cycles in this ledge
 | 2026-06-06 | 40 | 40 | 60 | Milestone D/E / Outcome | Added persistent objective-control state, deterministic score math for objectives/civilian risk/casualties/time, after-action summary data, `mk_headless_run --aar`, player AI civilian-risk restraint, revealed-opfor withdrawal behavior, and deterministic tests for scoring/AAR/AI caution. Verified default CTest and direct AI-only AAR transcript run. |
 | 2026-06-06 | 50 | 50 | 50 | Milestone D/E / Uncertainty + Replay | Added suspected-danger and false-contact records with confidence/terrain metadata, objective-control/suspected/false overlays, scenario briefing/AAR text and score thresholds, headless `--briefing`, `--debug-log`, `--expect-objective`, and `--expect-min-score`, plus CTest coverage for the new debug/balance path. Verified default CTest and direct briefing/debug/AAR transcript run. |
 | 2026-06-06 | 60 | 60 | 40 | Milestone D/E / Replay + Commands | Added versioned headless replay/event files, investigate and assault-move command APIs, cautious investigate movement, contact picking for suspected/false reports, suspected-contact AI investigate/overwatch behavior, objective labels, scenario score-weight overrides, a compact AI-only control-balance scenario, and CTest coverage for replay output and balance expectations. Verified default CTest, strict warning-as-error CTest, and direct AI-only replay/transcript run. |
+| 2026-06-07 | 70 | 70 | 30 | Milestone E / Replay Validation + Balance | Added standalone `.mkreplay` validation tooling, end-to-end replay validation CTest coverage with an invalid replay negative check, richer headless expectations for final outcome/contested objectives/civilian risk, and a contested civilian-risk AI-only smoke scenario. Verified default CTest, direct replay validation, and direct contested-risk balance run. |
 
 ## Milestones
 
@@ -231,10 +233,12 @@ When a development batch is completed, increment `Completed cycles in this ledge
 - Complete: add visible fire/suppression/casualty feedback records and overlays.
 - Complete: add hidden-contact state, reveal checks, and suspected-contact overlays.
 - Complete: add suspected-danger and false-contact records.
+- Complete: make investigate/search resolve suspected-danger and false-contact reports, including reveal/no-threat outcomes.
 - Complete: add first civilian-risk scoring and a non-combatant proximity/fire constraint.
 - Complete: add a basic opposing AI response.
 - Complete: turn the first contact systems into scenario outcome scoring and after-action text.
-- Continue: make uncertainty influence AI and player-facing commands rather than only reports/overlays.
+- Complete: make uncertainty influence first-pass AI and player-facing investigate commands rather than only reports/overlays.
+- Continue: deepen uncertainty into search/breach/cache systems once those scenario locations exist.
 
 ### Milestone E: Demo Polish
 
@@ -242,20 +246,21 @@ When a development batch is completed, increment `Completed cycles in this ledge
 - Complete: add first deterministic debug transcript lines and balance assertions.
 - Complete: broaden deterministic replay/debug logging into versioned replay/event files.
 - Complete: add first player-facing investigate command affordance for suspected and false contacts.
+- Complete: add replay validation tooling and invalid-replay coverage for versioned replay/event files.
+- Complete: add first contested-objective and civilian-risk AI-only balance smoke coverage.
 - Continue: add player-facing briefing and after-action UI presentation.
-- Continue: add replay playback and validation.
+- Continue: add replay playback.
 - Package one macOS-first smoke-tested build.
 - Document how to build, run, test, and regenerate runtime assets.
 
 ## Immediate Next Steps
 
-1. Make investigate/search resolve suspected-danger and false-contact reports, including reveal/no-threat outcomes.
-2. Add replay playback or replay validation tooling for the versioned `.mkreplay` event file.
-3. Add richer objective-state and score presentation inside the SDL shell when SDL3 is available.
-4. Add explicit order UI markers/icons for investigate, overwatch, breach/search, and objective status.
-5. Extend AI-only balance coverage to contested objectives and civilian-risk-heavy scenarios.
-6. Add scenario data for search/cache/breach points and rooftop/stair access once the art pass identifies locations.
-7. Keep all manifest/scenario/render/AI changes covered by CTest, including missing asset and invalid-reference failures.
+1. Add richer objective-state and score presentation inside the SDL shell when SDL3 is available.
+2. Add explicit order UI markers/icons for investigate, overwatch, breach/search, and objective status.
+3. Add replay playback for the versioned `.mkreplay` event file.
+4. Broaden AI-only balance coverage into seed sweeps and batch summaries, including civilian-risk-heavy variants.
+5. Add scenario data for search/cache/breach points and rooftop/stair access once the art pass identifies locations.
+6. Keep all manifest/scenario/render/AI changes covered by CTest, including missing asset and invalid-reference failures.
 
 ## Quality Bar
 

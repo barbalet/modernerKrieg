@@ -36,6 +36,13 @@ cmake --build build --target mk_ai_battle
 
 Add `--keep-running-after-outcome --fail-on-stall` when you want a longer soak that keeps ticking after an objective outcome and returns nonzero on a tactical stall.
 
+Validate generated replay/event logs:
+
+```sh
+./build/bin/mk_headless_run --ai-only --max-ticks 3 --quiet --replay build/mosul_ai.mkreplay
+./build/bin/mk_replay_validate --expect-result MK_OK build/mosul_ai.mkreplay
+```
+
 Run the same AI battle tool through the checked-in Xcode command-line project:
 
 ```sh
@@ -58,6 +65,7 @@ cmake --build --preset strict
 ctest --preset strict
 ./build/strict/bin/mk_headless_run --steps 3 --quiet
 ./build/strict/bin/mk_ai_battle --battles 1 --ticks 5 --quiet
+./build/strict/bin/mk_replay_validate --help
 ```
 
-Future AI-vs-AI checks should add seed-controlled autoplay runs and compare event logs or replay snapshots, not just process exit codes.
+AI-vs-AI checks should keep adding seed-controlled autoplay runs and replay validations, not just process exit codes.
