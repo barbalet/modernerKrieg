@@ -718,10 +718,109 @@ static bool mk_mosul_float_close(float first, float second) {
     return delta < 0.01f;
 }
 
+static mk_rect_t mk_mosul_pixel_rect_to_world(
+    const mk_asset_building_level_manifest_t *manifest,
+    int x,
+    int y,
+    int width,
+    int height
+) {
+    float pixels_per_meter = manifest != NULL && manifest->pixels_per_meter > 0.0f ? manifest->pixels_per_meter : 1.0f;
+
+    return mk_rect(
+        (float)x / pixels_per_meter,
+        (float)y / pixels_per_meter,
+        (float)width / pixels_per_meter,
+        (float)height / pixels_per_meter
+    );
+}
+
+static mk_result_t mk_mosul_apply_building_level_manifest(
+    const mk_asset_building_level_manifest_t *manifest,
+    mk_scenario_definition_t *scenario
+) {
+    mk_gameplay_area_t area;
+    size_t index;
+
+    if (manifest == NULL || scenario == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (manifest->level_count > MK_MAX_GAMEPLAY_AREA_LEVELS
+        || manifest->feature_count > MK_MAX_GAMEPLAY_AREA_FEATURES
+        || manifest->region_count > MK_MAX_GAMEPLAY_AREA_REGIONS) {
+        return MK_ERROR_CAPACITY;
+    }
+
+    memset(&area, 0, sizeof(area));
+    area.loaded = true;
+    area.schema_version = manifest->schema_version;
+    mk_mosul_copy_text(area.id, sizeof(area.id), manifest->id);
+    mk_mosul_copy_text(area.map_id, sizeof(area.map_id), manifest->map_id);
+    mk_mosul_copy_text(area.name, sizeof(area.name), manifest->name);
+    area.world_width_m = manifest->world_width_m;
+    area.world_height_m = manifest->world_height_m;
+    area.pixel_width = manifest->pixel_width;
+    area.pixel_height = manifest->pixel_height;
+    area.pixels_per_meter = manifest->pixels_per_meter;
+    mk_mosul_copy_text(area.origin, sizeof(area.origin), manifest->origin);
+    area.max_storeys = manifest->max_storeys;
+
+    area.level_count = manifest->level_count;
+    for (index = 0; index < manifest->level_count; ++index) {
+        const mk_asset_building_level_t *source = &manifest->levels[index];
+        mk_gameplay_level_t *level = &area.levels[index];
+
+        mk_mosul_copy_text(level->id, sizeof(level->id), source->id);
+        level->index = source->index;
+        level->elevation_m = source->elevation_m;
+        mk_mosul_copy_text(level->image_path, sizeof(level->image_path), source->png_path);
+        mk_mosul_copy_text(level->alpha, sizeof(level->alpha), source->alpha);
+        level->blocks_los_default = source->blocks_los_default;
+        level->blocks_movement_default = source->blocks_movement_default;
+    }
+
+    area.feature_count = manifest->feature_count;
+    for (index = 0; index < manifest->feature_count; ++index) {
+        const mk_asset_building_feature_t *source = &manifest->features[index];
+        mk_gameplay_feature_t *feature = &area.features[index];
+
+        mk_mosul_copy_text(feature->id, sizeof(feature->id), source->id);
+        mk_mosul_copy_text(feature->level_id, sizeof(feature->level_id), source->level_id);
+        mk_mosul_copy_text(feature->kind, sizeof(feature->kind), source->kind);
+        feature->pixel_x = source->x;
+        feature->pixel_y = source->y;
+        feature->pixel_width = source->width;
+        feature->pixel_height = source->height;
+        feature->bounds_m = mk_mosul_pixel_rect_to_world(manifest, source->x, source->y, source->width, source->height);
+        feature->blocks_los = source->blocks_los;
+        feature->blocks_movement = source->blocks_movement;
+        feature->allows_los = source->allows_los;
+        feature->allows_movement = source->allows_movement;
+    }
+
+    area.region_count = manifest->region_count;
+    for (index = 0; index < manifest->region_count; ++index) {
+        const mk_asset_building_region_t *source = &manifest->regions[index];
+        mk_gameplay_region_t *region = &area.regions[index];
+
+        mk_mosul_copy_text(region->id, sizeof(region->id), source->id);
+        region->storeys = source->storeys;
+        region->pixel_x = source->x;
+        region->pixel_y = source->y;
+        region->pixel_width = source->width;
+        region->pixel_height = source->height;
+        region->bounds_m = mk_mosul_pixel_rect_to_world(manifest, source->x, source->y, source->width, source->height);
+        mk_mosul_copy_text(region->roof_level_id, sizeof(region->roof_level_id), source->roof_level_id);
+    }
+
+    return mk_scenario_set_gameplay_area(scenario, &area);
+}
+
 static mk_result_t mk_mosul_validate_asset_references(
     const mk_mosul_scenario_entry_list_t *entries,
     const char *project_root,
-    const mk_map_t *map
+    mk_scenario_definition_t *scenario
 ) {
     char map_manifest_relative[256];
     char sprite_manifest_relative[256];
@@ -732,6 +831,7 @@ static mk_result_t mk_mosul_validate_asset_references(
     mk_asset_map_manifest_t map_manifest;
     mk_asset_sprite_manifest_t sprite_manifest;
     mk_asset_building_level_manifest_t building_level_manifest;
+    const mk_map_t *map = scenario != NULL ? &scenario->map : NULL;
 
     if (!mk_mosul_required_text(entries, "asset.map_manifest", map_manifest_relative, sizeof(map_manifest_relative))
         || !mk_mosul_required_text(entries, "asset.sprite_manifest", sprite_manifest_relative, sizeof(sprite_manifest_relative))
@@ -751,6 +851,10 @@ static mk_result_t mk_mosul_validate_asset_references(
     }
 
     building_level_manifest_relative = mk_mosul_entry_value(entries, "asset.building_level_manifest");
+    if (building_level_manifest_relative == NULL && strcmp(map_manifest.id, "market_commercial_streets_2003") == 0) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
     if (building_level_manifest_relative != NULL) {
         if (!mk_mosul_asset_path_is_safe(building_level_manifest_relative)
             || !mk_mosul_make_project_path(
@@ -779,6 +883,11 @@ static mk_result_t mk_mosul_validate_asset_references(
         && (strcmp(building_level_manifest.map_id, map_manifest.id) != 0
             || !mk_mosul_float_close(building_level_manifest.world_width_m, map->width_m)
             || !mk_mosul_float_close(building_level_manifest.world_height_m, map->height_m))) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    if (building_level_manifest_relative != NULL
+        && mk_mosul_apply_building_level_manifest(&building_level_manifest, scenario) != MK_OK) {
         return MK_ERROR_INVALID_DATA;
     }
 
@@ -1618,7 +1727,7 @@ mk_result_t mk_mosul_load_scenario_file(
         return result;
     }
 
-    result = mk_mosul_validate_asset_references(&entries, project_root, &scenario.map);
+    result = mk_mosul_validate_asset_references(&entries, project_root, &scenario);
     if (result != MK_OK) {
         return result;
     }

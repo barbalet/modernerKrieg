@@ -233,10 +233,10 @@ Implementation approach:
 - Added budget from gameplay-area integration rebaseline: 20 cycles.
 - Planned cycle budget: 100 cycles.
 - Planned cycle shape: 10 milestones x 10 cycles each.
-- Completed cycles in this ledger: 0.
-- Current cycle: 0.
-- Remaining planned cycles: 100.
-- Next cycle batch: cycles 1-10, Gameplay Area Adoption And Validation.
+- Completed cycles in this ledger: 10.
+- Current cycle: 10.
+- Remaining planned cycles: 90.
+- Next cycle batch: cycles 11-20, Topology Authoring Model.
 
 Prior implementation work is captured in the current audit and is not counted
 against this rebaselined ledger. When a development batch is completed,
@@ -246,6 +246,7 @@ increment `Completed cycles in this ledger`, advance `Current cycle`, reduce
 | Date | Cycles Completed | Current Cycle | Remaining Cycles | Focus | Notes |
 | --- | ---: | ---: | ---: | --- | --- |
 | 2026-06-07 | 0 | 0 | 100 | Rebaseline | Updated from 80 to 100 cycles after the multi-level JSON gameplay area landed on main. |
+| 2026-06-07 | 10 | 10 | 90 | Gameplay Area Adoption And Validation | Added core gameplay-area state, Mosul JSON-to-core handoff, world/pixel and blocker queries, replay/debug exposure, and validation tests. |
 
 ## Cycle Delta From Previous Plan
 
@@ -269,6 +270,8 @@ as room-by-room geometry rather than tactical areas, budget an additional 10 to
 ## Planned Cycle Batches
 
 ### Cycles 1-10: Gameplay Area Adoption And Validation
+
+Status: completed on 2026-06-07.
 
 Goal: make the new multi-level JSON gameplay area a first-class C input for the
 demo.

@@ -387,6 +387,72 @@ static void test_sprite_render_manifest_rejects_missing_runtime_png(void) {
     MK_TEST_ASSERT(mk_asset_load_sprite_render_manifest(path, MK_TEST_PROJECT_ROOT, &manifest) == MK_ERROR_INVALID_DATA);
 }
 
+static void test_building_level_manifest_rejects_missing_level_png(void) {
+    char path[512];
+    mk_asset_building_level_manifest_t manifest;
+
+    make_binary_path(path, sizeof(path), "bad_missing_building_level_png.json");
+    write_text_file(
+        path,
+        "{\n"
+        "  \"schema_version\": 1,\n"
+        "  \"id\": \"bad_building_levels\",\n"
+        "  \"map_id\": \"market_commercial_streets_2003\",\n"
+        "  \"name\": \"Bad Building Levels\",\n"
+        "  \"world_width_m\": 500,\n"
+        "  \"world_height_m\": 500,\n"
+        "  \"pixel_width\": 7000,\n"
+        "  \"pixel_height\": 7000,\n"
+        "  \"pixels_per_meter\": 14,\n"
+        "  \"origin\": \"top_left\",\n"
+        "  \"art_style\": \"test\",\n"
+        "  \"max_storeys\": 1,\n"
+        "  \"level_count\": 1,\n"
+        "  \"feature_count\": 1,\n"
+        "  \"building_region_count\": 1,\n"
+        "  \"levels\": [\n"
+        "    {\n"
+        "      \"id\": \"ground\",\n"
+        "      \"index\": 1,\n"
+        "      \"elevation_m\": 0,\n"
+        "      \"png\": \"assets/mosul/runtime/maps/market_commercial_streets_2003/levels/missing.png\",\n"
+        "      \"alpha\": \"opaque\",\n"
+        "      \"blocks_los_default\": false,\n"
+        "      \"blocks_movement_default\": false\n"
+        "    }\n"
+        "  ],\n"
+        "  \"features\": [\n"
+        "    {\n"
+        "      \"id\": \"wall\",\n"
+        "      \"level_id\": \"ground\",\n"
+        "      \"kind\": \"wall\",\n"
+        "      \"x\": 0,\n"
+        "      \"y\": 0,\n"
+        "      \"width\": 10,\n"
+        "      \"height\": 10,\n"
+        "      \"blocks_los\": true,\n"
+        "      \"blocks_movement\": true,\n"
+        "      \"allows_los\": false,\n"
+        "      \"allows_movement\": false\n"
+        "    }\n"
+        "  ],\n"
+        "  \"building_regions\": [\n"
+        "    {\n"
+        "      \"id\": \"region\",\n"
+        "      \"storeys\": 1,\n"
+        "      \"x\": 0,\n"
+        "      \"y\": 0,\n"
+        "      \"width\": 10,\n"
+        "      \"height\": 10,\n"
+        "      \"roof_level_id\": \"ground\"\n"
+        "    }\n"
+        "  ]\n"
+        "}\n"
+    );
+
+    MK_TEST_ASSERT(mk_asset_load_building_level_manifest(path, MK_TEST_PROJECT_ROOT, &manifest) == MK_ERROR_INVALID_DATA);
+}
+
 int main(void) {
     test_map_manifest_loads_market_layers();
     test_building_level_manifest_loads_multistorey_stack();
@@ -397,6 +463,7 @@ int main(void) {
     test_sprite_manifest_rejects_missing_sheet_reference();
     test_marker_manifest_rejects_bad_color();
     test_sprite_render_manifest_rejects_missing_runtime_png();
+    test_building_level_manifest_rejects_missing_level_png();
 
     puts("mk_asset_manifest_tests: ok");
     return 0;

@@ -44,6 +44,13 @@ static void load_default_data_scenario(mk_scenario_definition_t *out_scenario) {
 static void test_default_scenario_data_matches_fixture_shape(void) {
     mk_scenario_definition_t loaded;
     mk_scenario_definition_t fixture;
+    const mk_gameplay_feature_t *wall;
+    const mk_gameplay_feature_t *door;
+    const mk_gameplay_feature_t *window;
+    mk_vec2_t wall_sample;
+    mk_vec2_t door_sample;
+    mk_vec2_t window_sample;
+    mk_ivec2_t wall_pixel;
 
     load_default_data_scenario(&loaded);
     MK_TEST_ASSERT(mk_mosul_make_market_2003_fixture_scenario(&fixture) == MK_OK);
@@ -89,6 +96,39 @@ static void test_default_scenario_data_matches_fixture_shape(void) {
     MK_TEST_ASSERT(loaded.units[1].revealed == fixture.units[1].revealed);
     MK_TEST_ASSERT(loaded.units[1].concealment == fixture.units[1].concealment);
     MK_TEST_ASSERT(loaded.units[2].soldiers[0].ammo == 0);
+
+    MK_TEST_ASSERT(mk_gameplay_area_is_loaded(&loaded.gameplay_area));
+    MK_TEST_ASSERT(strcmp(loaded.gameplay_area.id, "market_commercial_streets_2003_building_levels") == 0);
+    MK_TEST_ASSERT(strcmp(loaded.gameplay_area.map_id, "market_commercial_streets_2003") == 0);
+    MK_TEST_ASSERT_CLOSE(loaded.gameplay_area.world_width_m, loaded.map.width_m);
+    MK_TEST_ASSERT_CLOSE(loaded.gameplay_area.world_height_m, loaded.map.height_m);
+    MK_TEST_ASSERT(loaded.gameplay_area.pixel_width == 7000);
+    MK_TEST_ASSERT(loaded.gameplay_area.pixel_height == 7000);
+    MK_TEST_ASSERT_CLOSE(loaded.gameplay_area.pixels_per_meter, 14.0f);
+    MK_TEST_ASSERT(loaded.gameplay_area.level_count == 4);
+    MK_TEST_ASSERT(loaded.gameplay_area.feature_count == 25);
+    MK_TEST_ASSERT(loaded.gameplay_area.region_count == 8);
+
+    wall = mk_gameplay_area_find_feature(&loaded.gameplay_area, "souq_west_outer_wall_ground");
+    door = mk_gameplay_area_find_feature(&loaded.gameplay_area, "souq_west_door_ground");
+    window = mk_gameplay_area_find_feature(&loaded.gameplay_area, "souq_east_window_ground");
+    MK_TEST_ASSERT(wall != NULL);
+    MK_TEST_ASSERT(door != NULL);
+    MK_TEST_ASSERT(window != NULL);
+
+    MK_TEST_ASSERT(mk_gameplay_area_pixel_to_world(&loaded.gameplay_area, mk_ivec2(840, 1500), &wall_sample) == MK_OK);
+    MK_TEST_ASSERT(mk_gameplay_area_pixel_to_world(&loaded.gameplay_area, mk_ivec2(840, 2200), &door_sample) == MK_OK);
+    MK_TEST_ASSERT(mk_gameplay_area_pixel_to_world(&loaded.gameplay_area, mk_ivec2(2110, 1720), &window_sample) == MK_OK);
+
+    MK_TEST_ASSERT(mk_gameplay_area_world_to_pixel(&loaded.gameplay_area, wall_sample, &wall_pixel) == MK_OK);
+    MK_TEST_ASSERT(wall_pixel.x >= wall->pixel_x);
+    MK_TEST_ASSERT(wall_pixel.y >= wall->pixel_y);
+    MK_TEST_ASSERT(mk_gameplay_area_blocks_los_at(&loaded.gameplay_area, "level_01_ground", wall_sample));
+    MK_TEST_ASSERT(mk_gameplay_area_blocks_movement_at(&loaded.gameplay_area, "level_01_ground", wall_sample));
+    MK_TEST_ASSERT(!mk_gameplay_area_blocks_los_at(&loaded.gameplay_area, "level_01_ground", door_sample));
+    MK_TEST_ASSERT(!mk_gameplay_area_blocks_movement_at(&loaded.gameplay_area, "level_01_ground", door_sample));
+    MK_TEST_ASSERT(!mk_gameplay_area_blocks_los_at(&loaded.gameplay_area, "level_01_ground", window_sample));
+    MK_TEST_ASSERT(mk_gameplay_area_blocks_movement_at(&loaded.gameplay_area, "level_01_ground", window_sample));
 }
 
 static void test_public_default_scenario_uses_data_file(void) {
@@ -99,6 +139,8 @@ static void test_public_default_scenario_uses_data_file(void) {
     MK_TEST_ASSERT(mk_game_load_scenario(&game, &scenario) == MK_OK);
     MK_TEST_ASSERT(strcmp(game.scenario_name, "Market Commercial Streets 2003") == 0);
     MK_TEST_ASSERT(game.unit_count == 3);
+    MK_TEST_ASSERT(mk_gameplay_area_is_loaded(&game.gameplay_area));
+    MK_TEST_ASSERT(game.gameplay_area.level_count == 4);
 }
 
 static void test_control_smoke_scenario_loads(void) {
@@ -139,6 +181,31 @@ static void test_missing_asset_manifest_is_rejected(void) {
         "name=Bad Missing Asset\n"
         "seed=1\n"
         "asset.map_manifest=assets/mosul/manifests/missing.mapmanifest\n"
+        "asset.sprite_manifest=assets/mosul/manifests/mosul_2003_sprites.spritemanifest\n"
+        "map.name=Market / Commercial Streets\n"
+        "map.width_m=500\n"
+        "map.height_m=500\n"
+        "map.tile_columns=10\n"
+        "map.tile_rows=10\n"
+        "map.tile_width_m=50\n"
+        "map.tile_height_m=50\n"
+        "map.default_terrain=open\n"
+    );
+
+    MK_TEST_ASSERT(mk_mosul_load_scenario_file(path, MK_TEST_PROJECT_ROOT, &scenario) == MK_ERROR_INVALID_DATA);
+}
+
+static void test_market_scenario_requires_building_level_manifest(void) {
+    char path[512];
+    mk_scenario_definition_t scenario;
+
+    make_binary_path(path, sizeof(path), "bad_missing_building_levels.mkscenario");
+    write_text_file(
+        path,
+        "format=modernerKrieg.scenario.v1\n"
+        "name=Bad Missing Building Levels\n"
+        "seed=1\n"
+        "asset.map_manifest=assets/mosul/manifests/market_commercial_streets_2003.mapmanifest\n"
         "asset.sprite_manifest=assets/mosul/manifests/mosul_2003_sprites.spritemanifest\n"
         "map.name=Market / Commercial Streets\n"
         "map.width_m=500\n"
@@ -285,6 +352,7 @@ int main(void) {
     test_control_smoke_scenario_loads();
     test_contested_risk_smoke_scenario_loads();
     test_missing_asset_manifest_is_rejected();
+    test_market_scenario_requires_building_level_manifest();
     test_invalid_force_reference_is_rejected();
     test_impossible_objective_bounds_are_rejected();
     test_invalid_score_thresholds_are_rejected();

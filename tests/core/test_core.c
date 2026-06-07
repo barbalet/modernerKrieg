@@ -34,6 +34,76 @@ static mk_rect_t make_rect(float x, float y, float width, float height) {
     return value;
 }
 
+static mk_gameplay_area_t make_test_gameplay_area(void) {
+    mk_gameplay_area_t area;
+
+    memset(&area, 0, sizeof(area));
+    area.loaded = true;
+    area.schema_version = 1;
+    strcpy(area.id, "test_area");
+    strcpy(area.map_id, "test_map");
+    strcpy(area.name, "Test Gameplay Area");
+    area.world_width_m = 100.0f;
+    area.world_height_m = 100.0f;
+    area.pixel_width = 1000;
+    area.pixel_height = 1000;
+    area.pixels_per_meter = 10.0f;
+    strcpy(area.origin, "top_left");
+    area.max_storeys = 2;
+    area.level_count = 1;
+    strcpy(area.levels[0].id, "ground");
+    area.levels[0].index = 1;
+    area.levels[0].elevation_m = 0.0f;
+    strcpy(area.levels[0].image_path, "assets/test/ground.png");
+    strcpy(area.levels[0].alpha, "opaque");
+
+    area.feature_count = 3;
+    strcpy(area.features[0].id, "west_wall");
+    strcpy(area.features[0].level_id, "ground");
+    strcpy(area.features[0].kind, "wall");
+    area.features[0].pixel_x = 100;
+    area.features[0].pixel_y = 200;
+    area.features[0].pixel_width = 20;
+    area.features[0].pixel_height = 80;
+    area.features[0].bounds_m = make_rect(10.0f, 20.0f, 2.0f, 8.0f);
+    area.features[0].blocks_los = true;
+    area.features[0].blocks_movement = true;
+
+    strcpy(area.features[1].id, "west_door");
+    strcpy(area.features[1].level_id, "ground");
+    strcpy(area.features[1].kind, "door");
+    area.features[1].pixel_x = 100;
+    area.features[1].pixel_y = 220;
+    area.features[1].pixel_width = 20;
+    area.features[1].pixel_height = 10;
+    area.features[1].bounds_m = make_rect(10.0f, 22.0f, 2.0f, 1.0f);
+    area.features[1].allows_los = true;
+    area.features[1].allows_movement = true;
+
+    strcpy(area.features[2].id, "west_window");
+    strcpy(area.features[2].level_id, "ground");
+    strcpy(area.features[2].kind, "window");
+    area.features[2].pixel_x = 100;
+    area.features[2].pixel_y = 250;
+    area.features[2].pixel_width = 20;
+    area.features[2].pixel_height = 10;
+    area.features[2].bounds_m = make_rect(10.0f, 25.0f, 2.0f, 1.0f);
+    area.features[2].blocks_movement = true;
+    area.features[2].allows_los = true;
+
+    area.region_count = 1;
+    strcpy(area.regions[0].id, "shop_row");
+    area.regions[0].storeys = 1;
+    area.regions[0].pixel_x = 80;
+    area.regions[0].pixel_y = 180;
+    area.regions[0].pixel_width = 120;
+    area.regions[0].pixel_height = 120;
+    area.regions[0].bounds_m = make_rect(8.0f, 18.0f, 12.0f, 12.0f);
+    strcpy(area.regions[0].roof_level_id, "ground");
+
+    return area;
+}
+
 static mk_scenario_definition_t make_east_mosul_block_scenario_fixture(void) {
     mk_scenario_definition_t scenario;
 
@@ -91,6 +161,73 @@ static void test_math_value_helpers(void) {
     assert_close(mk_clamp_f32(5.0f, 10.0f, 0.0f), 5.0f);
     assert(mk_rect_contains_point(rect, mk_vec2(4.0f, 5.0f)));
     assert(!mk_rect_contains_point(rect, mk_vec2(20.0f, 5.0f)));
+}
+
+static void test_gameplay_area_coordinate_and_blocker_queries(void) {
+    mk_gameplay_area_t area = make_test_gameplay_area();
+    mk_ivec2_t pixel;
+    mk_vec2_t position;
+    const mk_gameplay_level_t *level;
+    const mk_gameplay_feature_t *feature;
+    const mk_gameplay_region_t *region;
+    mk_scenario_definition_t scenario;
+    mk_game_t game;
+    mk_game_snapshot_t snapshot;
+
+    assert(mk_gameplay_area_is_loaded(&area));
+    assert(mk_gameplay_area_world_to_pixel(&area, mk_vec2(10.0f, 20.0f), &pixel) == MK_OK);
+    assert(pixel.x == 100);
+    assert(pixel.y == 200);
+    assert(mk_gameplay_area_world_to_pixel(&area, mk_vec2(100.0f, 100.0f), &pixel) == MK_OK);
+    assert(pixel.x == 999);
+    assert(pixel.y == 999);
+    assert(mk_gameplay_area_world_to_pixel(&area, mk_vec2(100.1f, 1.0f), &pixel) == MK_ERROR_INVALID_DATA);
+
+    assert(mk_gameplay_area_pixel_to_world(&area, mk_ivec2(100, 200), &position) == MK_OK);
+    assert_close(position.x, 10.0f);
+    assert_close(position.y, 20.0f);
+    assert(mk_gameplay_area_pixel_to_world(&area, mk_ivec2(1000, 0), &position) == MK_ERROR_INVALID_DATA);
+
+    level = mk_gameplay_area_find_level(&area, "ground");
+    assert(level != NULL);
+    assert(strcmp(level->image_path, "assets/test/ground.png") == 0);
+
+    feature = mk_gameplay_area_find_feature(&area, "west_wall");
+    assert(feature != NULL);
+    assert(mk_gameplay_area_feature_contains_pixel(feature, mk_ivec2(101, 201)));
+    assert(mk_gameplay_area_feature_contains_world(&area, feature, mk_vec2(10.1f, 20.1f)));
+
+    feature = mk_gameplay_area_find_feature_at_world(&area, "ground", mk_vec2(10.1f, 22.1f));
+    assert(feature != NULL);
+    assert(strcmp(feature->id, "west_door") == 0);
+
+    region = mk_gameplay_area_find_region(&area, "shop_row");
+    assert(region != NULL);
+    assert(region->storeys == 1);
+    assert(mk_gameplay_area_find_region_at_world(&area, mk_vec2(12.0f, 20.0f)) == region);
+
+    assert(mk_gameplay_area_blocks_los_at(&area, "ground", mk_vec2(10.1f, 20.1f)));
+    assert(mk_gameplay_area_blocks_movement_at(&area, "ground", mk_vec2(10.1f, 20.1f)));
+    assert(!mk_gameplay_area_blocks_los_at(&area, "ground", mk_vec2(10.1f, 22.1f)));
+    assert(!mk_gameplay_area_blocks_movement_at(&area, "ground", mk_vec2(10.1f, 22.1f)));
+    assert(!mk_gameplay_area_blocks_los_at(&area, "ground", mk_vec2(10.1f, 25.1f)));
+    assert(mk_gameplay_area_blocks_movement_at(&area, "ground", mk_vec2(10.1f, 25.1f)));
+    assert(!mk_gameplay_area_blocks_movement_at(&area, "missing", mk_vec2(10.1f, 20.1f)));
+
+    memset(&scenario, 0, sizeof(scenario));
+    strcpy(scenario.name, "Gameplay Area Scenario");
+    scenario.seed = 7;
+    scenario.map = mk_make_map("Test Map", 100.0f, 100.0f);
+    assert(mk_scenario_set_gameplay_area(&scenario, &area) == MK_OK);
+    assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
+    assert(mk_gameplay_area_is_loaded(&game.gameplay_area));
+    assert(game.gameplay_area.level_count == 1);
+    assert(mk_game_snapshot(&game, &snapshot) == MK_OK);
+    assert(mk_gameplay_area_is_loaded(&snapshot.gameplay_area));
+    assert(strcmp(snapshot.gameplay_area.features[1].id, "west_door") == 0);
+
+    area.world_width_m = 101.0f;
+    assert(mk_scenario_set_gameplay_area(&scenario, &area) == MK_ERROR_INVALID_DATA);
 }
 
 static void test_unit_and_soldier_creation(void) {
@@ -851,6 +988,7 @@ int main(void) {
     test_rng_is_deterministic();
     test_result_names_are_stable();
     test_math_value_helpers();
+    test_gameplay_area_coordinate_and_blocker_queries();
     test_unit_and_soldier_creation();
     test_map_tiles_are_configurable_and_addressable();
     test_capacity_limits_are_reported();

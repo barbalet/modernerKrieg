@@ -202,6 +202,224 @@ static bool mk_position_fits_map(mk_vec2_t position, const mk_map_t *map) {
         && position.y <= map->height_m;
 }
 
+static bool mk_float_close(float first, float second) {
+    float delta = first - second;
+
+    if (delta < 0.0f) {
+        delta = -delta;
+    }
+
+    return delta < 0.01f;
+}
+
+static bool mk_text_is_present(const char *text) {
+    return text != NULL && text[0] != '\0';
+}
+
+static bool mk_gameplay_area_pixel_rect_is_valid(
+    int x,
+    int y,
+    int width,
+    int height,
+    int pixel_width,
+    int pixel_height
+) {
+    return x >= 0
+        && y >= 0
+        && width > 0
+        && height > 0
+        && pixel_width > 0
+        && pixel_height > 0
+        && x + width <= pixel_width
+        && y + height <= pixel_height;
+}
+
+static mk_rect_t mk_gameplay_area_pixel_rect_to_world(
+    const mk_gameplay_area_t *area,
+    int x,
+    int y,
+    int width,
+    int height
+) {
+    float pixels_per_meter = area != NULL && area->pixels_per_meter > 0.0f ? area->pixels_per_meter : 1.0f;
+
+    return mk_rect(
+        (float)x / pixels_per_meter,
+        (float)y / pixels_per_meter,
+        (float)width / pixels_per_meter,
+        (float)height / pixels_per_meter
+    );
+}
+
+static bool mk_gameplay_area_rect_fits_world(const mk_gameplay_area_t *area, mk_rect_t rect) {
+    if (area == NULL || !mk_rect_is_valid(rect)) {
+        return false;
+    }
+
+    return rect.x >= 0.0f
+        && rect.y >= 0.0f
+        && rect.x + rect.width <= area->world_width_m + 0.01f
+        && rect.y + rect.height <= area->world_height_m + 0.01f;
+}
+
+static bool mk_gameplay_area_ids_are_unique(const mk_gameplay_area_t *area) {
+    size_t index;
+
+    if (area == NULL) {
+        return false;
+    }
+
+    for (index = 0; index < area->level_count; ++index) {
+        size_t other_index;
+
+        for (other_index = index + 1; other_index < area->level_count; ++other_index) {
+            if (strcmp(area->levels[index].id, area->levels[other_index].id) == 0) {
+                return false;
+            }
+        }
+    }
+
+    for (index = 0; index < area->feature_count; ++index) {
+        size_t other_index;
+
+        for (other_index = index + 1; other_index < area->feature_count; ++other_index) {
+            if (strcmp(area->features[index].id, area->features[other_index].id) == 0) {
+                return false;
+            }
+        }
+    }
+
+    for (index = 0; index < area->region_count; ++index) {
+        size_t other_index;
+
+        for (other_index = index + 1; other_index < area->region_count; ++other_index) {
+            if (strcmp(area->regions[index].id, area->regions[other_index].id) == 0) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+static bool mk_gameplay_area_is_valid(const mk_gameplay_area_t *area) {
+    size_t index;
+
+    if (area == NULL) {
+        return false;
+    }
+
+    if (!area->loaded) {
+        return true;
+    }
+
+    if (area->schema_version <= 0
+        || !mk_text_is_present(area->id)
+        || !mk_text_is_present(area->map_id)
+        || !mk_text_is_present(area->name)
+        || area->world_width_m <= 0.0f
+        || area->world_height_m <= 0.0f
+        || area->pixel_width <= 0
+        || area->pixel_height <= 0
+        || area->pixels_per_meter <= 0.0f
+        || strcmp(area->origin, "top_left") != 0
+        || area->max_storeys <= 0
+        || area->level_count == 0
+        || area->level_count > MK_MAX_GAMEPLAY_AREA_LEVELS
+        || area->feature_count > MK_MAX_GAMEPLAY_AREA_FEATURES
+        || area->region_count > MK_MAX_GAMEPLAY_AREA_REGIONS
+        || !mk_gameplay_area_ids_are_unique(area)) {
+        return false;
+    }
+
+    for (index = 0; index < area->level_count; ++index) {
+        const mk_gameplay_level_t *level = &area->levels[index];
+
+        if (!mk_text_is_present(level->id)
+            || !mk_text_is_present(level->image_path)
+            || !mk_text_is_present(level->alpha)
+            || level->index <= 0
+            || level->elevation_m < 0.0f) {
+            return false;
+        }
+    }
+
+    for (index = 0; index < area->feature_count; ++index) {
+        const mk_gameplay_feature_t *feature = &area->features[index];
+        mk_rect_t expected_bounds;
+
+        if (!mk_text_is_present(feature->id)
+            || !mk_text_is_present(feature->level_id)
+            || !mk_text_is_present(feature->kind)
+            || mk_gameplay_area_find_level(area, feature->level_id) == NULL
+            || !mk_gameplay_area_pixel_rect_is_valid(
+                feature->pixel_x,
+                feature->pixel_y,
+                feature->pixel_width,
+                feature->pixel_height,
+                area->pixel_width,
+                area->pixel_height
+            )
+            || (feature->blocks_los && feature->allows_los)
+            || (feature->blocks_movement && feature->allows_movement)
+            || !mk_gameplay_area_rect_fits_world(area, feature->bounds_m)) {
+            return false;
+        }
+
+        expected_bounds = mk_gameplay_area_pixel_rect_to_world(
+            area,
+            feature->pixel_x,
+            feature->pixel_y,
+            feature->pixel_width,
+            feature->pixel_height
+        );
+        if (!mk_float_close(feature->bounds_m.x, expected_bounds.x)
+            || !mk_float_close(feature->bounds_m.y, expected_bounds.y)
+            || !mk_float_close(feature->bounds_m.width, expected_bounds.width)
+            || !mk_float_close(feature->bounds_m.height, expected_bounds.height)) {
+            return false;
+        }
+    }
+
+    for (index = 0; index < area->region_count; ++index) {
+        const mk_gameplay_region_t *region = &area->regions[index];
+        mk_rect_t expected_bounds;
+
+        if (!mk_text_is_present(region->id)
+            || !mk_text_is_present(region->roof_level_id)
+            || mk_gameplay_area_find_level(area, region->roof_level_id) == NULL
+            || region->storeys <= 0
+            || region->storeys > area->max_storeys
+            || !mk_gameplay_area_pixel_rect_is_valid(
+                region->pixel_x,
+                region->pixel_y,
+                region->pixel_width,
+                region->pixel_height,
+                area->pixel_width,
+                area->pixel_height
+            )
+            || !mk_gameplay_area_rect_fits_world(area, region->bounds_m)) {
+            return false;
+        }
+
+        expected_bounds = mk_gameplay_area_pixel_rect_to_world(
+            area,
+            region->pixel_x,
+            region->pixel_y,
+            region->pixel_width,
+            region->pixel_height
+        );
+        if (!mk_float_close(region->bounds_m.x, expected_bounds.x)
+            || !mk_float_close(region->bounds_m.y, expected_bounds.y)
+            || !mk_float_close(region->bounds_m.width, expected_bounds.width)
+            || !mk_float_close(region->bounds_m.height, expected_bounds.height)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 static bool mk_map_tile_coordinate_is_valid(const mk_map_t *map, mk_ivec2_t coordinate) {
     if (map == NULL || map->tile_columns <= 0 || map->tile_rows <= 0) {
         return false;
@@ -1084,6 +1302,16 @@ static bool mk_scenario_is_valid(const mk_scenario_definition_t *scenario) {
         return false;
     }
 
+    if (!mk_gameplay_area_is_valid(&scenario->gameplay_area)) {
+        return false;
+    }
+
+    if (scenario->gameplay_area.loaded
+        && (!mk_float_close(scenario->gameplay_area.world_width_m, scenario->map.width_m)
+            || !mk_float_close(scenario->gameplay_area.world_height_m, scenario->map.height_m))) {
+        return false;
+    }
+
     if (scenario->controller_count > MK_MAX_CONTROLLERS
         || scenario->faction_count > MK_MAX_FACTIONS
         || scenario->force_count > MK_MAX_FORCES
@@ -1295,6 +1523,271 @@ bool mk_rect_contains_point(mk_rect_t rect, mk_vec2_t point) {
 
 float mk_vec2_distance(mk_vec2_t first, mk_vec2_t second) {
     return mk_distance(first, second);
+}
+
+bool mk_gameplay_area_is_loaded(const mk_gameplay_area_t *area) {
+    return area != NULL && area->loaded;
+}
+
+mk_result_t mk_gameplay_area_world_to_pixel(
+    const mk_gameplay_area_t *area,
+    mk_vec2_t position_m,
+    mk_ivec2_t *out_pixel
+) {
+    int pixel_x;
+    int pixel_y;
+
+    if (area == NULL || out_pixel == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (!area->loaded
+        || area->pixels_per_meter <= 0.0f
+        || position_m.x < 0.0f
+        || position_m.y < 0.0f
+        || position_m.x > area->world_width_m
+        || position_m.y > area->world_height_m) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    pixel_x = (int)floorf(position_m.x * area->pixels_per_meter);
+    pixel_y = (int)floorf(position_m.y * area->pixels_per_meter);
+    pixel_x = mk_clamp_int(pixel_x, 0, area->pixel_width - 1);
+    pixel_y = mk_clamp_int(pixel_y, 0, area->pixel_height - 1);
+
+    *out_pixel = mk_ivec2(pixel_x, pixel_y);
+    return MK_OK;
+}
+
+mk_result_t mk_gameplay_area_pixel_to_world(
+    const mk_gameplay_area_t *area,
+    mk_ivec2_t pixel,
+    mk_vec2_t *out_position_m
+) {
+    if (area == NULL || out_position_m == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (!area->loaded
+        || area->pixels_per_meter <= 0.0f
+        || pixel.x < 0
+        || pixel.y < 0
+        || pixel.x >= area->pixel_width
+        || pixel.y >= area->pixel_height) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    *out_position_m = mk_vec2((float)pixel.x / area->pixels_per_meter, (float)pixel.y / area->pixels_per_meter);
+    return MK_OK;
+}
+
+const mk_gameplay_level_t *mk_gameplay_area_find_level(
+    const mk_gameplay_area_t *area,
+    const char *level_id
+) {
+    size_t index;
+
+    if (area == NULL || level_id == NULL) {
+        return NULL;
+    }
+
+    for (index = 0; index < area->level_count; ++index) {
+        if (strcmp(area->levels[index].id, level_id) == 0) {
+            return &area->levels[index];
+        }
+    }
+
+    return NULL;
+}
+
+const mk_gameplay_feature_t *mk_gameplay_area_find_feature(
+    const mk_gameplay_area_t *area,
+    const char *feature_id
+) {
+    size_t index;
+
+    if (area == NULL || feature_id == NULL) {
+        return NULL;
+    }
+
+    for (index = 0; index < area->feature_count; ++index) {
+        if (strcmp(area->features[index].id, feature_id) == 0) {
+            return &area->features[index];
+        }
+    }
+
+    return NULL;
+}
+
+bool mk_gameplay_area_feature_contains_pixel(
+    const mk_gameplay_feature_t *feature,
+    mk_ivec2_t pixel
+) {
+    if (feature == NULL) {
+        return false;
+    }
+
+    return pixel.x >= feature->pixel_x
+        && pixel.y >= feature->pixel_y
+        && pixel.x < feature->pixel_x + feature->pixel_width
+        && pixel.y < feature->pixel_y + feature->pixel_height;
+}
+
+bool mk_gameplay_area_feature_contains_world(
+    const mk_gameplay_area_t *area,
+    const mk_gameplay_feature_t *feature,
+    mk_vec2_t position_m
+) {
+    mk_ivec2_t pixel;
+
+    if (area == NULL || feature == NULL) {
+        return false;
+    }
+
+    if (mk_gameplay_area_world_to_pixel(area, position_m, &pixel) != MK_OK) {
+        return false;
+    }
+
+    return mk_gameplay_area_feature_contains_pixel(feature, pixel);
+}
+
+const mk_gameplay_feature_t *mk_gameplay_area_find_feature_at_world(
+    const mk_gameplay_area_t *area,
+    const char *level_id,
+    mk_vec2_t position_m
+) {
+    const mk_gameplay_feature_t *match = NULL;
+    mk_ivec2_t pixel;
+    size_t index;
+
+    if (area == NULL || level_id == NULL) {
+        return NULL;
+    }
+
+    if (mk_gameplay_area_world_to_pixel(area, position_m, &pixel) != MK_OK) {
+        return NULL;
+    }
+
+    for (index = 0; index < area->feature_count; ++index) {
+        const mk_gameplay_feature_t *feature = &area->features[index];
+
+        if (strcmp(feature->level_id, level_id) == 0
+            && mk_gameplay_area_feature_contains_pixel(feature, pixel)) {
+            match = feature;
+        }
+    }
+
+    return match;
+}
+
+const mk_gameplay_region_t *mk_gameplay_area_find_region(
+    const mk_gameplay_area_t *area,
+    const char *region_id
+) {
+    size_t index;
+
+    if (area == NULL || region_id == NULL) {
+        return NULL;
+    }
+
+    for (index = 0; index < area->region_count; ++index) {
+        if (strcmp(area->regions[index].id, region_id) == 0) {
+            return &area->regions[index];
+        }
+    }
+
+    return NULL;
+}
+
+const mk_gameplay_region_t *mk_gameplay_area_find_region_at_world(
+    const mk_gameplay_area_t *area,
+    mk_vec2_t position_m
+) {
+    size_t index;
+
+    if (area == NULL || !area->loaded) {
+        return NULL;
+    }
+
+    for (index = 0; index < area->region_count; ++index) {
+        const mk_gameplay_region_t *region = &area->regions[index];
+
+        if (mk_rect_contains_point(region->bounds_m, position_m)) {
+            return region;
+        }
+    }
+
+    return NULL;
+}
+
+static bool mk_gameplay_area_blocks_at(
+    const mk_gameplay_area_t *area,
+    const char *level_id,
+    mk_vec2_t position_m,
+    bool check_line_of_sight
+) {
+    const mk_gameplay_level_t *level;
+    mk_ivec2_t pixel;
+    bool blocked;
+    size_t index;
+
+    if (area == NULL || level_id == NULL || !area->loaded) {
+        return false;
+    }
+
+    if (mk_gameplay_area_world_to_pixel(area, position_m, &pixel) != MK_OK) {
+        return false;
+    }
+
+    level = mk_gameplay_area_find_level(area, level_id);
+    if (level == NULL) {
+        return false;
+    }
+
+    blocked = check_line_of_sight ? level->blocks_los_default : level->blocks_movement_default;
+    for (index = 0; index < area->feature_count; ++index) {
+        const mk_gameplay_feature_t *feature = &area->features[index];
+
+        if (strcmp(feature->level_id, level_id) != 0 || !mk_gameplay_area_feature_contains_pixel(feature, pixel)) {
+            continue;
+        }
+
+        if (check_line_of_sight) {
+            if (feature->allows_los) {
+                return false;
+            }
+
+            if (feature->blocks_los) {
+                blocked = true;
+            }
+        } else {
+            if (feature->allows_movement) {
+                return false;
+            }
+
+            if (feature->blocks_movement) {
+                blocked = true;
+            }
+        }
+    }
+
+    return blocked;
+}
+
+bool mk_gameplay_area_blocks_los_at(
+    const mk_gameplay_area_t *area,
+    const char *level_id,
+    mk_vec2_t position_m
+) {
+    return mk_gameplay_area_blocks_at(area, level_id, position_m, true);
+}
+
+bool mk_gameplay_area_blocks_movement_at(
+    const mk_gameplay_area_t *area,
+    const char *level_id,
+    mk_vec2_t position_m
+) {
+    return mk_gameplay_area_blocks_at(area, level_id, position_m, false);
 }
 
 void mk_game_init(mk_game_t *game, uint64_t seed) {
@@ -1658,6 +2151,7 @@ mk_result_t mk_game_snapshot(const mk_game_t *game, mk_game_snapshot_t *out_snap
     out_snapshot->score_time_weight = game->score_time_weight;
     out_snapshot->selected_unit_id = game->selected_unit_id;
     out_snapshot->map = game->map;
+    out_snapshot->gameplay_area = game->gameplay_area;
     out_snapshot->controller_count = game->controller_count;
     memcpy(out_snapshot->controllers, game->controllers, sizeof(game->controllers));
     out_snapshot->faction_count = game->faction_count;
@@ -1702,6 +2196,7 @@ mk_result_t mk_game_load_scenario(mk_game_t *game, const mk_scenario_definition_
     game->score_civilian_casualty_weight = scenario->score_civilian_casualty_weight;
     game->score_time_weight = scenario->score_time_weight;
     game->map = scenario->map;
+    game->gameplay_area = scenario->gameplay_area;
     game->controller_count = scenario->controller_count;
     memcpy(game->controllers, scenario->controllers, sizeof(scenario->controllers));
     game->faction_count = scenario->faction_count;
@@ -2464,6 +2959,25 @@ mk_result_t mk_map_add_terrain(mk_map_t *map, const mk_terrain_zone_t *terrain, 
         *out_terrain_id = copy.id;
     }
 
+    return MK_OK;
+}
+
+mk_result_t mk_scenario_set_gameplay_area(mk_scenario_definition_t *scenario, const mk_gameplay_area_t *area) {
+    if (scenario == NULL || area == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (!mk_gameplay_area_is_valid(area)) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    if (area->loaded
+        && (!mk_float_close(area->world_width_m, scenario->map.width_m)
+            || !mk_float_close(area->world_height_m, scenario->map.height_m))) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    scenario->gameplay_area = *area;
     return MK_OK;
 }
 

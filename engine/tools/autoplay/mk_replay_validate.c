@@ -40,6 +40,7 @@ typedef struct {
     char final_outcome[32];
     bool have_header;
     bool have_start;
+    bool have_gameplay_area;
     bool have_tick;
     bool have_end;
 } mk_replay_state_t;
@@ -436,6 +437,51 @@ static bool mk_replay_validate_unit_event(
     return true;
 }
 
+static bool mk_replay_validate_gameplay_area_event(
+    const mk_replay_validate_config_t *config,
+    mk_replay_state_t *state,
+    const char *line,
+    uint32_t tick,
+    uint32_t line_number
+) {
+    uint32_t levels;
+    uint32_t features;
+    uint32_t regions;
+    uint32_t pixel_width;
+    uint32_t pixel_height;
+
+    if (!state->have_start) {
+        return mk_replay_fail(config, line_number, "gameplay area event appeared before start");
+    }
+
+    if (state->have_gameplay_area) {
+        return mk_replay_fail(config, line_number, "replay contains multiple gameplay area events");
+    }
+
+    if (tick != 0U) {
+        return mk_replay_fail(config, line_number, "gameplay area event must be at tick 0");
+    }
+
+    if (!mk_replay_has_quoted_field(line, "id")
+        || !mk_replay_has_quoted_field(line, "map")
+        || !mk_replay_read_field_u32(line, "levels", &levels)
+        || !mk_replay_read_field_u32(line, "features", &features)
+        || !mk_replay_read_field_u32(line, "regions", &regions)
+        || !mk_replay_read_field_u32(line, "pixel_width", &pixel_width)
+        || !mk_replay_read_field_u32(line, "pixel_height", &pixel_height)
+        || !mk_replay_read_field_number(line, "ppm")
+        || levels == 0U
+        || pixel_width == 0U
+        || pixel_height == 0U) {
+        return mk_replay_fail(config, line_number, "gameplay area event is missing required fields");
+    }
+
+    (void)features;
+    (void)regions;
+    state->have_gameplay_area = true;
+    return true;
+}
+
 static bool mk_replay_validate_objective_event(
     const mk_replay_validate_config_t *config,
     mk_replay_state_t *state,
@@ -626,6 +672,10 @@ static bool mk_replay_validate_event(
 
     if (strcmp(kind, "unit") == 0) {
         return mk_replay_validate_unit_event(config, state, line, line_number);
+    }
+
+    if (strcmp(kind, "gameplay_area") == 0) {
+        return mk_replay_validate_gameplay_area_event(config, state, line, tick, line_number);
     }
 
     if (strcmp(kind, "objective") == 0) {

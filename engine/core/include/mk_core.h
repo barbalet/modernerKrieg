@@ -10,6 +10,8 @@ extern "C" {
 #endif
 
 #define MK_NAME_CAPACITY 64
+#define MK_PATH_CAPACITY 256
+#define MK_KIND_CAPACITY 32
 #define MK_SCENARIO_NAME_CAPACITY 96
 #define MK_MAX_CONTROLLERS 8
 #define MK_MAX_FACTIONS 8
@@ -21,6 +23,9 @@ extern "C" {
 #define MK_MAX_SOLDIERS_PER_UNIT 16
 #define MK_MAX_UNITS 64
 #define MK_MAX_CONTACT_REPORTS 64
+#define MK_MAX_GAMEPLAY_AREA_LEVELS 8
+#define MK_MAX_GAMEPLAY_AREA_FEATURES 128
+#define MK_MAX_GAMEPLAY_AREA_REGIONS 64
 #define MK_SCENARIO_TEXT_CAPACITY 256
 #define MK_AFTER_ACTION_SUMMARY_CAPACITY 256
 #define MK_UNIT_PICK_RADIUS_M 8.0f
@@ -334,6 +339,63 @@ typedef struct {
 } mk_map_t;
 
 typedef struct {
+    char id[MK_NAME_CAPACITY];
+    int index;
+    float elevation_m;
+    char image_path[MK_PATH_CAPACITY];
+    char alpha[MK_KIND_CAPACITY];
+    bool blocks_los_default;
+    bool blocks_movement_default;
+} mk_gameplay_level_t;
+
+typedef struct {
+    char id[MK_NAME_CAPACITY];
+    char level_id[MK_NAME_CAPACITY];
+    char kind[MK_KIND_CAPACITY];
+    int pixel_x;
+    int pixel_y;
+    int pixel_width;
+    int pixel_height;
+    mk_rect_t bounds_m;
+    bool blocks_los;
+    bool blocks_movement;
+    bool allows_los;
+    bool allows_movement;
+} mk_gameplay_feature_t;
+
+typedef struct {
+    char id[MK_NAME_CAPACITY];
+    int storeys;
+    int pixel_x;
+    int pixel_y;
+    int pixel_width;
+    int pixel_height;
+    mk_rect_t bounds_m;
+    char roof_level_id[MK_NAME_CAPACITY];
+} mk_gameplay_region_t;
+
+typedef struct {
+    bool loaded;
+    int schema_version;
+    char id[MK_NAME_CAPACITY];
+    char map_id[MK_NAME_CAPACITY];
+    char name[MK_NAME_CAPACITY];
+    float world_width_m;
+    float world_height_m;
+    int pixel_width;
+    int pixel_height;
+    float pixels_per_meter;
+    char origin[MK_KIND_CAPACITY];
+    int max_storeys;
+    size_t level_count;
+    mk_gameplay_level_t levels[MK_MAX_GAMEPLAY_AREA_LEVELS];
+    size_t feature_count;
+    mk_gameplay_feature_t features[MK_MAX_GAMEPLAY_AREA_FEATURES];
+    size_t region_count;
+    mk_gameplay_region_t regions[MK_MAX_GAMEPLAY_AREA_REGIONS];
+} mk_gameplay_area_t;
+
+typedef struct {
     uint32_t id;
     char name[MK_NAME_CAPACITY];
     char label[MK_NAME_CAPACITY];
@@ -440,6 +502,7 @@ typedef struct {
     int score_civilian_casualty_weight;
     int score_time_weight;
     mk_map_t map;
+    mk_gameplay_area_t gameplay_area;
     size_t controller_count;
     mk_controller_slot_t controllers[MK_MAX_CONTROLLERS];
     size_t faction_count;
@@ -471,6 +534,7 @@ typedef struct {
     int score_time_weight;
     uint32_t selected_unit_id;
     mk_map_t map;
+    mk_gameplay_area_t gameplay_area;
     size_t controller_count;
     mk_controller_slot_t controllers[MK_MAX_CONTROLLERS];
     size_t faction_count;
@@ -504,6 +568,7 @@ typedef struct {
     int score_time_weight;
     uint32_t selected_unit_id;
     mk_map_t map;
+    mk_gameplay_area_t gameplay_area;
     size_t controller_count;
     mk_controller_slot_t controllers[MK_MAX_CONTROLLERS];
     size_t faction_count;
@@ -588,6 +653,57 @@ float mk_clamp_f32(float value, float minimum, float maximum);
 int mk_clamp_i32(int value, int minimum, int maximum);
 bool mk_rect_contains_point(mk_rect_t rect, mk_vec2_t point);
 float mk_vec2_distance(mk_vec2_t first, mk_vec2_t second);
+bool mk_gameplay_area_is_loaded(const mk_gameplay_area_t *area);
+mk_result_t mk_gameplay_area_world_to_pixel(
+    const mk_gameplay_area_t *area,
+    mk_vec2_t position_m,
+    mk_ivec2_t *out_pixel
+);
+mk_result_t mk_gameplay_area_pixel_to_world(
+    const mk_gameplay_area_t *area,
+    mk_ivec2_t pixel,
+    mk_vec2_t *out_position_m
+);
+const mk_gameplay_level_t *mk_gameplay_area_find_level(
+    const mk_gameplay_area_t *area,
+    const char *level_id
+);
+const mk_gameplay_feature_t *mk_gameplay_area_find_feature(
+    const mk_gameplay_area_t *area,
+    const char *feature_id
+);
+const mk_gameplay_feature_t *mk_gameplay_area_find_feature_at_world(
+    const mk_gameplay_area_t *area,
+    const char *level_id,
+    mk_vec2_t position_m
+);
+const mk_gameplay_region_t *mk_gameplay_area_find_region(
+    const mk_gameplay_area_t *area,
+    const char *region_id
+);
+const mk_gameplay_region_t *mk_gameplay_area_find_region_at_world(
+    const mk_gameplay_area_t *area,
+    mk_vec2_t position_m
+);
+bool mk_gameplay_area_feature_contains_pixel(
+    const mk_gameplay_feature_t *feature,
+    mk_ivec2_t pixel
+);
+bool mk_gameplay_area_feature_contains_world(
+    const mk_gameplay_area_t *area,
+    const mk_gameplay_feature_t *feature,
+    mk_vec2_t position_m
+);
+bool mk_gameplay_area_blocks_los_at(
+    const mk_gameplay_area_t *area,
+    const char *level_id,
+    mk_vec2_t position_m
+);
+bool mk_gameplay_area_blocks_movement_at(
+    const mk_gameplay_area_t *area,
+    const char *level_id,
+    mk_vec2_t position_m
+);
 
 mk_weapon_profile_t mk_make_weapon(
     const char *name,
@@ -659,6 +775,7 @@ mk_map_tile_t *mk_map_get_tile(mk_map_t *map, mk_ivec2_t coordinate);
 const mk_map_tile_t *mk_map_get_tile_const(const mk_map_t *map, mk_ivec2_t coordinate);
 mk_result_t mk_map_set_tile(mk_map_t *map, const mk_map_tile_t *tile);
 mk_result_t mk_map_add_terrain(mk_map_t *map, const mk_terrain_zone_t *terrain, uint32_t *out_terrain_id);
+mk_result_t mk_scenario_set_gameplay_area(mk_scenario_definition_t *scenario, const mk_gameplay_area_t *area);
 mk_result_t mk_scenario_add_controller(mk_scenario_definition_t *scenario, const mk_controller_slot_t *controller, uint32_t *out_controller_id);
 mk_result_t mk_scenario_add_faction(mk_scenario_definition_t *scenario, const mk_faction_t *faction, uint32_t *out_faction_id);
 mk_result_t mk_scenario_add_force(mk_scenario_definition_t *scenario, const mk_force_t *force, uint32_t *out_force_id);
