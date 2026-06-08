@@ -248,3 +248,17 @@ playtesting.
 ## Design Intent
 
 The game is commanded at unit scale, while the engine tracks meaningful soldier-level detail inside each unit: role, weapon, ammo, wounds, suppression, offset, exposure, and casualty state. That gives the Mosul demo room for modern urban systems such as civilians, drones, IEDs, breach actions, rooftops, hidden defenders, and asymmetric morale without turning the interface into individual-soldier micromanagement.
+
+## Public Discussion
+
+The public face of development is the Guderian Discord server:
+
+[Join the Guderian Discord server](https://discord.gg/FzyszZFS2c)
+
+Interested users, testers, artists, historians, engineers, and potential developers can also contact:
+
+`barbalet at gmail dot com`
+
+## License
+
+See [LICENSE](LICENSE).
