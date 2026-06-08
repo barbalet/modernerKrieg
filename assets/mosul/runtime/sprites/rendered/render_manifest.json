@@ -4,6 +4,8 @@
   "rendered_count": 1064,
   "missing_source_count": 0,
   "error_count": 0,
+  "alpha_mode": "edge_connected_background",
+  "alpha_background_threshold": 246,
   "rendered": [
     {
       "path": "assets/mosul/runtime/sprites/rendered/infantry_128/allied/us_army_rifleman/standing/north.png",
