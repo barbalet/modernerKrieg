@@ -165,3 +165,36 @@ Current runtime product:
 
 Traffic vehicles are now represented as dynamic runtime sprites rather than scenario data baked into the map. The current approved 7,000 px Market / Commercial Streets map layers still contain visible static traffic vehicle ink and should be rerendered from approved line-art map source without baked cars, buses, or motorcycles once that source renderer is available. Do not patch those map layers with simplified icon art, stick art, or blur/fill cleanup.
 - `assets/mosul/runtime/sprites/rendered/`: copied from the MOSUL render pipeline as the first complete runtime-facing sprite set.
+
+## Dynamic Vehicle And Map Cleanup Cycles
+
+The baked-vehicle cleanup and moving-vehicle integration should remain split
+into reviewable cycles. This work crosses source art, generated runtime assets,
+scenario records, C core simulation, renderer integration, and QA, so each
+cycle should leave the repository in a testable state.
+
+1. Submodule hygiene: fast-forward `mosul` and `modernerKrieg` to the tips of
+   `main`, then commit the nested gitlink updates upward so every repository
+   records the same baseline.
+2. Asset audit: identify every baked car, bus, motorcycle, and vehicle-like
+   mark in the Market / Commercial Streets map layers, then classify each as
+   removable background traffic, dynamic traffic, abandoned cover, or destroyed
+   terrain.
+3. Vehicle-free map rerender: regenerate the approved 7,000 px line-art map
+   overview and level PNGs without baked traffic vehicles. Do not use Pillow
+   cleanup, blur/fill inpainting, stick art, or simplified replacement marks.
+4. Dynamic vehicle asset validation: keep cars, buses, and motorcycles as
+   generated `1024 x 1024` RGBA runtime sprites with alpha edges, matching the
+   established line-art style and render manifest IDs.
+5. Scenario and data integration: add or revise `traffic_vehicle.*` records for
+   positions, destinations, speed, facing, seat capacity, boarding mode, active
+   state, and movement blocking.
+6. Runtime behavior: verify path following, routing failures, occupant position
+   updates, entering/exiting cars and buses, mounting/dismounting motorcycles,
+   collision, blocking, save/snapshot, replay, and deterministic AI behavior.
+7. Renderer and interaction pass: draw traffic vehicles only from runtime RGBA
+   sprites, expose picking/selection and boarding controls, and keep source
+   angle art out of the live renderer path.
+8. Verification and polish: run CTests, asset manifest validation, alpha-edge
+   validation, visual map before/after checks, and an in-game smoke pass showing
+   a vehicle-free base map with moving dynamic vehicles.
