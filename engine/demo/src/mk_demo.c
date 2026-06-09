@@ -271,6 +271,56 @@ static bool mk_demo_unit_is_visible_to_frontend(const mk_unit_t *unit) {
     return unit != NULL && !(unit->hidden && !unit->revealed);
 }
 
+static bool mk_demo_unit_is_inside_traffic_vehicle(const mk_game_snapshot_t *snapshot, uint32_t unit_id) {
+    size_t vehicle_index;
+
+    if (snapshot == NULL || unit_id == 0U) {
+        return false;
+    }
+
+    for (vehicle_index = 0; vehicle_index < snapshot->traffic_vehicle_count; ++vehicle_index) {
+        const mk_traffic_vehicle_t *vehicle = &snapshot->traffic_vehicles[vehicle_index];
+        size_t occupant_index;
+
+        if (!vehicle->active || vehicle->boarding_mode != MK_TRAFFIC_BOARD_INSIDE) {
+            continue;
+        }
+
+        for (occupant_index = 0; occupant_index < vehicle->embarked_unit_count; ++occupant_index) {
+            if (vehicle->embarked_unit_ids[occupant_index] == unit_id) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+static bool mk_demo_game_unit_is_inside_traffic_vehicle(const mk_game_t *game, uint32_t unit_id) {
+    size_t vehicle_index;
+
+    if (game == NULL || unit_id == 0U) {
+        return false;
+    }
+
+    for (vehicle_index = 0; vehicle_index < game->traffic_vehicle_count; ++vehicle_index) {
+        const mk_traffic_vehicle_t *vehicle = &game->traffic_vehicles[vehicle_index];
+        size_t occupant_index;
+
+        if (!vehicle->active || vehicle->boarding_mode != MK_TRAFFIC_BOARD_INSIDE) {
+            continue;
+        }
+
+        for (occupant_index = 0; occupant_index < vehicle->embarked_unit_count; ++occupant_index) {
+            if (vehicle->embarked_unit_ids[occupant_index] == unit_id) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 static void mk_demo_fill_pick(
     mk_demo_session_t *session,
     mk_demo_pick_result_t *out_pick,
@@ -780,8 +830,11 @@ mk_result_t mk_demo_session_collect_draw_commands(
 ) {
     mk_tactical_overlay_t overlays[MK_BOARD_VIEW_MAX_TACTICAL_OVERLAYS];
     mk_soldier_marker_t soldiers[MK_MAX_UNITS * MK_MAX_SOLDIERS_PER_UNIT];
+    mk_traffic_vehicle_marker_t traffic_vehicles[MK_MAX_TRAFFIC_VEHICLES];
     size_t overlay_count = 0;
     size_t soldier_count = 0;
+    size_t visible_soldier_count = 0;
+    size_t traffic_vehicle_count = 0;
     size_t needed = 0;
     size_t index;
     size_t command_index = 0;
@@ -818,14 +871,33 @@ mk_result_t mk_demo_session_collect_draw_commands(
         return result;
     }
 
+    result = mk_board_view_collect_traffic_vehicle_markers(
+        &session->view,
+        &session->snapshot,
+        traffic_vehicles,
+        sizeof(traffic_vehicles) / sizeof(traffic_vehicles[0]),
+        &traffic_vehicle_count
+    );
+    if (result != MK_OK) {
+        return result;
+    }
+
+    for (index = 0; index < soldier_count; ++index) {
+        if (!mk_demo_unit_is_inside_traffic_vehicle(&session->snapshot, soldiers[index].unit_id)) {
+            visible_soldier_count += 1;
+        }
+    }
+
     needed = session->snapshot.gameplay_area.level_count
         + session->snapshot.civilian_count
         + session->snapshot.objective_count
         + session->snapshot.contact_report_count
         + overlay_count
-        + soldier_count;
+        + visible_soldier_count
+        + traffic_vehicle_count;
     for (index = 0; index < session->snapshot.unit_count; ++index) {
-        if (mk_demo_unit_is_visible_to_frontend(&session->snapshot.units[index])) {
+        if (mk_demo_unit_is_visible_to_frontend(&session->snapshot.units[index])
+            && !mk_demo_unit_is_inside_traffic_vehicle(&session->snapshot, session->snapshot.units[index].id)) {
             needed += 1;
         }
     }
@@ -860,11 +932,37 @@ mk_result_t mk_demo_session_collect_draw_commands(
         }
     }
 
+    for (index = 0; index < traffic_vehicle_count; ++index) {
+        const mk_traffic_vehicle_marker_t *vehicle = &traffic_vehicles[index];
+        mk_demo_draw_command_t command = mk_demo_make_draw_command(
+            MK_DEMO_DRAW_TRAFFIC_VEHICLE,
+            vehicle->vehicle_id,
+            vehicle->sprite_id,
+            vehicle->sprite_id,
+            vehicle->position_m
+        );
+
+        mk_demo_copy_text(command.asset_path, sizeof(command.asset_path), vehicle->sprite_id);
+        command.side = MK_SIDE_CIVILIAN;
+        command.screen_position_px = vehicle->screen_position_px;
+        command.target_position_m = vehicle->position_m;
+        command.target_screen_position_px = vehicle->screen_position_px;
+        command.radius_m = vehicle->seat_capacity > 4 ? 5.0f : 2.0f;
+        command.screen_radius_px = command.radius_m * session->view.scale_px_per_m;
+        command.facing_degrees = vehicle->facing_degrees;
+        command.intensity = (int)vehicle->occupied_seats;
+        result = mk_demo_push_draw_command(out_commands, command_capacity, &command_index, &command);
+        if (result != MK_OK) {
+            return result;
+        }
+    }
+
     for (index = 0; index < session->snapshot.unit_count; ++index) {
         const mk_unit_t *unit = &session->snapshot.units[index];
         mk_demo_draw_command_t command;
 
-        if (!mk_demo_unit_is_visible_to_frontend(unit)) {
+        if (!mk_demo_unit_is_visible_to_frontend(unit)
+            || mk_demo_unit_is_inside_traffic_vehicle(&session->snapshot, unit->id)) {
             continue;
         }
 
@@ -919,6 +1017,10 @@ mk_result_t mk_demo_session_collect_draw_commands(
             "",
             soldier->position_m
         );
+
+        if (mk_demo_unit_is_inside_traffic_vehicle(&session->snapshot, soldier->unit_id)) {
+            continue;
+        }
 
         command.secondary_id = soldier->soldier_id;
         command.side = soldier->side;
@@ -1039,6 +1141,9 @@ mk_result_t mk_demo_session_pick_screen(
             const mk_unit_t *unit = &session->game.units[index];
 
             if (unit->id == id) {
+                if (mk_demo_game_unit_is_inside_traffic_vehicle(&session->game, unit->id)) {
+                    break;
+                }
                 mk_demo_fill_pick(
                     session,
                     out_pick,
@@ -1063,6 +1168,30 @@ mk_result_t mk_demo_session_pick_screen(
                 mk_demo_fill_pick(session, out_pick, MK_DEMO_PICK_CONTACT, report->id, report->target_unit_id, "", "", report->side, report->position_m);
                 return MK_OK;
             }
+        }
+    }
+
+    for (index = 0; index < session->game.traffic_vehicle_count; ++index) {
+        const mk_traffic_vehicle_t *vehicle = &session->game.traffic_vehicles[index];
+        float vehicle_radius_m = vehicle->seat_capacity > 4 ? 5.0f : radius_m;
+
+        if (!vehicle->active) {
+            continue;
+        }
+
+        if (mk_vec2_distance(vehicle->position_m, position_m) <= vehicle_radius_m) {
+            mk_demo_fill_pick(
+                session,
+                out_pick,
+                MK_DEMO_PICK_TRAFFIC_VEHICLE,
+                vehicle->id,
+                0U,
+                vehicle->scenario_id,
+                vehicle->name,
+                MK_SIDE_CIVILIAN,
+                vehicle->position_m
+            );
+            return MK_OK;
         }
     }
 

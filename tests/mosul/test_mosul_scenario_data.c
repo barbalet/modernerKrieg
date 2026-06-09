@@ -100,6 +100,7 @@ static void test_default_scenario_data_matches_fixture_shape(void) {
     MK_TEST_ASSERT(loaded.civilian_archetype_count == 4);
     MK_TEST_ASSERT(loaded.civilian_group_count == 4);
     MK_TEST_ASSERT(loaded.civilian_count == 7);
+    MK_TEST_ASSERT(loaded.traffic_vehicle_count == 6);
     MK_TEST_ASSERT(loaded.unit_count == 6);
     MK_TEST_ASSERT(strcmp(loaded.forces[0].command.callsign, fixture.forces[0].command.callsign) == 0);
     MK_TEST_ASSERT(strcmp(loaded.units[0].name, fixture.units[0].name) == 0);
@@ -120,6 +121,13 @@ static void test_default_scenario_data_matches_fixture_shape(void) {
     MK_TEST_ASSERT(strcmp(loaded.civilians[6].archetype_id, "wounded_bystander") == 0);
     MK_TEST_ASSERT(strcmp(loaded.civilians[6].topology_node_id, "market_stalls_ground") == 0);
     MK_TEST_ASSERT(loaded.civilians[6].risk == 1);
+    MK_TEST_ASSERT(strcmp(loaded.traffic_vehicles[0].scenario_id, "north_market_bus") == 0);
+    MK_TEST_ASSERT(loaded.traffic_vehicles[0].kind == MK_TRAFFIC_VEHICLE_BUS);
+    MK_TEST_ASSERT(loaded.traffic_vehicles[0].seat_capacity == 24);
+    MK_TEST_ASSERT(loaded.traffic_vehicles[0].boarding_mode == MK_TRAFFIC_BOARD_INSIDE);
+    MK_TEST_ASSERT(strcmp(loaded.traffic_vehicles[4].scenario_id, "souq_motorcycle") == 0);
+    MK_TEST_ASSERT(loaded.traffic_vehicles[4].kind == MK_TRAFFIC_VEHICLE_MOTORCYCLE);
+    MK_TEST_ASSERT(loaded.traffic_vehicles[4].boarding_mode == MK_TRAFFIC_BOARD_ON);
     MK_TEST_ASSERT(strcmp(loaded.units[3].template_id, "rooftop_watcher") == 0);
     MK_TEST_ASSERT(strcmp(loaded.units[3].level_id, "level_04_roof_access") == 0);
     MK_TEST_ASSERT(strcmp(loaded.units[3].topology_node_id, "hotel_roof_access") == 0);

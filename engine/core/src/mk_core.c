@@ -1960,6 +1960,266 @@ static void mk_update_unit_movement(mk_game_t *game, mk_unit_t *unit) {
     (void)game;
 }
 
+static void mk_traffic_vehicle_clear_route(mk_traffic_vehicle_t *vehicle) {
+    if (vehicle == NULL) {
+        return;
+    }
+
+    vehicle->has_route = false;
+    vehicle->route_step_count = 0;
+    vehicle->route_step_index = 0;
+    vehicle->route_total_cost = 0;
+    vehicle->route_uses_vertical_transition = false;
+    memset(vehicle->route_waypoints_m, 0, sizeof(vehicle->route_waypoints_m));
+    memset(vehicle->route_step_level_ids, 0, sizeof(vehicle->route_step_level_ids));
+    memset(vehicle->route_step_portal_ids, 0, sizeof(vehicle->route_step_portal_ids));
+    memset(vehicle->route_step_vertical_transition, 0, sizeof(vehicle->route_step_vertical_transition));
+    vehicle->route_stuck_ticks = 0;
+}
+
+static void mk_traffic_vehicle_set_route_failure(mk_traffic_vehicle_t *vehicle, const char *reason) {
+    if (vehicle == NULL) {
+        return;
+    }
+
+    mk_copy_text(vehicle->route_failure_reason, sizeof(vehicle->route_failure_reason), reason);
+    vehicle->route_failure_count += 1U;
+    mk_traffic_vehicle_clear_route(vehicle);
+}
+
+static bool mk_traffic_vehicle_assign_route(mk_traffic_vehicle_t *vehicle, const mk_gameplay_route_t *route) {
+    size_t index;
+
+    if (vehicle == NULL
+        || route == NULL
+        || !route->valid
+        || route->step_count == 0
+        || route->step_count > MK_MAX_GAMEPLAY_ROUTE_STEPS) {
+        return false;
+    }
+
+    mk_traffic_vehicle_clear_route(vehicle);
+    vehicle->has_route = true;
+    vehicle->route_step_count = route->step_count;
+    vehicle->route_step_index = 0;
+    vehicle->route_total_cost = route->total_cost;
+    vehicle->route_uses_vertical_transition = route->uses_vertical_transition;
+    for (index = 0; index < route->step_count; ++index) {
+        vehicle->route_waypoints_m[index] = route->steps[index].waypoint_m;
+        mk_copy_name(vehicle->route_step_level_ids[index], route->steps[index].level_id);
+        mk_copy_name(vehicle->route_step_portal_ids[index], route->steps[index].portal_id);
+        vehicle->route_step_vertical_transition[index] = route->steps[index].vertical_transition;
+    }
+
+    return true;
+}
+
+static const char *mk_traffic_vehicle_current_level_id(const mk_game_t *game, const mk_traffic_vehicle_t *vehicle) {
+    if (vehicle != NULL && vehicle->level_id[0] != '\0') {
+        return vehicle->level_id;
+    }
+
+    return mk_game_default_level_id(game);
+}
+
+static void mk_game_refresh_traffic_vehicle_topology(mk_game_t *game, mk_traffic_vehicle_t *vehicle) {
+    const char *level_id;
+    const mk_gameplay_topology_node_t *node;
+
+    if (game == NULL || vehicle == NULL || !mk_gameplay_area_topology_is_loaded(&game->gameplay_area)) {
+        return;
+    }
+
+    level_id = mk_traffic_vehicle_current_level_id(game, vehicle);
+    node = mk_gameplay_area_find_topology_node_at_world(&game->gameplay_area, level_id, vehicle->position_m);
+    if (node != NULL) {
+        mk_copy_name(vehicle->topology_node_id, node->id);
+        mk_copy_name(vehicle->level_id, node->level_id);
+    }
+}
+
+static void mk_game_update_traffic_vehicle_occupants(mk_game_t *game, const mk_traffic_vehicle_t *vehicle) {
+    size_t index;
+
+    if (game == NULL || vehicle == NULL) {
+        return;
+    }
+
+    for (index = 0; index < vehicle->embarked_unit_count; ++index) {
+        mk_unit_t *unit = mk_game_find_unit(game, vehicle->embarked_unit_ids[index]);
+
+        if (unit == NULL) {
+            continue;
+        }
+
+        unit->position_m = vehicle->position_m;
+        unit->target_position_m = vehicle->position_m;
+        unit->facing_degrees = vehicle->facing_degrees;
+        unit->has_move_target = false;
+        unit->order = MK_ORDER_HOLD;
+        mk_unit_clear_route(unit);
+        mk_copy_name(unit->level_id, mk_traffic_vehicle_current_level_id(game, vehicle));
+        mk_copy_name(unit->topology_node_id, vehicle->topology_node_id);
+    }
+}
+
+static mk_result_t mk_game_try_assign_traffic_vehicle_route(
+    const mk_game_t *game,
+    mk_traffic_vehicle_t *vehicle,
+    const char *target_level_id,
+    mk_vec2_t target_position_m,
+    bool require_route
+) {
+    const char *start_level_id;
+    const char *goal_level_id;
+    mk_gameplay_route_t route;
+    mk_result_t result;
+
+    if (game == NULL || vehicle == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    mk_traffic_vehicle_clear_route(vehicle);
+    if (!mk_gameplay_area_topology_is_loaded(&game->gameplay_area)) {
+        return require_route ? MK_ERROR_INVALID_DATA : MK_OK;
+    }
+
+    start_level_id = mk_traffic_vehicle_current_level_id(game, vehicle);
+    goal_level_id = target_level_id != NULL && target_level_id[0] != '\0' ? target_level_id : start_level_id;
+    if (start_level_id[0] == '\0' || goal_level_id[0] == '\0') {
+        return require_route ? MK_ERROR_INVALID_DATA : MK_OK;
+    }
+
+    result = mk_gameplay_area_plan_route(
+        &game->gameplay_area,
+        start_level_id,
+        vehicle->position_m,
+        goal_level_id,
+        target_position_m,
+        &route
+    );
+    if (result != MK_OK) {
+        mk_copy_text(vehicle->route_failure_reason, sizeof(vehicle->route_failure_reason), route.blocked_reason);
+        return require_route ? result : MK_OK;
+    }
+
+    if (!mk_traffic_vehicle_assign_route(vehicle, &route)) {
+        mk_copy_text(vehicle->route_failure_reason, sizeof(vehicle->route_failure_reason), "route_capacity");
+        return MK_ERROR_CAPACITY;
+    }
+
+    vehicle->route_request_id += 1U;
+    vehicle->route_stuck_ticks = 0U;
+    vehicle->route_vertical_transitions_completed = 0U;
+    vehicle->route_last_position_m = vehicle->position_m;
+    mk_copy_text(vehicle->route_failure_reason, sizeof(vehicle->route_failure_reason), "");
+    if (vehicle->level_id[0] == '\0') {
+        mk_copy_name(vehicle->level_id, start_level_id);
+    }
+
+    return MK_OK;
+}
+
+static float mk_traffic_vehicle_move_speed(const mk_traffic_vehicle_t *vehicle) {
+    float speed = vehicle != NULL && vehicle->speed_m_per_tick > 0.0f
+        ? vehicle->speed_m_per_tick
+        : MK_DEFAULT_TRAFFIC_VEHICLE_SPEED_M_PER_TICK;
+
+    if (vehicle != NULL && vehicle->kind == MK_TRAFFIC_VEHICLE_BUS) {
+        speed *= 0.75f;
+    } else if (vehicle != NULL && vehicle->kind == MK_TRAFFIC_VEHICLE_MOTORCYCLE) {
+        speed *= 1.2f;
+    }
+
+    return mk_clamp_f32(speed, 1.0f, 14.0f);
+}
+
+static void mk_game_update_traffic_vehicle_movement(mk_game_t *game, mk_traffic_vehicle_t *vehicle) {
+    mk_vec2_t movement_target;
+    float dx;
+    float dy;
+    float distance_squared;
+    float speed;
+    float step_squared;
+    float distance;
+
+    if (game == NULL || vehicle == NULL || !vehicle->active || !vehicle->has_destination) {
+        return;
+    }
+
+    movement_target = vehicle->destination_m;
+    if (vehicle->has_route) {
+        if (vehicle->route_step_count == 0 || vehicle->route_step_index >= vehicle->route_step_count) {
+            mk_traffic_vehicle_set_route_failure(vehicle, "route_exhausted");
+            vehicle->has_destination = false;
+            mk_game_update_traffic_vehicle_occupants(game, vehicle);
+            return;
+        }
+
+        movement_target = vehicle->route_waypoints_m[vehicle->route_step_index];
+    }
+
+    dx = movement_target.x - vehicle->position_m.x;
+    dy = movement_target.y - vehicle->position_m.y;
+    distance_squared = dx * dx + dy * dy;
+    speed = mk_traffic_vehicle_move_speed(vehicle);
+    step_squared = speed * speed;
+
+    if (distance_squared <= step_squared || distance_squared <= 0.0001f) {
+        vehicle->position_m = movement_target;
+        if (vehicle->has_route) {
+            if (vehicle->route_step_level_ids[vehicle->route_step_index][0] != '\0') {
+                mk_copy_name(vehicle->level_id, vehicle->route_step_level_ids[vehicle->route_step_index]);
+            }
+            if (vehicle->route_step_vertical_transition[vehicle->route_step_index]) {
+                vehicle->route_vertical_transitions_completed += 1U;
+            }
+
+            vehicle->route_step_index += 1U;
+            vehicle->route_stuck_ticks = 0U;
+            vehicle->route_last_position_m = vehicle->position_m;
+            mk_game_refresh_traffic_vehicle_topology(game, vehicle);
+            mk_game_update_traffic_vehicle_occupants(game, vehicle);
+            if (vehicle->route_step_index < vehicle->route_step_count) {
+                return;
+            }
+        }
+
+        vehicle->position_m = vehicle->destination_m;
+        if (vehicle->destination_level_id[0] != '\0') {
+            mk_copy_name(vehicle->level_id, vehicle->destination_level_id);
+        }
+        vehicle->has_destination = false;
+        mk_traffic_vehicle_clear_route(vehicle);
+        mk_game_refresh_traffic_vehicle_topology(game, vehicle);
+        mk_game_update_traffic_vehicle_occupants(game, vehicle);
+        return;
+    }
+
+    distance = sqrtf(distance_squared);
+    vehicle->position_m.x += dx / distance * speed;
+    vehicle->position_m.y += dy / distance * speed;
+    vehicle->facing_degrees = atan2f(dy, dx) * 57.2957795f;
+    mk_game_refresh_traffic_vehicle_topology(game, vehicle);
+    mk_game_update_traffic_vehicle_occupants(game, vehicle);
+
+    if (vehicle->has_route) {
+        float moved_since_last = mk_vec2_distance(vehicle->route_last_position_m, vehicle->position_m);
+
+        if (moved_since_last < 0.01f) {
+            vehicle->route_stuck_ticks += 1U;
+        } else {
+            vehicle->route_stuck_ticks = 0U;
+            vehicle->route_last_position_m = vehicle->position_m;
+        }
+
+        if (vehicle->route_stuck_ticks > 8U) {
+            mk_traffic_vehicle_set_route_failure(vehicle, "stuck");
+            vehicle->has_destination = false;
+        }
+    }
+}
+
 static void mk_civilian_clear_route(mk_civilian_t *civilian) {
     if (civilian == NULL) {
         return;
@@ -2596,6 +2856,7 @@ static bool mk_scenario_is_valid(const mk_scenario_definition_t *scenario) {
         || scenario->map.tile_count > MK_MAX_MAP_TILES
         || scenario->objective_count > MK_MAX_OBJECTIVES
         || scenario->civilian_count > MK_MAX_CIVILIANS
+        || scenario->traffic_vehicle_count > MK_MAX_TRAFFIC_VEHICLES
         || scenario->unit_count > MK_MAX_UNITS) {
         return false;
     }
@@ -2852,6 +3113,49 @@ static bool mk_scenario_is_valid(const mk_scenario_definition_t *scenario) {
                 true
             )) {
             return false;
+        }
+    }
+
+    for (index = 0; index < scenario->traffic_vehicle_count; ++index) {
+        const mk_traffic_vehicle_t *vehicle = &scenario->traffic_vehicles[index];
+        size_t other_index;
+
+        if (vehicle->id == 0
+            || !mk_text_is_present(vehicle->scenario_id)
+            || !mk_text_is_present(vehicle->name)
+            || !mk_text_is_present(vehicle->sprite_id)
+            || vehicle->kind > MK_TRAFFIC_VEHICLE_MOTORCYCLE
+            || vehicle->boarding_mode > MK_TRAFFIC_BOARD_ON
+            || !mk_position_fits_map(vehicle->position_m, &scenario->map)
+            || (vehicle->has_destination && !mk_position_fits_map(vehicle->destination_m, &scenario->map))
+            || (vehicle->has_destination
+                && mk_text_is_present(vehicle->destination_level_id)
+                && mk_gameplay_area_is_loaded(&scenario->gameplay_area)
+                && mk_gameplay_area_find_level(&scenario->gameplay_area, vehicle->destination_level_id) == NULL)
+            || vehicle->speed_m_per_tick < 0.0f
+            || vehicle->seat_capacity < 0
+            || vehicle->seat_capacity > MK_MAX_TRAFFIC_VEHICLE_OCCUPANTS
+            || vehicle->occupied_seats < 0
+            || vehicle->occupied_seats > vehicle->seat_capacity
+            || vehicle->embarked_unit_count > MK_MAX_TRAFFIC_VEHICLE_OCCUPANTS
+            || vehicle->embarked_unit_count > (size_t)vehicle->seat_capacity
+            || (mk_text_is_present(vehicle->level_id)
+                && mk_gameplay_area_is_loaded(&scenario->gameplay_area)
+                && mk_gameplay_area_find_level(&scenario->gameplay_area, vehicle->level_id) == NULL)
+            || !mk_scenario_topology_reference_is_valid(
+                scenario,
+                vehicle->level_id,
+                vehicle->topology_node_id,
+                vehicle->position_m,
+                true
+            )) {
+            return false;
+        }
+
+        for (other_index = index + 1; other_index < scenario->traffic_vehicle_count; ++other_index) {
+            if (strcmp(vehicle->scenario_id, scenario->traffic_vehicles[other_index].scenario_id) == 0) {
+                return false;
+            }
         }
     }
 
@@ -4055,6 +4359,7 @@ float mk_random_float01(mk_game_t *game) {
 
 void mk_game_step(mk_game_t *game) {
     size_t unit_index;
+    size_t vehicle_index;
 
     if (game == NULL) {
         return;
@@ -4084,6 +4389,10 @@ void mk_game_step(mk_game_t *game) {
         }
 
         mk_update_unit_status(unit);
+    }
+
+    for (vehicle_index = 0; vehicle_index < game->traffic_vehicle_count; ++vehicle_index) {
+        mk_game_update_traffic_vehicle_movement(game, &game->traffic_vehicles[vehicle_index]);
     }
 
     mk_game_update_investigation_contacts(game);
@@ -4499,6 +4808,8 @@ mk_result_t mk_game_snapshot(const mk_game_t *game, mk_game_snapshot_t *out_snap
     memcpy(out_snapshot->objectives, game->objectives, sizeof(game->objectives));
     out_snapshot->civilian_count = game->civilian_count;
     memcpy(out_snapshot->civilians, game->civilians, sizeof(game->civilians));
+    out_snapshot->traffic_vehicle_count = game->traffic_vehicle_count;
+    memcpy(out_snapshot->traffic_vehicles, game->traffic_vehicles, sizeof(game->traffic_vehicles));
     out_snapshot->unit_count = game->unit_count;
     memcpy(out_snapshot->units, game->units, sizeof(game->units));
     out_snapshot->contact_report_count = game->contact_report_count;
@@ -4552,6 +4863,8 @@ mk_result_t mk_game_load_scenario(mk_game_t *game, const mk_scenario_definition_
     memcpy(game->objectives, scenario->objectives, sizeof(scenario->objectives));
     game->civilian_count = scenario->civilian_count;
     memcpy(game->civilians, scenario->civilians, sizeof(scenario->civilians));
+    game->traffic_vehicle_count = scenario->traffic_vehicle_count;
+    memcpy(game->traffic_vehicles, scenario->traffic_vehicles, sizeof(scenario->traffic_vehicles));
     game->unit_count = scenario->unit_count;
     memcpy(game->units, scenario->units, sizeof(scenario->units));
     game->contact_report_count = 0;
@@ -4580,6 +4893,29 @@ mk_result_t mk_game_load_scenario(mk_game_t *game, const mk_scenario_definition_
             mk_copy_name(game->units[index].level_id, mk_game_default_level_id(game));
         }
         mk_update_unit_status(&game->units[index]);
+    }
+
+    for (index = 0; index < game->traffic_vehicle_count; ++index) {
+        if (game->traffic_vehicles[index].level_id[0] == '\0') {
+            mk_copy_name(game->traffic_vehicles[index].level_id, mk_game_default_level_id(game));
+        }
+        if (game->traffic_vehicles[index].has_destination) {
+            if (game->traffic_vehicles[index].destination_level_id[0] == '\0') {
+                mk_copy_name(
+                    game->traffic_vehicles[index].destination_level_id,
+                    game->traffic_vehicles[index].level_id
+                );
+            }
+            (void)mk_game_try_assign_traffic_vehicle_route(
+                game,
+                &game->traffic_vehicles[index],
+                game->traffic_vehicles[index].destination_level_id,
+                game->traffic_vehicles[index].destination_m,
+                false
+            );
+        }
+        mk_game_refresh_traffic_vehicle_topology(game, &game->traffic_vehicles[index]);
+        mk_game_update_traffic_vehicle_occupants(game, &game->traffic_vehicles[index]);
     }
 
     return MK_OK;
@@ -4869,6 +5205,48 @@ mk_result_t mk_game_issue_selected_investigate_order(mk_game_t *game, mk_vec2_t 
     }
 
     return mk_game_issue_investigate_order(game, game->selected_unit_id, target_position_m);
+}
+
+mk_result_t mk_game_issue_traffic_vehicle_move_order(
+    mk_game_t *game,
+    uint32_t vehicle_id,
+    const char *target_level_id,
+    mk_vec2_t target_position_m
+) {
+    mk_traffic_vehicle_t *vehicle;
+    mk_result_t route_result;
+
+    if (game == NULL || vehicle_id == 0U) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (!mk_position_fits_map(target_position_m, &game->map)) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    vehicle = mk_game_find_traffic_vehicle(game, vehicle_id);
+    if (vehicle == NULL) {
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    if (!vehicle->active) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    route_result = mk_game_try_assign_traffic_vehicle_route(game, vehicle, target_level_id, target_position_m, false);
+    if (route_result != MK_OK) {
+        return route_result;
+    }
+
+    vehicle->destination_m = target_position_m;
+    vehicle->has_destination = true;
+    if (target_level_id != NULL && target_level_id[0] != '\0') {
+        mk_copy_name(vehicle->destination_level_id, target_level_id);
+    } else {
+        mk_copy_name(vehicle->destination_level_id, mk_traffic_vehicle_current_level_id(game, vehicle));
+    }
+
+    return MK_OK;
 }
 
 mk_result_t mk_game_issue_civilian_instruction(
@@ -5789,6 +6167,43 @@ mk_civilian_t mk_make_civilian(const char *name, uint32_t faction_id, mk_vec2_t 
     return civilian;
 }
 
+mk_traffic_vehicle_t mk_make_traffic_vehicle(
+    const char *scenario_id,
+    const char *name,
+    mk_traffic_vehicle_kind_t kind,
+    mk_vec2_t position_m
+) {
+    mk_traffic_vehicle_t vehicle;
+
+    memset(&vehicle, 0, sizeof(vehicle));
+    mk_copy_name(vehicle.scenario_id, scenario_id);
+    mk_copy_name(vehicle.name, name);
+    vehicle.kind = kind;
+    vehicle.position_m = position_m;
+    vehicle.destination_m = position_m;
+    vehicle.speed_m_per_tick = MK_DEFAULT_TRAFFIC_VEHICLE_SPEED_M_PER_TICK;
+    vehicle.active = true;
+    vehicle.blocks_movement = true;
+
+    if (kind == MK_TRAFFIC_VEHICLE_BUS) {
+        mk_copy_name(vehicle.sprite_id, "traffic_city_bus_intact_north");
+        vehicle.boarding_mode = MK_TRAFFIC_BOARD_INSIDE;
+        vehicle.seat_capacity = 24;
+        vehicle.speed_m_per_tick = 6.0f;
+    } else if (kind == MK_TRAFFIC_VEHICLE_MOTORCYCLE) {
+        mk_copy_name(vehicle.sprite_id, "traffic_motorcycle_intact_north");
+        vehicle.boarding_mode = MK_TRAFFIC_BOARD_ON;
+        vehicle.seat_capacity = 1;
+        vehicle.speed_m_per_tick = 10.0f;
+    } else {
+        mk_copy_name(vehicle.sprite_id, "traffic_civilian_car_intact_north");
+        vehicle.boarding_mode = MK_TRAFFIC_BOARD_INSIDE;
+        vehicle.seat_capacity = 4;
+    }
+
+    return vehicle;
+}
+
 mk_result_t mk_map_configure_tiles(
     mk_map_t *map,
     int columns,
@@ -6065,6 +6480,47 @@ mk_result_t mk_scenario_add_civilian(
     return MK_OK;
 }
 
+mk_result_t mk_scenario_add_traffic_vehicle(
+    mk_scenario_definition_t *scenario,
+    const mk_traffic_vehicle_t *vehicle,
+    uint32_t *out_vehicle_id
+) {
+    mk_traffic_vehicle_t copy;
+
+    if (scenario == NULL || vehicle == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (scenario->traffic_vehicle_count >= MK_MAX_TRAFFIC_VEHICLES) {
+        return MK_ERROR_CAPACITY;
+    }
+
+    if (!mk_position_fits_map(vehicle->position_m, &scenario->map)
+        || vehicle->kind > MK_TRAFFIC_VEHICLE_MOTORCYCLE
+        || vehicle->boarding_mode > MK_TRAFFIC_BOARD_ON
+        || vehicle->seat_capacity < 0
+        || vehicle->seat_capacity > MK_MAX_TRAFFIC_VEHICLE_OCCUPANTS
+        || vehicle->embarked_unit_count > (size_t)vehicle->seat_capacity) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    copy = *vehicle;
+    copy.id = (uint32_t)(scenario->traffic_vehicle_count + 1);
+    if (copy.scenario_id[0] == '\0') {
+        mk_copy_name(copy.scenario_id, copy.name);
+    }
+    copy.occupied_seats = (int)copy.embarked_unit_count;
+
+    scenario->traffic_vehicles[scenario->traffic_vehicle_count] = copy;
+    scenario->traffic_vehicle_count += 1;
+
+    if (out_vehicle_id != NULL) {
+        *out_vehicle_id = copy.id;
+    }
+
+    return MK_OK;
+}
+
 mk_result_t mk_scenario_add_unit(mk_scenario_definition_t *scenario, const mk_unit_t *unit, uint32_t *out_unit_id) {
     mk_unit_t copy;
 
@@ -6145,6 +6601,189 @@ const mk_unit_t *mk_game_find_unit_const(const mk_game_t *game, uint32_t unit_id
     }
 
     return NULL;
+}
+
+mk_result_t mk_game_add_traffic_vehicle(
+    mk_game_t *game,
+    const mk_traffic_vehicle_t *vehicle,
+    uint32_t *out_vehicle_id
+) {
+    mk_traffic_vehicle_t copy;
+
+    if (game == NULL || vehicle == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (game->traffic_vehicle_count >= MK_MAX_TRAFFIC_VEHICLES) {
+        return MK_ERROR_CAPACITY;
+    }
+
+    if (!mk_position_fits_map(vehicle->position_m, &game->map)
+        || vehicle->kind > MK_TRAFFIC_VEHICLE_MOTORCYCLE
+        || vehicle->boarding_mode > MK_TRAFFIC_BOARD_ON
+        || vehicle->seat_capacity < 0
+        || vehicle->seat_capacity > MK_MAX_TRAFFIC_VEHICLE_OCCUPANTS
+        || vehicle->embarked_unit_count > (size_t)vehicle->seat_capacity) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    copy = *vehicle;
+    copy.id = (uint32_t)(game->traffic_vehicle_count + 1);
+    if (copy.scenario_id[0] == '\0') {
+        mk_copy_name(copy.scenario_id, copy.name);
+    }
+    copy.occupied_seats = (int)copy.embarked_unit_count;
+
+    game->traffic_vehicles[game->traffic_vehicle_count] = copy;
+    game->traffic_vehicle_count += 1;
+
+    if (out_vehicle_id != NULL) {
+        *out_vehicle_id = copy.id;
+    }
+
+    return MK_OK;
+}
+
+mk_traffic_vehicle_t *mk_game_find_traffic_vehicle(mk_game_t *game, uint32_t vehicle_id) {
+    size_t index;
+
+    if (game == NULL || vehicle_id == 0U) {
+        return NULL;
+    }
+
+    for (index = 0; index < game->traffic_vehicle_count; ++index) {
+        if (game->traffic_vehicles[index].id == vehicle_id) {
+            return &game->traffic_vehicles[index];
+        }
+    }
+
+    return NULL;
+}
+
+const mk_traffic_vehicle_t *mk_game_find_traffic_vehicle_const(const mk_game_t *game, uint32_t vehicle_id) {
+    size_t index;
+
+    if (game == NULL || vehicle_id == 0U) {
+        return NULL;
+    }
+
+    for (index = 0; index < game->traffic_vehicle_count; ++index) {
+        if (game->traffic_vehicles[index].id == vehicle_id) {
+            return &game->traffic_vehicles[index];
+        }
+    }
+
+    return NULL;
+}
+
+static bool mk_traffic_vehicle_has_unit(const mk_traffic_vehicle_t *vehicle, uint32_t unit_id) {
+    size_t index;
+
+    if (vehicle == NULL || unit_id == 0U) {
+        return false;
+    }
+
+    for (index = 0; index < vehicle->embarked_unit_count; ++index) {
+        if (vehicle->embarked_unit_ids[index] == unit_id) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool mk_traffic_vehicle_remove_unit(mk_traffic_vehicle_t *vehicle, uint32_t unit_id) {
+    size_t index;
+
+    if (vehicle == NULL || unit_id == 0U) {
+        return false;
+    }
+
+    for (index = 0; index < vehicle->embarked_unit_count; ++index) {
+        if (vehicle->embarked_unit_ids[index] == unit_id) {
+            size_t move_index;
+
+            for (move_index = index + 1; move_index < vehicle->embarked_unit_count; ++move_index) {
+                vehicle->embarked_unit_ids[move_index - 1] = vehicle->embarked_unit_ids[move_index];
+            }
+            vehicle->embarked_unit_count -= 1U;
+            vehicle->embarked_unit_ids[vehicle->embarked_unit_count] = 0U;
+            vehicle->occupied_seats = (int)vehicle->embarked_unit_count;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+mk_result_t mk_game_board_traffic_vehicle(mk_game_t *game, uint32_t vehicle_id, uint32_t unit_id) {
+    mk_traffic_vehicle_t *vehicle;
+    mk_unit_t *unit;
+    size_t index;
+
+    if (game == NULL || vehicle_id == 0U || unit_id == 0U) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    vehicle = mk_game_find_traffic_vehicle(game, vehicle_id);
+    unit = mk_game_find_unit(game, unit_id);
+    if (vehicle == NULL || unit == NULL) {
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    if (!vehicle->active) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    if (mk_traffic_vehicle_has_unit(vehicle, unit_id)) {
+        mk_game_update_traffic_vehicle_occupants(game, vehicle);
+        return MK_OK;
+    }
+
+    if (vehicle->embarked_unit_count >= MK_MAX_TRAFFIC_VEHICLE_OCCUPANTS
+        || vehicle->occupied_seats >= vehicle->seat_capacity) {
+        return MK_ERROR_CAPACITY;
+    }
+
+    for (index = 0; index < game->traffic_vehicle_count; ++index) {
+        (void)mk_traffic_vehicle_remove_unit(&game->traffic_vehicles[index], unit_id);
+    }
+
+    vehicle->embarked_unit_ids[vehicle->embarked_unit_count] = unit_id;
+    vehicle->embarked_unit_count += 1U;
+    vehicle->occupied_seats = (int)vehicle->embarked_unit_count;
+    mk_game_update_traffic_vehicle_occupants(game, vehicle);
+
+    return MK_OK;
+}
+
+mk_result_t mk_game_unboard_traffic_vehicle(mk_game_t *game, uint32_t vehicle_id, uint32_t unit_id) {
+    mk_traffic_vehicle_t *vehicle;
+    mk_unit_t *unit;
+
+    if (game == NULL || vehicle_id == 0U || unit_id == 0U) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    vehicle = mk_game_find_traffic_vehicle(game, vehicle_id);
+    unit = mk_game_find_unit(game, unit_id);
+    if (vehicle == NULL || unit == NULL) {
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    if (!mk_traffic_vehicle_remove_unit(vehicle, unit_id)) {
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    unit->position_m = vehicle->position_m;
+    unit->target_position_m = vehicle->position_m;
+    unit->has_move_target = false;
+    unit->order = MK_ORDER_HOLD;
+    mk_unit_clear_route(unit);
+    mk_copy_name(unit->level_id, mk_traffic_vehicle_current_level_id(game, vehicle));
+    mk_copy_name(unit->topology_node_id, vehicle->topology_node_id);
+
+    return MK_OK;
 }
 
 mk_result_t mk_unit_add_soldier(mk_unit_t *unit, const mk_soldier_t *soldier, uint32_t *out_soldier_id) {

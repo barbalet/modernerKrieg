@@ -700,3 +700,58 @@ mk_result_t mk_board_view_collect_soldier_markers(
 
     return MK_OK;
 }
+
+mk_result_t mk_board_view_collect_traffic_vehicle_markers(
+    const mk_board_view_t *view,
+    const mk_game_snapshot_t *snapshot,
+    mk_traffic_vehicle_marker_t *out_markers,
+    size_t marker_capacity,
+    size_t *out_marker_count
+) {
+    size_t needed = 0;
+    size_t marker_index = 0;
+    size_t vehicle_index;
+
+    if (!mk_render_view_is_valid(view) || snapshot == NULL || out_marker_count == NULL) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    for (vehicle_index = 0; vehicle_index < snapshot->traffic_vehicle_count; ++vehicle_index) {
+        if (snapshot->traffic_vehicles[vehicle_index].active) {
+            needed += 1U;
+        }
+    }
+
+    *out_marker_count = needed;
+
+    if (out_markers == NULL) {
+        return marker_capacity == 0 ? MK_OK : MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (marker_capacity < needed) {
+        return MK_ERROR_CAPACITY;
+    }
+
+    for (vehicle_index = 0; vehicle_index < snapshot->traffic_vehicle_count; ++vehicle_index) {
+        const mk_traffic_vehicle_t *vehicle = &snapshot->traffic_vehicles[vehicle_index];
+
+        if (!vehicle->active) {
+            continue;
+        }
+
+        out_markers[marker_index].vehicle_id = vehicle->id;
+        out_markers[marker_index].kind = vehicle->kind;
+        out_markers[marker_index].boarding_mode = vehicle->boarding_mode;
+        strncpy(out_markers[marker_index].sprite_id, vehicle->sprite_id, sizeof(out_markers[marker_index].sprite_id) - 1U);
+        out_markers[marker_index].sprite_id[sizeof(out_markers[marker_index].sprite_id) - 1U] = '\0';
+        out_markers[marker_index].position_m = vehicle->position_m;
+        out_markers[marker_index].screen_position_px = mk_board_view_map_to_screen(view, vehicle->position_m);
+        out_markers[marker_index].facing_degrees = vehicle->facing_degrees;
+        out_markers[marker_index].seat_capacity = vehicle->seat_capacity;
+        out_markers[marker_index].occupied_seats = vehicle->occupied_seats;
+        out_markers[marker_index].active = vehicle->active;
+        marker_index += 1U;
+    }
+
+    return MK_OK;
+}

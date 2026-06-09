@@ -22,6 +22,8 @@ extern "C" {
 #define MK_MAX_CIVILIANS 128
 #define MK_MAX_SOLDIERS_PER_UNIT 16
 #define MK_MAX_UNITS 64
+#define MK_MAX_TRAFFIC_VEHICLES 32
+#define MK_MAX_TRAFFIC_VEHICLE_OCCUPANTS 32
 #define MK_MAX_CONTACT_REPORTS 64
 #define MK_MAX_SCENARIO_SPAWN_ZONES 16
 #define MK_MAX_SCENARIO_UNIT_TEMPLATES 16
@@ -41,6 +43,7 @@ extern "C" {
 #define MK_UNIT_PICK_RADIUS_M 8.0f
 #define MK_DEFAULT_MOVE_SPEED_M_PER_TICK 6.0f
 #define MK_DEFAULT_CIVILIAN_SPEED_M_PER_TICK 2.0f
+#define MK_DEFAULT_TRAFFIC_VEHICLE_SPEED_M_PER_TICK 8.0f
 #define MK_DEFAULT_SCORE_SUCCESS_THRESHOLD 450
 #define MK_DEFAULT_SCORE_PARTIAL_THRESHOLD 150
 #define MK_DEFAULT_SCORE_OBJECTIVE_WEIGHT 100
@@ -189,6 +192,17 @@ typedef enum {
     MK_CIVILIAN_INTENT_FREEZE = 5,
     MK_CIVILIAN_INTENT_ASSIST_GROUP = 6
 } mk_civilian_intent_t;
+
+typedef enum {
+    MK_TRAFFIC_VEHICLE_CAR = 0,
+    MK_TRAFFIC_VEHICLE_BUS = 1,
+    MK_TRAFFIC_VEHICLE_MOTORCYCLE = 2
+} mk_traffic_vehicle_kind_t;
+
+typedef enum {
+    MK_TRAFFIC_BOARD_INSIDE = 0,
+    MK_TRAFFIC_BOARD_ON = 1
+} mk_traffic_boarding_mode_t;
 
 typedef enum {
     MK_CONTACT_REPORT_FIRE = 0,
@@ -686,6 +700,44 @@ typedef struct {
 } mk_civilian_t;
 
 typedef struct {
+    uint32_t id;
+    char scenario_id[MK_NAME_CAPACITY];
+    char name[MK_NAME_CAPACITY];
+    char sprite_id[MK_NAME_CAPACITY];
+    char level_id[MK_NAME_CAPACITY];
+    char topology_node_id[MK_NAME_CAPACITY];
+    mk_traffic_vehicle_kind_t kind;
+    mk_traffic_boarding_mode_t boarding_mode;
+    mk_vec2_t position_m;
+    mk_vec2_t destination_m;
+    bool has_destination;
+    float speed_m_per_tick;
+    float facing_degrees;
+    int seat_capacity;
+    int occupied_seats;
+    bool active;
+    bool blocks_movement;
+    bool has_route;
+    size_t route_step_count;
+    size_t route_step_index;
+    int route_total_cost;
+    bool route_uses_vertical_transition;
+    mk_vec2_t route_waypoints_m[MK_MAX_GAMEPLAY_ROUTE_STEPS];
+    char route_step_level_ids[MK_MAX_GAMEPLAY_ROUTE_STEPS][MK_NAME_CAPACITY];
+    char route_step_portal_ids[MK_MAX_GAMEPLAY_ROUTE_STEPS][MK_NAME_CAPACITY];
+    bool route_step_vertical_transition[MK_MAX_GAMEPLAY_ROUTE_STEPS];
+    uint32_t route_request_id;
+    uint32_t route_stuck_ticks;
+    uint32_t route_failure_count;
+    uint32_t route_vertical_transitions_completed;
+    mk_vec2_t route_last_position_m;
+    char route_failure_reason[MK_KIND_CAPACITY];
+    char destination_level_id[MK_NAME_CAPACITY];
+    uint32_t embarked_unit_ids[MK_MAX_TRAFFIC_VEHICLE_OCCUPANTS];
+    size_t embarked_unit_count;
+} mk_traffic_vehicle_t;
+
+typedef struct {
     bool visible;
     float distance_m;
     int cover;
@@ -826,6 +878,8 @@ typedef struct {
     mk_objective_t objectives[MK_MAX_OBJECTIVES];
     size_t civilian_count;
     mk_civilian_t civilians[MK_MAX_CIVILIANS];
+    size_t traffic_vehicle_count;
+    mk_traffic_vehicle_t traffic_vehicles[MK_MAX_TRAFFIC_VEHICLES];
     size_t unit_count;
     mk_unit_t units[MK_MAX_UNITS];
 } mk_scenario_definition_t;
@@ -866,6 +920,8 @@ typedef struct {
     mk_objective_t objectives[MK_MAX_OBJECTIVES];
     size_t civilian_count;
     mk_civilian_t civilians[MK_MAX_CIVILIANS];
+    size_t traffic_vehicle_count;
+    mk_traffic_vehicle_t traffic_vehicles[MK_MAX_TRAFFIC_VEHICLES];
     size_t unit_count;
     mk_unit_t units[MK_MAX_UNITS];
     size_t contact_report_count;
@@ -908,6 +964,8 @@ typedef struct {
     mk_objective_t objectives[MK_MAX_OBJECTIVES];
     size_t civilian_count;
     mk_civilian_t civilians[MK_MAX_CIVILIANS];
+    size_t traffic_vehicle_count;
+    mk_traffic_vehicle_t traffic_vehicles[MK_MAX_TRAFFIC_VEHICLES];
     size_t unit_count;
     mk_unit_t units[MK_MAX_UNITS];
     size_t contact_report_count;
@@ -953,6 +1011,12 @@ mk_result_t mk_game_issue_move_order_to_level(
 );
 mk_result_t mk_game_issue_selected_move_order(mk_game_t *game, mk_vec2_t target_position_m);
 mk_result_t mk_game_issue_selected_investigate_order(mk_game_t *game, mk_vec2_t target_position_m);
+mk_result_t mk_game_issue_traffic_vehicle_move_order(
+    mk_game_t *game,
+    uint32_t vehicle_id,
+    const char *target_level_id,
+    mk_vec2_t target_position_m
+);
 mk_result_t mk_game_trace_line_of_sight(
     const mk_game_t *game,
     mk_vec2_t from_m,
@@ -1191,6 +1255,12 @@ mk_objective_t mk_make_objective(
     int value
 );
 mk_civilian_t mk_make_civilian(const char *name, uint32_t faction_id, mk_vec2_t position_m);
+mk_traffic_vehicle_t mk_make_traffic_vehicle(
+    const char *scenario_id,
+    const char *name,
+    mk_traffic_vehicle_kind_t kind,
+    mk_vec2_t position_m
+);
 
 mk_result_t mk_map_configure_tiles(
     mk_map_t *map,
@@ -1210,11 +1280,25 @@ mk_result_t mk_scenario_add_faction(mk_scenario_definition_t *scenario, const mk
 mk_result_t mk_scenario_add_force(mk_scenario_definition_t *scenario, const mk_force_t *force, uint32_t *out_force_id);
 mk_result_t mk_scenario_add_objective(mk_scenario_definition_t *scenario, const mk_objective_t *objective, uint32_t *out_objective_id);
 mk_result_t mk_scenario_add_civilian(mk_scenario_definition_t *scenario, const mk_civilian_t *civilian, uint32_t *out_civilian_id);
+mk_result_t mk_scenario_add_traffic_vehicle(
+    mk_scenario_definition_t *scenario,
+    const mk_traffic_vehicle_t *vehicle,
+    uint32_t *out_vehicle_id
+);
 mk_result_t mk_scenario_add_unit(mk_scenario_definition_t *scenario, const mk_unit_t *unit, uint32_t *out_unit_id);
 
 mk_result_t mk_game_add_unit(mk_game_t *game, const mk_unit_t *unit, uint32_t *out_unit_id);
 mk_unit_t *mk_game_find_unit(mk_game_t *game, uint32_t unit_id);
 const mk_unit_t *mk_game_find_unit_const(const mk_game_t *game, uint32_t unit_id);
+mk_result_t mk_game_add_traffic_vehicle(
+    mk_game_t *game,
+    const mk_traffic_vehicle_t *vehicle,
+    uint32_t *out_vehicle_id
+);
+mk_traffic_vehicle_t *mk_game_find_traffic_vehicle(mk_game_t *game, uint32_t vehicle_id);
+const mk_traffic_vehicle_t *mk_game_find_traffic_vehicle_const(const mk_game_t *game, uint32_t vehicle_id);
+mk_result_t mk_game_board_traffic_vehicle(mk_game_t *game, uint32_t vehicle_id, uint32_t unit_id);
+mk_result_t mk_game_unboard_traffic_vehicle(mk_game_t *game, uint32_t vehicle_id, uint32_t unit_id);
 
 mk_result_t mk_unit_add_soldier(mk_unit_t *unit, const mk_soldier_t *soldier, uint32_t *out_soldier_id);
 

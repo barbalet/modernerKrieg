@@ -231,13 +231,13 @@ static void test_sprite_manifest_loads_first_frames(void) {
     MK_TEST_ASSERT(mk_asset_load_sprite_manifest(path, MK_TEST_PROJECT_ROOT, &manifest) == MK_OK);
     MK_TEST_ASSERT(strcmp(manifest.id, "mosul_2003_sprites") == 0);
     MK_TEST_ASSERT(manifest.sheet_count == 4);
-    MK_TEST_ASSERT(manifest.frame_count == 5);
+    MK_TEST_ASSERT(manifest.frame_count == 8);
     MK_TEST_ASSERT(strcmp(manifest.runtime_render_manifest, "assets/mosul/runtime/sprites/rendered/render_manifest.json") == 0);
-    MK_TEST_ASSERT(manifest.runtime_rendered_count == 1064);
+    MK_TEST_ASSERT(manifest.runtime_rendered_count == 1088);
     MK_TEST_ASSERT(manifest.runtime_infantry_count == 640);
     MK_TEST_ASSERT(manifest.runtime_civilian_count == 168);
     MK_TEST_ASSERT(manifest.runtime_weapon_count == 64);
-    MK_TEST_ASSERT(manifest.runtime_vehicle_count == 192);
+    MK_TEST_ASSERT(manifest.runtime_vehicle_count == 216);
 
     sheet = mk_asset_find_sprite_sheet(&manifest, "us_allied_troops_128");
     MK_TEST_ASSERT(sheet != NULL);
@@ -254,6 +254,11 @@ static void test_sprite_manifest_loads_first_frames(void) {
     frame = mk_asset_find_sprite_frame(&manifest, "fallback_unit_marker");
     MK_TEST_ASSERT(frame != NULL);
     MK_TEST_ASSERT(strcmp(frame->state, "fallback") == 0);
+
+    frame = mk_asset_find_sprite_frame(&manifest, "traffic_city_bus_intact_north");
+    MK_TEST_ASSERT(frame != NULL);
+    MK_TEST_ASSERT(strcmp(frame->sheet, "vehicles_128") == 0);
+    MK_TEST_ASSERT(strcmp(frame->role, "traffic_bus") == 0);
 }
 
 static void test_sprite_render_manifest_loads_all_runtime_facings(void) {
@@ -270,13 +275,13 @@ static void test_sprite_render_manifest_loads_all_runtime_facings(void) {
     MK_TEST_ASSERT(mk_asset_load_sprite_render_manifest(render_path, MK_TEST_PROJECT_ROOT, &render_manifest) == MK_OK);
     MK_TEST_ASSERT(render_manifest.schema_version == 1);
     MK_TEST_ASSERT(strcmp(render_manifest.source_manifest, "assets/mosul/runtime/sprites/manifest.json") == 0);
-    MK_TEST_ASSERT(render_manifest.rendered_count == 1064);
+    MK_TEST_ASSERT(render_manifest.rendered_count == 1088);
     MK_TEST_ASSERT(render_manifest.missing_source_count == 0);
     MK_TEST_ASSERT(render_manifest.error_count == 0);
     MK_TEST_ASSERT(render_manifest.infantry_count == 640);
     MK_TEST_ASSERT(render_manifest.civilian_count == 168);
     MK_TEST_ASSERT(render_manifest.weapon_count == 64);
-    MK_TEST_ASSERT(render_manifest.vehicle_count == 192);
+    MK_TEST_ASSERT(render_manifest.vehicle_count == 216);
 
     entry = mk_asset_find_sprite_render_entry(
         &render_manifest,

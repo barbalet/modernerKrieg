@@ -21,7 +21,8 @@ typedef enum {
     MK_DEMO_PICK_TERRAIN = 5,
     MK_DEMO_PICK_TOPOLOGY_NODE = 6,
     MK_DEMO_PICK_TOPOLOGY_PORTAL = 7,
-    MK_DEMO_PICK_SEMANTIC_ZONE = 8
+    MK_DEMO_PICK_SEMANTIC_ZONE = 8,
+    MK_DEMO_PICK_TRAFFIC_VEHICLE = 9
 } mk_demo_pick_kind_t;
 
 typedef enum {
@@ -31,7 +32,8 @@ typedef enum {
     MK_DEMO_DRAW_SOLDIER = 3,
     MK_DEMO_DRAW_OBJECTIVE = 4,
     MK_DEMO_DRAW_CONTACT = 5,
-    MK_DEMO_DRAW_OVERLAY = 6
+    MK_DEMO_DRAW_OVERLAY = 6,
+    MK_DEMO_DRAW_TRAFFIC_VEHICLE = 7
 } mk_demo_draw_kind_t;
 
 typedef struct {
@@ -116,6 +118,7 @@ typedef struct {
     mk_vec2_t target_screen_position_px;
     float radius_m;
     float screen_radius_px;
+    float facing_degrees;
     int intensity;
     bool selected;
 } mk_demo_draw_command_t;

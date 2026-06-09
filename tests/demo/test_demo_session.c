@@ -64,6 +64,7 @@ static void test_session_draw_commands_and_picking(void) {
     const mk_demo_draw_command_t *level_command;
     const mk_demo_draw_command_t *civilian_command;
     const mk_demo_draw_command_t *objective_command;
+    const mk_demo_draw_command_t *traffic_command;
     mk_demo_pick_result_t pick;
     size_t command_count = 0;
 
@@ -81,11 +82,15 @@ static void test_session_draw_commands_and_picking(void) {
     level_command = find_draw_command(commands, command_count, MK_DEMO_DRAW_LEVEL);
     civilian_command = find_draw_command(commands, command_count, MK_DEMO_DRAW_CIVILIAN);
     objective_command = find_draw_command(commands, command_count, MK_DEMO_DRAW_OBJECTIVE);
+    traffic_command = find_draw_command(commands, command_count, MK_DEMO_DRAW_TRAFFIC_VEHICLE);
     MK_TEST_ASSERT(unit_command != NULL);
     MK_TEST_ASSERT(level_command != NULL);
     MK_TEST_ASSERT(civilian_command != NULL);
     MK_TEST_ASSERT(objective_command != NULL);
+    MK_TEST_ASSERT(traffic_command != NULL);
     MK_TEST_ASSERT(level_command->asset_path[0] != '\0');
+    MK_TEST_ASSERT(traffic_command->asset_path[0] != '\0');
+    MK_TEST_ASSERT(traffic_command->radius_m > 0.0f);
 
     MK_TEST_ASSERT(mk_demo_session_pick_screen(
         session,

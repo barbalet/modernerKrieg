@@ -153,6 +153,18 @@
           { "id": "armed_sedan", "display_name": "Armed sedan / irregular car" }
         ]
       }
+    },
+    "traffic_vehicles_1024": {
+      "kind": "vehicle",
+      "pixel_size": [1024, 1024],
+      "states": ["intact"],
+      "factions": {
+        "civilian": [
+          { "id": "traffic_civilian_car", "display_name": "Civilian traffic car" },
+          { "id": "traffic_city_bus", "display_name": "Civilian city bus" },
+          { "id": "traffic_motorcycle", "display_name": "Civilian motorcycle" }
+        ]
+      }
     }
   }
 }

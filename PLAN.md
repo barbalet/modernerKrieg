@@ -81,12 +81,12 @@ AI, urban combat, replay, and AI-vs-AI battles all depend on it.
 
 ### Sprite And Asset Availability
 
-The runtime sprite set contains 1,064 rendered PNGs:
+The runtime sprite set contains 1,088 rendered PNGs:
 
 - 640 infantry sprites: 16 combatant roles x 5 body states x 8 facings
 - 168 civilian sprites: 7 civilian archetypes x 3 body states x 8 facings
 - 64 weapon sprites: 8 weapon types x 8 facings
-- 192 vehicle sprites: 8 vehicle types x 3 damage states x 8 facings
+- 216 vehicle sprites: 8 combat/support vehicle types x 3 damage states x 8 facings, plus 3 intact dynamic traffic vehicle types x 8 facings
 
 The C asset layer validates map, sprite, marker, runtime render, and
 building-level manifests. Native frontends should consume validated asset and

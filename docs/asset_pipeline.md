@@ -107,12 +107,12 @@ The full imported render-pipeline manifests are loaded and validated by the C as
 - `assets/mosul/runtime/sprites/manifest.json`
 - `assets/mosul/runtime/sprites/rendered/render_manifest.json`
 
-The current runtime sprite set contains 1,064 PNGs, and tests assert that every render-manifest path exists:
+The current runtime sprite set contains 1,088 PNGs, and tests assert that every render-manifest path exists:
 
 - 640 infantry sprites: 16 demo roles x 5 states x 8 facings.
 - 168 civilian sprites: 7 civilian archetypes x 3 states x 8 facings.
 - 64 weapon sprites: 8 weapon types x 8 facings.
-- 192 vehicle sprites: 8 vehicle types x 3 damage states x 8 facings.
+- 216 vehicle sprites: 8 combat/support vehicle types x 3 damage states x 8 facings, plus 3 intact dynamic traffic vehicle types x 8 facings.
 
 ## Population Asset References
 
@@ -162,4 +162,6 @@ Current runtime product:
 
 - `assets/mosul/runtime/maps/market_commercial_streets_2003/overview.png`: copied from the source `preview_1400.png` as the first runtime map overview.
 - `assets/mosul/runtime/maps/market_commercial_streets_2003/levels/`: copied from the source 7,000 px ground, roof/second-floor, upper-floor, and roof-access line-art layers.
+
+Traffic vehicles are now represented as dynamic runtime sprites rather than scenario data baked into the map. The current approved 7,000 px Market / Commercial Streets map layers still contain visible static traffic vehicle ink and should be rerendered from approved line-art map source without baked cars, buses, or motorcycles once that source renderer is available. Do not patch those map layers with simplified icon art, stick art, or blur/fill cleanup.
 - `assets/mosul/runtime/sprites/rendered/`: copied from the MOSUL render pipeline as the first complete runtime-facing sprite set.

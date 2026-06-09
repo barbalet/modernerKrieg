@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "source_manifest": "assets/mosul/runtime/sprites/manifest.json",
-  "rendered_count": 1064,
+  "rendered_count": 1088,
   "missing_source_count": 0,
   "error_count": 0,
   "alpha_mode": "edge_connected_background",
@@ -8517,6 +8517,198 @@
       "item_id": "armed_sedan",
       "state": "destroyed",
       "faction": "opposing",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_civilian_car/intact/north.png",
+      "kind": "vehicle",
+      "item_id": "traffic_civilian_car",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_civilian_car/intact/south.png",
+      "kind": "vehicle",
+      "item_id": "traffic_civilian_car",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_civilian_car/intact/east.png",
+      "kind": "vehicle",
+      "item_id": "traffic_civilian_car",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_civilian_car/intact/west.png",
+      "kind": "vehicle",
+      "item_id": "traffic_civilian_car",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_civilian_car/intact/north_east.png",
+      "kind": "vehicle",
+      "item_id": "traffic_civilian_car",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_civilian_car/intact/north_west.png",
+      "kind": "vehicle",
+      "item_id": "traffic_civilian_car",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_civilian_car/intact/south_east.png",
+      "kind": "vehicle",
+      "item_id": "traffic_civilian_car",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_civilian_car/intact/south_west.png",
+      "kind": "vehicle",
+      "item_id": "traffic_civilian_car",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_city_bus/intact/north.png",
+      "kind": "vehicle",
+      "item_id": "traffic_city_bus",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_city_bus/intact/south.png",
+      "kind": "vehicle",
+      "item_id": "traffic_city_bus",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_city_bus/intact/east.png",
+      "kind": "vehicle",
+      "item_id": "traffic_city_bus",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_city_bus/intact/west.png",
+      "kind": "vehicle",
+      "item_id": "traffic_city_bus",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_city_bus/intact/north_east.png",
+      "kind": "vehicle",
+      "item_id": "traffic_city_bus",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_city_bus/intact/north_west.png",
+      "kind": "vehicle",
+      "item_id": "traffic_city_bus",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_city_bus/intact/south_east.png",
+      "kind": "vehicle",
+      "item_id": "traffic_city_bus",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_city_bus/intact/south_west.png",
+      "kind": "vehicle",
+      "item_id": "traffic_city_bus",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "south_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_motorcycle/intact/north.png",
+      "kind": "vehicle",
+      "item_id": "traffic_motorcycle",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "north"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_motorcycle/intact/south.png",
+      "kind": "vehicle",
+      "item_id": "traffic_motorcycle",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "south"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_motorcycle/intact/east.png",
+      "kind": "vehicle",
+      "item_id": "traffic_motorcycle",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_motorcycle/intact/west.png",
+      "kind": "vehicle",
+      "item_id": "traffic_motorcycle",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_motorcycle/intact/north_east.png",
+      "kind": "vehicle",
+      "item_id": "traffic_motorcycle",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "north_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_motorcycle/intact/north_west.png",
+      "kind": "vehicle",
+      "item_id": "traffic_motorcycle",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "north_west"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_motorcycle/intact/south_east.png",
+      "kind": "vehicle",
+      "item_id": "traffic_motorcycle",
+      "state": "intact",
+      "faction": "civilian",
+      "angle": "south_east"
+    },
+    {
+      "path": "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/traffic_motorcycle/intact/south_west.png",
+      "kind": "vehicle",
+      "item_id": "traffic_motorcycle",
+      "state": "intact",
+      "faction": "civilian",
       "angle": "south_west"
     }
   ],

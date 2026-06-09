@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MK_MOSUL_SCENARIO_MAX_ENTRIES 1024
+#define MK_MOSUL_SCENARIO_MAX_ENTRIES 1536
 #define MK_MOSUL_SCENARIO_MAX_WEAPONS 32
 #define MK_MOSUL_SCENARIO_PATH_CAPACITY 512
 
@@ -802,6 +802,65 @@ static bool mk_mosul_optional_civilian_intent(
     return false;
 }
 
+static bool mk_mosul_required_traffic_vehicle_kind(
+    const mk_mosul_scenario_entry_list_t *entries,
+    const char *key,
+    mk_traffic_vehicle_kind_t *out_kind
+) {
+    const char *value = mk_mosul_entry_value(entries, key);
+
+    if (value == NULL || out_kind == NULL) {
+        return false;
+    }
+
+    if (strcmp(value, "car") == 0) {
+        *out_kind = MK_TRAFFIC_VEHICLE_CAR;
+        return true;
+    }
+
+    if (strcmp(value, "bus") == 0) {
+        *out_kind = MK_TRAFFIC_VEHICLE_BUS;
+        return true;
+    }
+
+    if (strcmp(value, "motorcycle") == 0) {
+        *out_kind = MK_TRAFFIC_VEHICLE_MOTORCYCLE;
+        return true;
+    }
+
+    return false;
+}
+
+static bool mk_mosul_optional_traffic_boarding_mode(
+    const mk_mosul_scenario_entry_list_t *entries,
+    const char *key,
+    mk_traffic_boarding_mode_t default_mode,
+    mk_traffic_boarding_mode_t *out_mode
+) {
+    const char *value = mk_mosul_entry_value(entries, key);
+
+    if (out_mode == NULL) {
+        return false;
+    }
+
+    if (value == NULL) {
+        *out_mode = default_mode;
+        return true;
+    }
+
+    if (strcmp(value, "inside") == 0) {
+        *out_mode = MK_TRAFFIC_BOARD_INSIDE;
+        return true;
+    }
+
+    if (strcmp(value, "on") == 0) {
+        *out_mode = MK_TRAFFIC_BOARD_ON;
+        return true;
+    }
+
+    return false;
+}
+
 static bool mk_mosul_asset_path_is_safe(const char *path) {
     if (path == NULL || path[0] == '\0') {
         return false;
@@ -1053,6 +1112,8 @@ static mk_result_t mk_mosul_validate_population_asset_references(
 ) {
     size_t archetype_count = 0;
     size_t archetype_index;
+    size_t traffic_vehicle_count = 0;
+    size_t traffic_vehicle_index;
 
     if (!mk_mosul_optional_count(
             entries,
@@ -1068,6 +1129,21 @@ static mk_result_t mk_mosul_validate_population_asset_references(
         char sprite_id[MK_NAME_CAPACITY];
 
         mk_mosul_make_indexed_key(key, sizeof(key), "civilian_archetype", archetype_index, "sprite_id");
+        if (!mk_mosul_required_text(entries, key, sprite_id, sizeof(sprite_id))
+            || mk_asset_find_sprite_frame(sprite_manifest, sprite_id) == NULL) {
+            return MK_ERROR_INVALID_DATA;
+        }
+    }
+
+    if (!mk_mosul_optional_count(entries, "traffic_vehicle.count", MK_MAX_TRAFFIC_VEHICLES, &traffic_vehicle_count)) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    for (traffic_vehicle_index = 0; traffic_vehicle_index < traffic_vehicle_count; ++traffic_vehicle_index) {
+        char key[128];
+        char sprite_id[MK_NAME_CAPACITY];
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "traffic_vehicle", traffic_vehicle_index, "sprite_id");
         if (!mk_mosul_required_text(entries, key, sprite_id, sizeof(sprite_id))
             || mk_asset_find_sprite_frame(sprite_manifest, sprite_id) == NULL) {
             return MK_ERROR_INVALID_DATA;
@@ -2182,6 +2258,149 @@ static mk_result_t mk_mosul_load_civilians(
     return MK_OK;
 }
 
+static mk_result_t mk_mosul_load_traffic_vehicles(
+    const mk_mosul_scenario_entry_list_t *entries,
+    mk_scenario_definition_t *scenario
+) {
+    size_t traffic_vehicle_count = 0;
+    size_t traffic_vehicle_index;
+
+    if (!mk_mosul_optional_count(entries, "traffic_vehicle.count", MK_MAX_TRAFFIC_VEHICLES, &traffic_vehicle_count)) {
+        return MK_ERROR_INVALID_DATA;
+    }
+
+    for (traffic_vehicle_index = 0; traffic_vehicle_index < traffic_vehicle_count; ++traffic_vehicle_index) {
+        char key[128];
+        char scenario_id[MK_NAME_CAPACITY];
+        char name[MK_NAME_CAPACITY];
+        char sprite_id[MK_NAME_CAPACITY];
+        char level_id[MK_NAME_CAPACITY];
+        char topology_node_id[MK_NAME_CAPACITY];
+        char destination_level_id[MK_NAME_CAPACITY];
+        mk_traffic_vehicle_kind_t kind;
+        mk_traffic_boarding_mode_t boarding_mode;
+        mk_vec2_t position;
+        mk_vec2_t destination;
+        float speed_m_per_tick = MK_DEFAULT_TRAFFIC_VEHICLE_SPEED_M_PER_TICK;
+        float facing_degrees = 0.0f;
+        int seat_capacity = 0;
+        int occupied_seats = 0;
+        bool has_destination = false;
+        bool active = true;
+        bool blocks_movement = true;
+        mk_traffic_vehicle_t vehicle;
+        mk_result_t result;
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "traffic_vehicle", traffic_vehicle_index, "id");
+        if (!mk_mosul_required_text(entries, key, scenario_id, sizeof(scenario_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "traffic_vehicle", traffic_vehicle_index, "name");
+        if (!mk_mosul_required_text(entries, key, name, sizeof(name))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "traffic_vehicle", traffic_vehicle_index, "kind");
+        if (!mk_mosul_required_traffic_vehicle_kind(entries, key, &kind)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "traffic_vehicle", traffic_vehicle_index, "position");
+        if (!mk_mosul_required_vec2(entries, key, &position)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        vehicle = mk_make_traffic_vehicle(scenario_id, name, kind, position);
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "traffic_vehicle", traffic_vehicle_index, "sprite_id");
+        if (!mk_mosul_required_text(entries, key, sprite_id, sizeof(sprite_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "traffic_vehicle", traffic_vehicle_index, "level_id");
+        if (!mk_mosul_optional_text(entries, key, "", level_id, sizeof(level_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "traffic_vehicle", traffic_vehicle_index, "topology_node_id");
+        if (!mk_mosul_optional_text(entries, key, "", topology_node_id, sizeof(topology_node_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "traffic_vehicle", traffic_vehicle_index, "destination");
+        if (!mk_mosul_optional_vec2(entries, key, &destination, &has_destination)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "traffic_vehicle", traffic_vehicle_index, "destination_level_id");
+        if (!mk_mosul_optional_text(entries, key, level_id, destination_level_id, sizeof(destination_level_id))) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "traffic_vehicle", traffic_vehicle_index, "speed_m_per_tick");
+        if (!mk_mosul_optional_float(entries, key, vehicle.speed_m_per_tick, &speed_m_per_tick)
+            || speed_m_per_tick < 0.0f) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "traffic_vehicle", traffic_vehicle_index, "facing_degrees");
+        if (!mk_mosul_optional_float(entries, key, vehicle.facing_degrees, &facing_degrees)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "traffic_vehicle", traffic_vehicle_index, "seat_capacity");
+        if (!mk_mosul_optional_int(entries, key, vehicle.seat_capacity, &seat_capacity)
+            || seat_capacity < 0
+            || seat_capacity > MK_MAX_TRAFFIC_VEHICLE_OCCUPANTS) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "traffic_vehicle", traffic_vehicle_index, "occupied_seats");
+        if (!mk_mosul_optional_int(entries, key, 0, &occupied_seats)
+            || occupied_seats < 0
+            || occupied_seats > seat_capacity) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "traffic_vehicle", traffic_vehicle_index, "boarding_mode");
+        if (!mk_mosul_optional_traffic_boarding_mode(entries, key, vehicle.boarding_mode, &boarding_mode)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "traffic_vehicle", traffic_vehicle_index, "active");
+        if (!mk_mosul_optional_bool(entries, key, true, &active)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_make_indexed_key(key, sizeof(key), "traffic_vehicle", traffic_vehicle_index, "blocks_movement");
+        if (!mk_mosul_optional_bool(entries, key, true, &blocks_movement)) {
+            return MK_ERROR_INVALID_DATA;
+        }
+
+        mk_mosul_copy_text(vehicle.sprite_id, sizeof(vehicle.sprite_id), sprite_id);
+        mk_mosul_copy_text(vehicle.level_id, sizeof(vehicle.level_id), level_id);
+        mk_mosul_copy_text(vehicle.topology_node_id, sizeof(vehicle.topology_node_id), topology_node_id);
+        mk_mosul_copy_text(vehicle.destination_level_id, sizeof(vehicle.destination_level_id), destination_level_id);
+        vehicle.destination_m = has_destination ? destination : position;
+        vehicle.has_destination = has_destination;
+        vehicle.speed_m_per_tick = speed_m_per_tick;
+        vehicle.facing_degrees = facing_degrees;
+        vehicle.seat_capacity = seat_capacity;
+        vehicle.occupied_seats = occupied_seats;
+        vehicle.boarding_mode = boarding_mode;
+        vehicle.active = active;
+        vehicle.blocks_movement = blocks_movement;
+
+        result = mk_scenario_add_traffic_vehicle(scenario, &vehicle, NULL);
+        if (result != MK_OK) {
+            return result;
+        }
+    }
+
+    return MK_OK;
+}
+
 static mk_result_t mk_mosul_load_units(
     const mk_mosul_scenario_entry_list_t *entries,
     mk_scenario_definition_t *scenario,
@@ -2516,6 +2735,11 @@ mk_result_t mk_mosul_load_scenario_file(
     }
 
     result = mk_mosul_load_civilians(&entries, scenario, faction_ids, faction_count);
+    if (result != MK_OK) {
+        goto cleanup;
+    }
+
+    result = mk_mosul_load_traffic_vehicles(&entries, scenario);
     if (result != MK_OK) {
         goto cleanup;
     }

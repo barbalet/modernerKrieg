@@ -30,6 +30,19 @@ typedef struct {
     bool selected_unit;
 } mk_soldier_marker_t;
 
+typedef struct {
+    uint32_t vehicle_id;
+    mk_traffic_vehicle_kind_t kind;
+    mk_traffic_boarding_mode_t boarding_mode;
+    char sprite_id[MK_NAME_CAPACITY];
+    mk_vec2_t position_m;
+    mk_vec2_t screen_position_px;
+    float facing_degrees;
+    int seat_capacity;
+    int occupied_seats;
+    bool active;
+} mk_traffic_vehicle_marker_t;
+
 typedef enum {
     MK_TACTICAL_OVERLAY_SELECTION = 0,
     MK_TACTICAL_OVERLAY_MOVE_ROUTE = 1,
@@ -98,6 +111,14 @@ mk_result_t mk_board_view_collect_soldier_markers(
     const mk_board_view_t *view,
     const mk_game_snapshot_t *snapshot,
     mk_soldier_marker_t *out_markers,
+    size_t marker_capacity,
+    size_t *out_marker_count
+);
+
+mk_result_t mk_board_view_collect_traffic_vehicle_markers(
+    const mk_board_view_t *view,
+    const mk_game_snapshot_t *snapshot,
+    mk_traffic_vehicle_marker_t *out_markers,
     size_t marker_capacity,
     size_t *out_marker_count
 );

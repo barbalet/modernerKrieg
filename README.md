@@ -177,8 +177,8 @@ The public MOSUL demo target is the 2003 Market / Commercial Streets scenario: a
 - four 7,000 px runtime building-level PNGs for ground, roofs/second floors, upper floors, and roof access
 - a JSON building-level manifest for walls, doors, windows, breach holes, stairs, roof edges, and storey regions
 - 128 px top-down combatant, stance, vehicle, and weapon sheets
-- complete source-angle infantry, civilian, weapon, and vehicle sprites
-- 1,064 rendered runtime-facing PNGs under `assets/mosul/runtime/sprites/rendered`
+- complete source-angle infantry, civilian, weapon, combat/support vehicle, and dynamic traffic vehicle sprites
+- 1,088 rendered runtime-facing PNGs under `assets/mosul/runtime/sprites/rendered`
 - JSON sprite pipeline manifests under `assets/mosul/runtime/sprites/`, validated by the C asset loader
 - reference plates for combatants, weapons, vehicles, and urban tactics
 

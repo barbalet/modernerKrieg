@@ -897,6 +897,7 @@ static void test_scenario_loading_populates_core_state(void) {
     assert(game.civilian_archetype_count == 4);
     assert(game.civilian_group_count == 4);
     assert(game.civilian_count == 7);
+    assert(game.traffic_vehicle_count == 6);
     assert(game.unit_count == 6);
     assert(game.controllers[0].kind == MK_CONTROLLER_TACTICAL_AI);
     assert(game.controllers[2].kind == MK_CONTROLLER_OBSERVER);
@@ -912,6 +913,11 @@ static void test_scenario_loading_populates_core_state(void) {
     assert_close(game.civilians[0].speed_m_per_tick, MK_DEFAULT_CIVILIAN_SPEED_M_PER_TICK);
     assert(strcmp(game.civilians[6].archetype_id, "wounded_bystander") == 0);
     assert(game.civilians[6].risk == 1);
+    assert(strcmp(game.traffic_vehicles[0].scenario_id, "north_market_bus") == 0);
+    assert(game.traffic_vehicles[0].seat_capacity == 24);
+    assert(game.traffic_vehicles[0].boarding_mode == MK_TRAFFIC_BOARD_INSIDE);
+    assert(strcmp(game.traffic_vehicles[4].scenario_id, "souq_motorcycle") == 0);
+    assert(game.traffic_vehicles[4].boarding_mode == MK_TRAFFIC_BOARD_ON);
     assert(game.units[0].faction_id == 1);
     assert(game.units[0].force_id == 1);
     assert(game.units[0].controller_id == 1);
@@ -956,6 +962,7 @@ static void test_snapshot_is_stable_copy(void) {
     assert(snapshot.civilian_archetype_count == 4);
     assert(snapshot.civilian_group_count == 4);
     assert(snapshot.civilian_count == 7);
+    assert(snapshot.traffic_vehicle_count == 6);
     assert(snapshot.map.tile_count == 100);
     assert(snapshot.controllers[1].side == MK_SIDE_OPFOR);
     assert(snapshot.forces[1].faction_id == 2);
@@ -1576,6 +1583,47 @@ static void test_after_action_report_is_stable(void) {
     assert(strstr(report.summary, "ticks=5") != NULL);
 }
 
+static void test_traffic_vehicle_boarding_moves_units(void) {
+    mk_scenario_definition_t scenario = make_east_mosul_block_scenario_fixture();
+    mk_game_t game;
+    mk_traffic_vehicle_t *bus;
+    mk_traffic_vehicle_t *motorcycle;
+    mk_unit_t *unit;
+    mk_vec2_t bus_start;
+
+    assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
+    assert(game.traffic_vehicle_count == 6);
+
+    bus = mk_game_find_traffic_vehicle(&game, 1);
+    motorcycle = mk_game_find_traffic_vehicle(&game, 5);
+    unit = mk_game_find_unit(&game, 1);
+    assert(bus != NULL);
+    assert(motorcycle != NULL);
+    assert(unit != NULL);
+    assert(bus->boarding_mode == MK_TRAFFIC_BOARD_INSIDE);
+    assert(motorcycle->boarding_mode == MK_TRAFFIC_BOARD_ON);
+
+    bus_start = bus->position_m;
+    assert(mk_game_board_traffic_vehicle(&game, bus->id, unit->id) == MK_OK);
+    assert(bus->embarked_unit_count == 1);
+    assert(bus->occupied_seats == 1);
+    assert_close(unit->position_m.x, bus->position_m.x);
+    assert_close(unit->position_m.y, bus->position_m.y);
+
+    mk_game_step(&game);
+    assert(mk_vec2_distance(bus->position_m, bus_start) > 0.0f);
+    assert_close(unit->position_m.x, bus->position_m.x);
+    assert_close(unit->position_m.y, bus->position_m.y);
+
+    assert(mk_game_unboard_traffic_vehicle(&game, bus->id, unit->id) == MK_OK);
+    assert(bus->embarked_unit_count == 0);
+    assert(bus->occupied_seats == 0);
+
+    assert(mk_game_board_traffic_vehicle(&game, motorcycle->id, unit->id) == MK_OK);
+    assert(motorcycle->embarked_unit_count == 1);
+    assert(motorcycle->occupied_seats == 1);
+}
+
 static void test_invalid_scenario_is_rejected(void) {
     mk_scenario_definition_t valid_scenario = make_east_mosul_block_scenario_fixture();
     mk_scenario_definition_t scenario;
@@ -1649,6 +1697,7 @@ int main(void) {
     test_objective_control_and_scoring();
     test_score_uses_scenario_weights();
     test_after_action_report_is_stable();
+    test_traffic_vehicle_boarding_moves_units();
     test_invalid_scenario_is_rejected();
 
     puts("mk_core_tests: ok");
