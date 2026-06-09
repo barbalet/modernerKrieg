@@ -168,7 +168,8 @@ Traffic vehicles are now represented as dynamic runtime sprites rather than scen
 
 ## Dynamic Vehicle And Map Cleanup Cycles
 
-Current active cycle: cycle 1, submodule hygiene. Last updated: 2026-06-09.
+Current active cycle: cycle 2, asset audit. Last completed cycle: cycle 1,
+submodule hygiene. Last updated: 2026-06-09.
 
 When work advances, update this tracker in the same commit as the relevant
 code, art, or asset changes. Keep exactly one cycle marked `active` until the
@@ -181,8 +182,8 @@ cycle should leave the repository in a testable state.
 
 | Cycle | Status | Name | Exit Criteria |
 | --- | --- | --- | --- |
-| 1 | active | Submodule hygiene | `mosul` and `modernerKrieg` are fast-forwarded to the tips of `main`, and the nested gitlink updates are committed upward so every repository records the same baseline. |
-| 2 | pending | Asset audit | Every baked car, bus, motorcycle, and vehicle-like mark in the Market / Commercial Streets map layers is identified and classified as removable background traffic, dynamic traffic, abandoned cover, or destroyed terrain. |
+| 1 | completed | Submodule hygiene | `mosul` and `modernerKrieg` are fast-forwarded to the tips of `main`, and the nested gitlink updates are committed upward so every repository records the same baseline. |
+| 2 | active | Asset audit | Every baked car, bus, motorcycle, and vehicle-like mark in the Market / Commercial Streets map layers is identified and classified as removable background traffic, dynamic traffic, abandoned cover, or destroyed terrain. |
 | 3 | pending | Vehicle-free map rerender | The approved 7,000 px line-art map overview and level PNGs are regenerated without baked traffic vehicles, with no Pillow cleanup, blur/fill inpainting, stick art, or simplified replacement marks. |
 | 4 | pending | Dynamic vehicle asset validation | Cars, buses, and motorcycles exist as generated `1024 x 1024` RGBA runtime sprites with alpha edges, matching the established line-art style and render manifest IDs. |
 | 5 | pending | Scenario and data integration | `traffic_vehicle.*` records define positions, destinations, speed, facing, seat capacity, boarding mode, active state, and movement blocking. |
