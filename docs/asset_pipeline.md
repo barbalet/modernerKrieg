@@ -168,33 +168,24 @@ Traffic vehicles are now represented as dynamic runtime sprites rather than scen
 
 ## Dynamic Vehicle And Map Cleanup Cycles
 
+Current active cycle: cycle 1, submodule hygiene. Last updated: 2026-06-09.
+
+When work advances, update this tracker in the same commit as the relevant
+code, art, or asset changes. Keep exactly one cycle marked `active` until the
+dynamic vehicle work is complete.
+
 The baked-vehicle cleanup and moving-vehicle integration should remain split
 into reviewable cycles. This work crosses source art, generated runtime assets,
 scenario records, C core simulation, renderer integration, and QA, so each
 cycle should leave the repository in a testable state.
 
-1. Submodule hygiene: fast-forward `mosul` and `modernerKrieg` to the tips of
-   `main`, then commit the nested gitlink updates upward so every repository
-   records the same baseline.
-2. Asset audit: identify every baked car, bus, motorcycle, and vehicle-like
-   mark in the Market / Commercial Streets map layers, then classify each as
-   removable background traffic, dynamic traffic, abandoned cover, or destroyed
-   terrain.
-3. Vehicle-free map rerender: regenerate the approved 7,000 px line-art map
-   overview and level PNGs without baked traffic vehicles. Do not use Pillow
-   cleanup, blur/fill inpainting, stick art, or simplified replacement marks.
-4. Dynamic vehicle asset validation: keep cars, buses, and motorcycles as
-   generated `1024 x 1024` RGBA runtime sprites with alpha edges, matching the
-   established line-art style and render manifest IDs.
-5. Scenario and data integration: add or revise `traffic_vehicle.*` records for
-   positions, destinations, speed, facing, seat capacity, boarding mode, active
-   state, and movement blocking.
-6. Runtime behavior: verify path following, routing failures, occupant position
-   updates, entering/exiting cars and buses, mounting/dismounting motorcycles,
-   collision, blocking, save/snapshot, replay, and deterministic AI behavior.
-7. Renderer and interaction pass: draw traffic vehicles only from runtime RGBA
-   sprites, expose picking/selection and boarding controls, and keep source
-   angle art out of the live renderer path.
-8. Verification and polish: run CTests, asset manifest validation, alpha-edge
-   validation, visual map before/after checks, and an in-game smoke pass showing
-   a vehicle-free base map with moving dynamic vehicles.
+| Cycle | Status | Name | Exit Criteria |
+| --- | --- | --- | --- |
+| 1 | active | Submodule hygiene | `mosul` and `modernerKrieg` are fast-forwarded to the tips of `main`, and the nested gitlink updates are committed upward so every repository records the same baseline. |
+| 2 | pending | Asset audit | Every baked car, bus, motorcycle, and vehicle-like mark in the Market / Commercial Streets map layers is identified and classified as removable background traffic, dynamic traffic, abandoned cover, or destroyed terrain. |
+| 3 | pending | Vehicle-free map rerender | The approved 7,000 px line-art map overview and level PNGs are regenerated without baked traffic vehicles, with no Pillow cleanup, blur/fill inpainting, stick art, or simplified replacement marks. |
+| 4 | pending | Dynamic vehicle asset validation | Cars, buses, and motorcycles exist as generated `1024 x 1024` RGBA runtime sprites with alpha edges, matching the established line-art style and render manifest IDs. |
+| 5 | pending | Scenario and data integration | `traffic_vehicle.*` records define positions, destinations, speed, facing, seat capacity, boarding mode, active state, and movement blocking. |
+| 6 | pending | Runtime behavior | Path following, routing failures, occupant position updates, entering/exiting cars and buses, mounting/dismounting motorcycles, collision, blocking, save/snapshot, replay, and deterministic AI behavior are verified. |
+| 7 | pending | Renderer and interaction pass | Traffic vehicles draw only from runtime RGBA sprites, expose picking/selection and boarding controls, and keep source angle art out of the live renderer path. |
+| 8 | pending | Verification and polish | CTests, asset manifest validation, alpha-edge validation, visual map before/after checks, and an in-game smoke pass show a vehicle-free base map with moving dynamic vehicles. |
