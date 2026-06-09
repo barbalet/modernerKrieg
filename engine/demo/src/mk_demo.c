@@ -42,6 +42,40 @@ static void mk_demo_copy_text(char *destination, size_t capacity, const char *so
     destination[index] = '\0';
 }
 
+static bool mk_demo_copy_traffic_vehicle_runtime_path(
+    char *destination,
+    size_t capacity,
+    const char *sprite_id
+) {
+    const char *item_id = NULL;
+    int written;
+
+    if (destination == NULL || capacity == 0 || sprite_id == NULL) {
+        return false;
+    }
+
+    if (strcmp(sprite_id, "traffic_civilian_car_intact_north") == 0) {
+        item_id = "traffic_civilian_car";
+    } else if (strcmp(sprite_id, "traffic_city_bus_intact_north") == 0) {
+        item_id = "traffic_city_bus";
+    } else if (strcmp(sprite_id, "traffic_motorcycle_intact_north") == 0) {
+        item_id = "traffic_motorcycle";
+    }
+
+    if (item_id == NULL) {
+        mk_demo_copy_text(destination, capacity, sprite_id);
+        return false;
+    }
+
+    written = snprintf(
+        destination,
+        capacity,
+        "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/%s/intact/north.png",
+        item_id
+    );
+    return written > 0 && (size_t)written < capacity;
+}
+
 static bool mk_demo_text_is_present(const char *text) {
     return text != NULL && text[0] != '\0';
 }
@@ -942,7 +976,11 @@ mk_result_t mk_demo_session_collect_draw_commands(
             vehicle->position_m
         );
 
-        mk_demo_copy_text(command.asset_path, sizeof(command.asset_path), vehicle->sprite_id);
+        (void)mk_demo_copy_traffic_vehicle_runtime_path(
+            command.asset_path,
+            sizeof(command.asset_path),
+            vehicle->sprite_id
+        );
         command.side = MK_SIDE_CIVILIAN;
         command.screen_position_px = vehicle->screen_position_px;
         command.target_position_m = vehicle->position_m;

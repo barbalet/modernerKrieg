@@ -90,6 +90,7 @@ static void test_session_draw_commands_and_picking(void) {
     MK_TEST_ASSERT(traffic_command != NULL);
     MK_TEST_ASSERT(level_command->asset_path[0] != '\0');
     MK_TEST_ASSERT(traffic_command->asset_path[0] != '\0');
+    MK_TEST_ASSERT(strstr(traffic_command->asset_path, "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/") != NULL);
     MK_TEST_ASSERT(traffic_command->radius_m > 0.0f);
 
     MK_TEST_ASSERT(mk_demo_session_pick_screen(
