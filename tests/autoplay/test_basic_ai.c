@@ -136,7 +136,7 @@ static void test_basic_ai_run_is_deterministic(void) {
     MK_TEST_ASSERT(first.units[2].order == MK_ORDER_HOLD);
 }
 
-static void test_basic_ai_advances_expected_positions(void) {
+static void test_basic_ai_advances_expected_positions_and_respects_traffic(void) {
     mk_game_t game = make_loaded_game();
 
     MK_TEST_ASSERT(mk_ai_issue_basic_orders(&game) == MK_OK);
@@ -144,8 +144,12 @@ static void test_basic_ai_advances_expected_positions(void) {
 
     MK_TEST_ASSERT_CLOSE(game.units[0].position_m.x, 86.00f);
     MK_TEST_ASSERT_CLOSE(game.units[0].position_m.y, 245.81f);
-    MK_TEST_ASSERT_CLOSE(game.units[1].position_m.x, 344.43f);
-    MK_TEST_ASSERT_CLOSE(game.units[1].position_m.y, 232.23f);
+    MK_TEST_ASSERT_CLOSE(game.units[1].position_m.x, 350.00f);
+    MK_TEST_ASSERT_CLOSE(game.units[1].position_m.y, 230.00f);
+    MK_TEST_ASSERT(game.units[1].order == MK_ORDER_HOLD);
+    MK_TEST_ASSERT(!game.units[1].has_move_target);
+    MK_TEST_ASSERT(game.units[1].route_failure_count == 1U);
+    MK_TEST_ASSERT(strcmp(game.units[1].route_failure_reason, "traffic_blocked") == 0);
     MK_TEST_ASSERT_CLOSE(game.units[2].position_m.x, 252.0f);
     MK_TEST_ASSERT_CLOSE(game.units[2].position_m.y, 206.0f);
 }
@@ -417,7 +421,7 @@ static void test_basic_ai_transcript_is_deterministic(void) {
 int main(void) {
     test_basic_ai_emits_orders_for_both_sides();
     test_basic_ai_run_is_deterministic();
-    test_basic_ai_advances_expected_positions();
+    test_basic_ai_advances_expected_positions_and_respects_traffic();
     test_basic_ai_suppresses_at_close_range();
     test_basic_ai_player_holds_near_civilian();
     test_basic_ai_player_holds_risky_fire_lane();
