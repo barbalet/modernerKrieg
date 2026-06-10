@@ -169,9 +169,10 @@ Traffic vehicles are now represented as dynamic runtime sprites rather than scen
 ## Dynamic Vehicle And Map Cleanup Cycles
 
 Current active cycle: cycle 8, verification and polish. Last completed cycle:
-cycle 7, renderer and interaction pass. Blocked cycle: cycle 3,
-vehicle-free map rerender, blocked on an exact 7,000 px geometry-preserving map
-renderer. Last updated: 2026-06-10.
+cycle 7, renderer and interaction pass. Blocked cycles: cycle 3,
+vehicle-free map rerender, and the final visual-map signoff portion of cycle 8,
+both blocked on an exact 7,000 px geometry-preserving map renderer. Last
+updated: 2026-06-10.
 
 When work advances, update this tracker in the same commit as the relevant
 code, art, or asset changes. Keep exactly one cycle marked `active` until the
@@ -218,6 +219,16 @@ Cycle 7 renderer and interaction artifacts:
 - `engine/demo/src/mk_demo.c`
 - `tests/demo/test_demo_session.c`
 
+Cycle 8 verification artifacts:
+
+- `docs/traffic_vehicle_cycle8_verification.md`
+- `docs/build_matrix.md`
+- `docs/traffic_vehicle_sprite_validation.md`
+- `scripts/check_traffic_vehicle_runtime_smoke.py`
+- `CMakeLists.txt`
+- `scripts/validate_traffic_vehicle_sprites.py`
+- `tests/autoplay/test_basic_ai.c`
+
 | Cycle | Status | Name | Exit Criteria |
 | --- | --- | --- | --- |
 | 1 | completed | Submodule hygiene | `mosul` and `modernerKrieg` are fast-forwarded to the tips of `main`, and the nested gitlink updates are committed upward so every repository records the same baseline. |
@@ -227,4 +238,4 @@ Cycle 7 renderer and interaction artifacts:
 | 5 | completed | Scenario and data integration | `traffic_vehicle.*` records define positions, destinations, speed, facing, seat capacity, boarding mode, active state, and movement blocking. |
 | 6 | completed | Runtime behavior | Path following, routing failures, occupant position updates, entering/exiting cars and buses, mounting/dismounting motorcycles, collision, blocking, save/snapshot, replay, and deterministic AI behavior are verified. |
 | 7 | completed | Renderer and interaction pass | Traffic vehicles draw only from runtime RGBA sprites, expose picking/selection and boarding controls, and keep source angle art out of the live renderer path. |
-| 8 | active | Verification and polish | CTests, asset manifest validation, alpha-edge validation, visual map before/after checks, and an in-game smoke pass show a vehicle-free base map with moving dynamic vehicles. |
+| 8 | active, software checks automated | Verification and polish | CTests, asset manifest validation, alpha-edge validation, and an in-game smoke pass prove dynamic vehicles move as runtime entities. Final vehicle-free base-map visual signoff remains blocked by cycle 3. |

@@ -1,6 +1,7 @@
 # Traffic Vehicle Sprite Validation
 
-Last updated: 2026-06-09. This document closes dynamic vehicle cleanup cycle 4.
+Last updated: 2026-06-10. This document closes dynamic vehicle cleanup cycle 4
+and is now wired into cycle 8 CTest verification.
 
 ## Scope
 
@@ -39,6 +40,12 @@ python3 scripts/validate_traffic_vehicle_sprites.py
 
 The script reads PNG chunks directly with the Python standard library. It does
 not use Pillow and does not perform any rendering or asset mutation.
+
+When CMake finds a Python 3 interpreter, the same check is also available as:
+
+```bash
+ctest --test-dir build --output-on-failure -R mk_traffic_vehicle_sprite_validation
+```
 
 ## Checks
 

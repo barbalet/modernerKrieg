@@ -32,6 +32,16 @@ the native-wrapper C contract, draw/pick helpers, AI-only stepping, audit
 exports, debug text, after-action export, and performance counters without
 launching a platform frontend.
 
+The suites also include the dynamic traffic vehicle verification checks when a
+Python 3 interpreter is available:
+
+- `mk_traffic_vehicle_sprite_validation` checks the rendered car, bus, and
+  motorcycle PNGs for manifest coverage, RGBA format, `1024 x 1024` dimensions,
+  visible vehicle pixels, and transparent outer borders.
+- `mk_traffic_vehicle_runtime_smoke` runs a headless Mosul replay and verifies
+  that six traffic vehicles are recorded as active, blocking, seat-aware runtime
+  entities, with at least three moving during the smoke pass.
+
 Run repeated AI-vs-AI battles from CMake:
 
 ```sh

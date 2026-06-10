@@ -151,6 +151,7 @@ mk_apply_warnings(mk_replay_validate)
 
 if(MK_BUILD_TESTS)
   enable_testing()
+  find_package(Python3 COMPONENTS Interpreter QUIET)
 
   add_executable(mk_core_tests
     tests/core/test_core.c
@@ -267,6 +268,30 @@ if(MK_BUILD_TESTS)
       -DMK_REPLAY_PATH=${CMAKE_CURRENT_BINARY_DIR}/mosul_replay.mkreplay
       -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckHeadlessReplay.cmake
   )
+  if(Python3_Interpreter_FOUND)
+    add_test(
+      NAME mk_traffic_vehicle_sprite_validation
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/scripts/validate_traffic_vehicle_sprites.py
+        --root
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+    add_test(
+      NAME mk_traffic_vehicle_runtime_smoke
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_traffic_vehicle_runtime_smoke.py
+        --headless
+        $<TARGET_FILE:mk_headless_run>
+        --replay
+        ${CMAKE_CURRENT_BINARY_DIR}/traffic_vehicle_runtime_smoke.mkreplay
+        --steps
+        12
+        --expect-traffic-vehicles
+        6
+        --expect-min-moving
+        3
+    )
+  endif()
   add_test(
     NAME mk_headless_run_control_balance
     COMMAND mk_headless_run
