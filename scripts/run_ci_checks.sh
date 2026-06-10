@@ -80,6 +80,7 @@ ci_main() {
 
   run git rev-parse HEAD
   run cmake --version
+  run python3 scripts/validate_traffic_vehicle_sprites.py
 
   run cmake --preset default
   run cmake --build --preset default --config Debug

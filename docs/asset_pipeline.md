@@ -168,9 +168,10 @@ Traffic vehicles are now represented as dynamic runtime sprites rather than scen
 
 ## Dynamic Vehicle And Map Cleanup Cycles
 
-Current active cycle: cycle 3, vehicle-free map rerender. Status: active,
-blocked on an exact 7,000 px geometry-preserving map renderer. Last completed
-cycle: cycle 2, asset audit. Last updated: 2026-06-09.
+Current active cycle: cycle 5, scenario and data integration. Last completed
+cycle: cycle 4, dynamic vehicle asset validation. Blocked cycle: cycle 3,
+vehicle-free map rerender, blocked on an exact 7,000 px geometry-preserving map
+renderer. Last updated: 2026-06-09.
 
 When work advances, update this tracker in the same commit as the relevant
 code, art, or asset changes. Keep exactly one cycle marked `active` until the
@@ -190,13 +191,18 @@ Cycle 3 current artifacts:
 - `docs/market_commercial_streets_vehicle_free_rerender_attempt.md`
 - `assets/mosul/runtime/maps/market_commercial_streets_2003/candidates/vehicle_free_candidate_1254.png`
 
+Cycle 4 validation artifacts:
+
+- `docs/traffic_vehicle_sprite_validation.md`
+- `scripts/validate_traffic_vehicle_sprites.py`
+
 | Cycle | Status | Name | Exit Criteria |
 | --- | --- | --- | --- |
 | 1 | completed | Submodule hygiene | `mosul` and `modernerKrieg` are fast-forwarded to the tips of `main`, and the nested gitlink updates are committed upward so every repository records the same baseline. |
 | 2 | completed | Asset audit | Every baked car, bus, motorcycle, and vehicle-like mark in the Market / Commercial Streets map layers is identified and classified as removable background traffic, dynamic traffic, abandoned cover, or destroyed terrain. |
-| 3 | active | Vehicle-free map rerender | The approved 7,000 px line-art map overview and level PNGs are regenerated without baked traffic vehicles, with no Pillow cleanup, blur/fill inpainting, stick art, or simplified replacement marks. |
-| 4 | pending | Dynamic vehicle asset validation | Cars, buses, and motorcycles exist as generated `1024 x 1024` RGBA runtime sprites with alpha edges, matching the established line-art style and render manifest IDs. |
-| 5 | pending | Scenario and data integration | `traffic_vehicle.*` records define positions, destinations, speed, facing, seat capacity, boarding mode, active state, and movement blocking. |
+| 3 | blocked | Vehicle-free map rerender | The approved 7,000 px line-art map overview and level PNGs are regenerated without baked traffic vehicles, with no Pillow cleanup, blur/fill inpainting, stick art, or simplified replacement marks. |
+| 4 | completed | Dynamic vehicle asset validation | Cars, buses, and motorcycles exist as generated `1024 x 1024` RGBA runtime sprites with alpha edges, matching the established line-art style and render manifest IDs. |
+| 5 | active | Scenario and data integration | `traffic_vehicle.*` records define positions, destinations, speed, facing, seat capacity, boarding mode, active state, and movement blocking. |
 | 6 | pending | Runtime behavior | Path following, routing failures, occupant position updates, entering/exiting cars and buses, mounting/dismounting motorcycles, collision, blocking, save/snapshot, replay, and deterministic AI behavior are verified. |
 | 7 | pending | Renderer and interaction pass | Traffic vehicles draw only from runtime RGBA sprites, expose picking/selection and boarding controls, and keep source angle art out of the live renderer path. |
 | 8 | pending | Verification and polish | CTests, asset manifest validation, alpha-edge validation, visual map before/after checks, and an in-game smoke pass show a vehicle-free base map with moving dynamic vehicles. |

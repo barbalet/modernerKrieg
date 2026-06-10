@@ -13,3 +13,8 @@ Current imported runtime set:
 - `rendered/render_manifest.json`: detailed list of the 1,088 rendered PNGs.
 
 Human, civilian, and weapon sprites are `128 x 128`. Vehicle sprites are `1024 x 1024`.
+
+Dynamic traffic vehicles are validated by `scripts/validate_traffic_vehicle_sprites.py`.
+The validation requires all 24 car, bus, and motorcycle runtime PNGs to be
+`1024 x 1024` RGBA with fully transparent corners and outer borders, and it
+checks that their render-manifest and compact sprite-manifest IDs are present.
