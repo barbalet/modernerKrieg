@@ -24,16 +24,21 @@ headless replay from the default 2003 Market / Commercial Streets scenario and
 checks that:
 
 - the gameplay area reports the expected `7000 x 7000` tactical map metadata
-- the replay reports six dynamic traffic vehicles
+- the replay reports twenty-six traffic vehicle records
 - every tick contains a complete record for each vehicle
 - every vehicle record uses a known traffic sprite ID
 - every vehicle exposes valid kind, boarding mode, seat, occupancy, active, and
   movement-blocker fields
 - at least three traffic vehicles move by at least one meter during the smoke
   pass
+- at least twenty traffic vehicles begin without destinations, proving parked
+  vehicles are represented as static runtime blockers rather than ignored map
+  artwork
 
 This gives the renderer and gameplay layer a repeatable in-game proof that
 traffic vehicles are dynamic runtime entities rather than static map marks.
+For the current map art, it also prevents moving vehicles from overrunning
+known baked vehicle marks by mirroring those marks as static traffic records.
 
 ## Visual Map Status
 

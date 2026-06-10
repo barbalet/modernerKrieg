@@ -1,6 +1,7 @@
 #include "mk_mosul_demo.h"
 #include "mk_test.h"
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -51,10 +52,14 @@ typedef struct {
     float position_y;
     float destination_x;
     float destination_y;
+    bool has_destination;
     float speed_m_per_tick;
     float facing_degrees;
     int seat_capacity;
 } expected_traffic_vehicle_t;
+
+#define EXPECTED_MARKET_TRAFFIC_VEHICLE_COUNT \
+    (sizeof(k_expected_market_traffic_vehicles) / sizeof(k_expected_market_traffic_vehicles[0]))
 
 static const expected_traffic_vehicle_t k_expected_market_traffic_vehicles[] = {
     {
@@ -67,6 +72,7 @@ static const expected_traffic_vehicle_t k_expected_market_traffic_vehicles[] = {
         382.0f,
         242.0f,
         232.0f,
+        true,
         5.5f,
         270.0f,
         24
@@ -81,6 +87,7 @@ static const expected_traffic_vehicle_t k_expected_market_traffic_vehicles[] = {
         472.0f,
         258.0f,
         318.0f,
+        true,
         5.0f,
         270.0f,
         24
@@ -95,6 +102,7 @@ static const expected_traffic_vehicle_t k_expected_market_traffic_vehicles[] = {
         234.0f,
         166.0f,
         234.0f,
+        true,
         7.5f,
         180.0f,
         4
@@ -109,6 +117,7 @@ static const expected_traffic_vehicle_t k_expected_market_traffic_vehicles[] = {
         236.0f,
         406.0f,
         236.0f,
+        true,
         7.0f,
         0.0f,
         4
@@ -123,6 +132,7 @@ static const expected_traffic_vehicle_t k_expected_market_traffic_vehicles[] = {
         252.0f,
         284.0f,
         252.0f,
+        true,
         10.0f,
         180.0f,
         1
@@ -137,7 +147,308 @@ static const expected_traffic_vehicle_t k_expected_market_traffic_vehicles[] = {
         238.0f,
         386.0f,
         238.0f,
+        true,
         6.5f,
+        180.0f,
+        4
+    },
+    {
+        "central_avenue_static_car_north",
+        "Central Avenue Parked Car North",
+        "traffic_civilian_car_intact_north",
+        MK_TRAFFIC_VEHICLE_CAR,
+        MK_TRAFFIC_BOARD_INSIDE,
+        242.0f,
+        346.0f,
+        242.0f,
+        346.0f,
+        false,
+        6.0f,
+        270.0f,
+        4
+    },
+    {
+        "central_avenue_static_car_mid",
+        "Central Avenue Parked Car Mid",
+        "traffic_civilian_car_intact_north",
+        MK_TRAFFIC_VEHICLE_CAR,
+        MK_TRAFFIC_BOARD_INSIDE,
+        248.0f,
+        318.0f,
+        248.0f,
+        318.0f,
+        false,
+        6.0f,
+        90.0f,
+        4
+    },
+    {
+        "central_avenue_static_bus_mid",
+        "Central Avenue Parked Bus Mid",
+        "traffic_city_bus_intact_north",
+        MK_TRAFFIC_VEHICLE_BUS,
+        MK_TRAFFIC_BOARD_INSIDE,
+        242.0f,
+        285.0f,
+        242.0f,
+        285.0f,
+        false,
+        4.5f,
+        270.0f,
+        24
+    },
+    {
+        "south_avenue_static_car_upper",
+        "South Avenue Parked Car Upper",
+        "traffic_civilian_car_intact_north",
+        MK_TRAFFIC_VEHICLE_CAR,
+        MK_TRAFFIC_BOARD_INSIDE,
+        258.0f,
+        435.0f,
+        258.0f,
+        435.0f,
+        false,
+        6.0f,
+        270.0f,
+        4
+    },
+    {
+        "south_avenue_static_bus_mid",
+        "South Avenue Parked Bus Mid",
+        "traffic_city_bus_intact_north",
+        MK_TRAFFIC_VEHICLE_BUS,
+        MK_TRAFFIC_BOARD_INSIDE,
+        258.0f,
+        402.0f,
+        258.0f,
+        402.0f,
+        false,
+        4.5f,
+        270.0f,
+        24
+    },
+    {
+        "south_avenue_static_car_lower",
+        "South Avenue Parked Car Lower",
+        "traffic_civilian_car_intact_north",
+        MK_TRAFFIC_VEHICLE_CAR,
+        MK_TRAFFIC_BOARD_INSIDE,
+        252.0f,
+        365.0f,
+        252.0f,
+        365.0f,
+        false,
+        6.0f,
+        90.0f,
+        4
+    },
+    {
+        "west_market_static_car_approach",
+        "West Market Parked Car Approach",
+        "traffic_civilian_car_intact_north",
+        MK_TRAFFIC_VEHICLE_CAR,
+        MK_TRAFFIC_BOARD_INSIDE,
+        205.0f,
+        234.0f,
+        205.0f,
+        234.0f,
+        false,
+        6.0f,
+        180.0f,
+        4
+    },
+    {
+        "west_market_static_van_awning",
+        "West Market Parked Van Awning",
+        "traffic_city_bus_intact_north",
+        MK_TRAFFIC_VEHICLE_BUS,
+        MK_TRAFFIC_BOARD_INSIDE,
+        188.0f,
+        232.0f,
+        188.0f,
+        232.0f,
+        false,
+        4.5f,
+        180.0f,
+        24
+    },
+    {
+        "east_market_static_car_inner",
+        "East Market Parked Car Inner",
+        "traffic_civilian_car_intact_north",
+        MK_TRAFFIC_VEHICLE_CAR,
+        MK_TRAFFIC_BOARD_INSIDE,
+        346.0f,
+        236.0f,
+        346.0f,
+        236.0f,
+        false,
+        6.0f,
+        0.0f,
+        4
+    },
+    {
+        "east_market_static_car_outer",
+        "East Market Parked Car Outer",
+        "traffic_civilian_car_intact_north",
+        MK_TRAFFIC_VEHICLE_CAR,
+        MK_TRAFFIC_BOARD_INSIDE,
+        378.0f,
+        238.0f,
+        378.0f,
+        238.0f,
+        false,
+        6.0f,
+        0.0f,
+        4
+    },
+    {
+        "souq_lane_static_motorcycle",
+        "Souq Lane Parked Motorcycle",
+        "traffic_motorcycle_intact_north",
+        MK_TRAFFIC_VEHICLE_MOTORCYCLE,
+        MK_TRAFFIC_BOARD_ON,
+        316.0f,
+        252.0f,
+        316.0f,
+        252.0f,
+        false,
+        8.0f,
+        180.0f,
+        1
+    },
+    {
+        "souq_lane_static_car",
+        "Souq Lane Parked Car",
+        "traffic_civilian_car_intact_north",
+        MK_TRAFFIC_VEHICLE_CAR,
+        MK_TRAFFIC_BOARD_INSIDE,
+        292.0f,
+        252.0f,
+        292.0f,
+        252.0f,
+        false,
+        6.0f,
+        180.0f,
+        4
+    },
+    {
+        "east_shopfront_static_car_inner",
+        "East Shopfront Parked Car Inner",
+        "traffic_civilian_car_intact_north",
+        MK_TRAFFIC_VEHICLE_CAR,
+        MK_TRAFFIC_BOARD_INSIDE,
+        412.0f,
+        238.0f,
+        412.0f,
+        238.0f,
+        false,
+        6.0f,
+        180.0f,
+        4
+    },
+    {
+        "east_shopfront_static_car_outer",
+        "East Shopfront Parked Car Outer",
+        "traffic_civilian_car_intact_north",
+        MK_TRAFFIC_VEHICLE_CAR,
+        MK_TRAFFIC_BOARD_INSIDE,
+        394.0f,
+        238.0f,
+        394.0f,
+        238.0f,
+        false,
+        6.0f,
+        180.0f,
+        4
+    },
+    {
+        "west_entry_static_car",
+        "West Entry Parked Car",
+        "traffic_civilian_car_intact_north",
+        MK_TRAFFIC_VEHICLE_CAR,
+        MK_TRAFFIC_BOARD_INSIDE,
+        100.0f,
+        245.0f,
+        100.0f,
+        245.0f,
+        false,
+        6.0f,
+        0.0f,
+        4
+    },
+    {
+        "west_entry_static_van",
+        "West Entry Parked Van",
+        "traffic_city_bus_intact_north",
+        MK_TRAFFIC_VEHICLE_BUS,
+        MK_TRAFFIC_BOARD_INSIDE,
+        132.0f,
+        252.0f,
+        132.0f,
+        252.0f,
+        false,
+        4.5f,
+        0.0f,
+        24
+    },
+    {
+        "north_avenue_static_car_roofline",
+        "North Avenue Parked Car Roofline",
+        "traffic_civilian_car_intact_north",
+        MK_TRAFFIC_VEHICLE_CAR,
+        MK_TRAFFIC_BOARD_INSIDE,
+        242.0f,
+        120.0f,
+        242.0f,
+        120.0f,
+        false,
+        6.0f,
+        270.0f,
+        4
+    },
+    {
+        "north_avenue_static_car_market",
+        "North Avenue Parked Car Market",
+        "traffic_civilian_car_intact_north",
+        MK_TRAFFIC_VEHICLE_CAR,
+        MK_TRAFFIC_BOARD_INSIDE,
+        260.0f,
+        156.0f,
+        260.0f,
+        156.0f,
+        false,
+        6.0f,
+        90.0f,
+        4
+    },
+    {
+        "southeast_static_car_courtyard",
+        "Southeast Courtyard Parked Car",
+        "traffic_civilian_car_intact_north",
+        MK_TRAFFIC_VEHICLE_CAR,
+        MK_TRAFFIC_BOARD_INSIDE,
+        390.0f,
+        426.0f,
+        390.0f,
+        426.0f,
+        false,
+        6.0f,
+        0.0f,
+        4
+    },
+    {
+        "southwest_static_car_courtyard",
+        "Southwest Courtyard Parked Car",
+        "traffic_civilian_car_intact_north",
+        MK_TRAFFIC_VEHICLE_CAR,
+        MK_TRAFFIC_BOARD_INSIDE,
+        190.0f,
+        416.0f,
+        190.0f,
+        416.0f,
+        false,
+        6.0f,
         180.0f,
         4
     }
@@ -147,7 +458,7 @@ static void assert_market_traffic_vehicle_records(const mk_traffic_vehicle_t *ve
     size_t index;
 
     MK_TEST_ASSERT(vehicles != NULL);
-    MK_TEST_ASSERT(count == sizeof(k_expected_market_traffic_vehicles) / sizeof(k_expected_market_traffic_vehicles[0]));
+    MK_TEST_ASSERT(count == EXPECTED_MARKET_TRAFFIC_VEHICLE_COUNT);
 
     for (index = 0; index < count; ++index) {
         const expected_traffic_vehicle_t *expected = &k_expected_market_traffic_vehicles[index];
@@ -163,7 +474,7 @@ static void assert_market_traffic_vehicle_records(const mk_traffic_vehicle_t *ve
         MK_TEST_ASSERT(vehicle->boarding_mode == expected->boarding_mode);
         MK_TEST_ASSERT_CLOSE(vehicle->position_m.x, expected->position_x);
         MK_TEST_ASSERT_CLOSE(vehicle->position_m.y, expected->position_y);
-        MK_TEST_ASSERT(vehicle->has_destination);
+        MK_TEST_ASSERT(vehicle->has_destination == expected->has_destination);
         MK_TEST_ASSERT_CLOSE(vehicle->destination_m.x, expected->destination_x);
         MK_TEST_ASSERT_CLOSE(vehicle->destination_m.y, expected->destination_y);
         MK_TEST_ASSERT_CLOSE(vehicle->speed_m_per_tick, expected->speed_m_per_tick);
@@ -234,7 +545,7 @@ static void test_default_scenario_data_matches_fixture_shape(void) {
     MK_TEST_ASSERT(loaded.civilian_archetype_count == 4);
     MK_TEST_ASSERT(loaded.civilian_group_count == 4);
     MK_TEST_ASSERT(loaded.civilian_count == 7);
-    MK_TEST_ASSERT(loaded.traffic_vehicle_count == 6);
+    MK_TEST_ASSERT(loaded.traffic_vehicle_count == EXPECTED_MARKET_TRAFFIC_VEHICLE_COUNT);
     MK_TEST_ASSERT(loaded.unit_count == 6);
     MK_TEST_ASSERT(strcmp(loaded.forces[0].command.callsign, fixture.forces[0].command.callsign) == 0);
     MK_TEST_ASSERT(strcmp(loaded.units[0].name, fixture.units[0].name) == 0);
@@ -403,7 +714,7 @@ static void test_public_default_scenario_uses_data_file(void) {
     MK_TEST_ASSERT(game.civilian_archetype_count == 4);
     MK_TEST_ASSERT(game.civilian_group_count == 4);
     MK_TEST_ASSERT(game.civilian_count == 7);
-    MK_TEST_ASSERT(game.traffic_vehicle_count == 6);
+    MK_TEST_ASSERT(game.traffic_vehicle_count == EXPECTED_MARKET_TRAFFIC_VEHICLE_COUNT);
     assert_market_traffic_vehicle_records(game.traffic_vehicles, game.traffic_vehicle_count);
     MK_TEST_ASSERT(game.unit_count == 6);
     MK_TEST_ASSERT(mk_gameplay_area_is_loaded(&game.gameplay_area));

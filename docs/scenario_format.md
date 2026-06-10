@@ -132,12 +132,13 @@ The loader validates that referenced sprite runtime ids exist in the sprite mani
 
 Civilian intent is optional. Supported values are `none`, `shelter`, `flee`, `evacuate`, `follow_instructions`, `freeze`, and `assist_group`. A civilian with `destination` starts with `has_destination` set in core state; if the topology can route between the current node and destination level, the route is assigned during scenario load. If no route is available, the core keeps a deterministic straight-line fallback and records the route failure reason.
 
-Dynamic traffic vehicles are separate from the base map art and can carry
-units. Cars and buses use `boarding_mode=inside`; motorcycles use
-`boarding_mode=on`. Each live demo record should define its start position,
-destination, speed, facing, seat capacity, active state, and movement blocking
-state so the C core can treat it as a moving scenario entity rather than map
-decoration.
+Traffic vehicles are separate from the base map art and can carry units. Cars
+and buses use `boarding_mode=inside`; motorcycles use `boarding_mode=on`. Moving
+demo records define a start position, destination, speed, facing, seat capacity,
+active state, and movement blocking state so the C core can treat them as
+scenario entities rather than map decoration. Parked/static records omit
+`destination`; they render and block movement at their start position until a
+runtime command or script assigns a destination.
 
 ```text
 traffic_vehicle.0.id=north_market_bus

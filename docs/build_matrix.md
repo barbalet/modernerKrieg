@@ -39,8 +39,9 @@ Python 3 interpreter is available:
   motorcycle PNGs for manifest coverage, RGBA format, `1024 x 1024` dimensions,
   visible vehicle pixels, and transparent outer borders.
 - `mk_traffic_vehicle_runtime_smoke` runs a headless Mosul replay and verifies
-  that six traffic vehicles are recorded as active, blocking, seat-aware runtime
-  entities, with at least three moving during the smoke pass.
+  that twenty-six traffic vehicles are recorded as active, blocking, seat-aware
+  runtime entities, with at least twenty starting static and at least three
+  moving during the smoke pass.
 
 Run repeated AI-vs-AI battles from CMake:
 

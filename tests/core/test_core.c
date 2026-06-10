@@ -974,7 +974,7 @@ static void test_scenario_loading_populates_core_state(void) {
     assert(game.civilian_archetype_count == 4);
     assert(game.civilian_group_count == 4);
     assert(game.civilian_count == 7);
-    assert(game.traffic_vehicle_count == 6);
+    assert(game.traffic_vehicle_count == 26);
     assert(game.unit_count == 6);
     assert(game.controllers[0].kind == MK_CONTROLLER_TACTICAL_AI);
     assert(game.controllers[2].kind == MK_CONTROLLER_OBSERVER);
@@ -995,6 +995,9 @@ static void test_scenario_loading_populates_core_state(void) {
     assert(game.traffic_vehicles[0].boarding_mode == MK_TRAFFIC_BOARD_INSIDE);
     assert(strcmp(game.traffic_vehicles[4].scenario_id, "souq_motorcycle") == 0);
     assert(game.traffic_vehicles[4].boarding_mode == MK_TRAFFIC_BOARD_ON);
+    assert(strcmp(game.traffic_vehicles[6].scenario_id, "central_avenue_static_car_north") == 0);
+    assert(!game.traffic_vehicles[6].has_destination);
+    assert(game.traffic_vehicles[6].blocks_movement);
     assert(game.units[0].faction_id == 1);
     assert(game.units[0].force_id == 1);
     assert(game.units[0].controller_id == 1);
@@ -1039,10 +1042,12 @@ static void test_snapshot_is_stable_copy(void) {
     assert(snapshot.civilian_archetype_count == 4);
     assert(snapshot.civilian_group_count == 4);
     assert(snapshot.civilian_count == 7);
-    assert(snapshot.traffic_vehicle_count == 6);
+    assert(snapshot.traffic_vehicle_count == 26);
     assert(strcmp(snapshot.traffic_vehicles[0].scenario_id, "north_market_bus") == 0);
     assert(snapshot.traffic_vehicles[0].active);
     assert(snapshot.traffic_vehicles[0].blocks_movement);
+    assert(strcmp(snapshot.traffic_vehicles[6].scenario_id, "central_avenue_static_car_north") == 0);
+    assert(!snapshot.traffic_vehicles[6].has_destination);
     assert(snapshot.map.tile_count == 100);
     assert(snapshot.controllers[1].side == MK_SIDE_OPFOR);
     assert(snapshot.forces[1].faction_id == 2);

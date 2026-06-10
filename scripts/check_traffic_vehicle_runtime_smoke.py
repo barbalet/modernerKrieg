@@ -96,11 +96,13 @@ def _validate_replay(
     steps: int,
     expect_traffic_vehicles: int,
     expect_min_moving: int,
-) -> tuple[int, int, int]:
+    expect_min_static: int,
+) -> tuple[int, int, int, int]:
     expected_traffic_vehicles = 0
     gameplay_area_seen = False
     records_by_tick: dict[int, list[dict[str, str]]] = {}
     positions_by_vehicle: dict[int, list[tuple[int, float, float]]] = {}
+    first_records_by_vehicle: dict[int, dict[str, str]] = {}
 
     for line_number, raw_line in enumerate(replay.read_text(encoding="utf-8").splitlines(), start=1):
         if not raw_line.startswith("event "):
@@ -146,6 +148,7 @@ def _validate_replay(
 
             records_by_tick.setdefault(tick, []).append(fields)
             positions_by_vehicle.setdefault(vehicle_id, []).append((tick, x, y))
+            first_records_by_vehicle.setdefault(vehicle_id, fields)
 
     if expected_traffic_vehicles != expect_traffic_vehicles:
         raise ValueError(
@@ -174,7 +177,15 @@ def _validate_replay(
     if moving < expect_min_moving:
         raise ValueError(f"expected at least {expect_min_moving} moving vehicles, observed {moving}")
 
-    return expected_traffic_vehicles, len(records_by_tick), moving
+    static = sum(
+        1
+        for fields in first_records_by_vehicle.values()
+        if fields["has_destination"] == "0" and fields["has_route"] == "0"
+    )
+    if static < expect_min_static:
+        raise ValueError(f"expected at least {expect_min_static} static vehicles, observed {static}")
+
+    return expected_traffic_vehicles, len(records_by_tick), moving, static
 
 
 def main() -> int:
@@ -183,18 +194,20 @@ def main() -> int:
     parser.add_argument("--replay", required=True, help="replay path to create and inspect")
     parser.add_argument("--scenario", default=None, help="optional scenario path")
     parser.add_argument("--steps", type=int, default=12, help="headless tick count")
-    parser.add_argument("--expect-traffic-vehicles", type=int, default=6)
+    parser.add_argument("--expect-traffic-vehicles", type=int, default=26)
     parser.add_argument("--expect-min-moving", type=int, default=3)
+    parser.add_argument("--expect-min-static", type=int, default=20)
     args = parser.parse_args()
 
     try:
         replay = Path(args.replay)
         _run_headless(Path(args.headless), replay, args.steps, args.scenario)
-        vehicle_count, tick_count, moving_count = _validate_replay(
+        vehicle_count, tick_count, moving_count, static_count = _validate_replay(
             replay,
             args.steps,
             args.expect_traffic_vehicles,
             args.expect_min_moving,
+            args.expect_min_static,
         )
     except (OSError, subprocess.CalledProcessError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -203,7 +216,8 @@ def main() -> int:
     print("traffic vehicle runtime smoke passed")
     print(
         f"steps={args.steps} traffic_vehicles={vehicle_count} "
-        f"ticks_with_records={tick_count} moving_vehicles={moving_count}"
+        f"ticks_with_records={tick_count} moving_vehicles={moving_count} "
+        f"static_vehicles={static_count}"
     )
     return 0
 

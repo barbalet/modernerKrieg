@@ -287,9 +287,11 @@ if(MK_BUILD_TESTS)
         --steps
         12
         --expect-traffic-vehicles
-        6
+        26
         --expect-min-moving
         3
+        --expect-min-static
+        20
     )
   endif()
   add_test(
