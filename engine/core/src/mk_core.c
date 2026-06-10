@@ -1857,6 +1857,88 @@ static bool mk_order_is_movement_order(mk_order_t order) {
         || order == MK_ORDER_INVESTIGATE;
 }
 
+static float mk_traffic_vehicle_block_radius_m(const mk_traffic_vehicle_t *vehicle) {
+    if (vehicle == NULL) {
+        return 0.0f;
+    }
+
+    if (vehicle->kind == MK_TRAFFIC_VEHICLE_BUS) {
+        return 6.0f;
+    }
+
+    if (vehicle->kind == MK_TRAFFIC_VEHICLE_MOTORCYCLE) {
+        return 2.0f;
+    }
+
+    return 3.5f;
+}
+
+static bool mk_traffic_vehicle_contains_unit(const mk_traffic_vehicle_t *vehicle, uint32_t unit_id) {
+    size_t index;
+
+    if (vehicle == NULL || unit_id == 0U) {
+        return false;
+    }
+
+    for (index = 0; index < vehicle->embarked_unit_count; ++index) {
+        if (vehicle->embarked_unit_ids[index] == unit_id) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool mk_game_position_blocked_by_traffic_vehicle(
+    const mk_game_t *game,
+    uint32_t moving_vehicle_id,
+    uint32_t moving_unit_id,
+    float moving_radius_m,
+    mk_vec2_t current_position_m,
+    mk_vec2_t candidate_position_m
+) {
+    size_t index;
+
+    if (game == NULL || moving_radius_m < 0.0f) {
+        return false;
+    }
+
+    for (index = 0; index < game->traffic_vehicle_count; ++index) {
+        const mk_traffic_vehicle_t *vehicle = &game->traffic_vehicles[index];
+        float radius_m;
+        float radius_squared;
+        float current_distance_squared;
+        float candidate_distance_squared;
+
+        if (!vehicle->active
+            || !vehicle->blocks_movement
+            || vehicle->id == moving_vehicle_id
+            || mk_traffic_vehicle_contains_unit(vehicle, moving_unit_id)) {
+            continue;
+        }
+
+        radius_m = moving_radius_m + mk_traffic_vehicle_block_radius_m(vehicle);
+        radius_squared = radius_m * radius_m;
+        candidate_distance_squared =
+            (candidate_position_m.x - vehicle->position_m.x) * (candidate_position_m.x - vehicle->position_m.x)
+            + (candidate_position_m.y - vehicle->position_m.y) * (candidate_position_m.y - vehicle->position_m.y);
+        if (candidate_distance_squared > radius_squared) {
+            continue;
+        }
+
+        current_distance_squared =
+            (current_position_m.x - vehicle->position_m.x) * (current_position_m.x - vehicle->position_m.x)
+            + (current_position_m.y - vehicle->position_m.y) * (current_position_m.y - vehicle->position_m.y);
+        if (current_distance_squared <= radius_squared && candidate_distance_squared > current_distance_squared) {
+            continue;
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
 static void mk_update_unit_movement(mk_game_t *game, mk_unit_t *unit) {
     float dx;
     float dy;
@@ -1911,6 +1993,20 @@ static void mk_update_unit_movement(mk_game_t *game, mk_unit_t *unit) {
     step_squared = speed * speed;
 
     if (distance_squared <= step_squared || distance_squared <= 0.0001f) {
+        if (mk_game_position_blocked_by_traffic_vehicle(
+                game,
+                0U,
+                unit->id,
+                1.0f,
+                unit->position_m,
+                movement_target
+            )) {
+            mk_unit_set_route_failure(unit, "traffic_blocked");
+            unit->has_move_target = false;
+            unit->order = MK_ORDER_HOLD;
+            return;
+        }
+
         unit->position_m = movement_target;
         if (unit->has_route) {
             if (unit->route_step_level_ids[unit->route_step_index][0] != '\0') {
@@ -1936,8 +2032,23 @@ static void mk_update_unit_movement(mk_game_t *game, mk_unit_t *unit) {
     }
 
     distance = sqrtf(distance_squared);
-    unit->position_m.x += dx / distance * speed;
-    unit->position_m.y += dy / distance * speed;
+    movement_target.x = unit->position_m.x + dx / distance * speed;
+    movement_target.y = unit->position_m.y + dy / distance * speed;
+    if (mk_game_position_blocked_by_traffic_vehicle(
+            game,
+            0U,
+            unit->id,
+            1.0f,
+            unit->position_m,
+            movement_target
+        )) {
+        mk_unit_set_route_failure(unit, "traffic_blocked");
+        unit->has_move_target = false;
+        unit->order = MK_ORDER_HOLD;
+        return;
+    }
+
+    unit->position_m = movement_target;
     unit->facing_degrees = atan2f(dy, dx) * 57.2957795f;
 
     if (unit->has_route) {
@@ -1957,7 +2068,6 @@ static void mk_update_unit_movement(mk_game_t *game, mk_unit_t *unit) {
         }
     }
 
-    (void)game;
 }
 
 static void mk_traffic_vehicle_clear_route(mk_traffic_vehicle_t *vehicle) {
@@ -2166,6 +2276,20 @@ static void mk_game_update_traffic_vehicle_movement(mk_game_t *game, mk_traffic_
     step_squared = speed * speed;
 
     if (distance_squared <= step_squared || distance_squared <= 0.0001f) {
+        if (mk_game_position_blocked_by_traffic_vehicle(
+                game,
+                vehicle->id,
+                0U,
+                mk_traffic_vehicle_block_radius_m(vehicle),
+                vehicle->position_m,
+                movement_target
+            )) {
+            mk_traffic_vehicle_set_route_failure(vehicle, "traffic_blocked");
+            vehicle->has_destination = false;
+            mk_game_update_traffic_vehicle_occupants(game, vehicle);
+            return;
+        }
+
         vehicle->position_m = movement_target;
         if (vehicle->has_route) {
             if (vehicle->route_step_level_ids[vehicle->route_step_index][0] != '\0') {
@@ -2197,8 +2321,23 @@ static void mk_game_update_traffic_vehicle_movement(mk_game_t *game, mk_traffic_
     }
 
     distance = sqrtf(distance_squared);
-    vehicle->position_m.x += dx / distance * speed;
-    vehicle->position_m.y += dy / distance * speed;
+    movement_target.x = vehicle->position_m.x + dx / distance * speed;
+    movement_target.y = vehicle->position_m.y + dy / distance * speed;
+    if (mk_game_position_blocked_by_traffic_vehicle(
+            game,
+            vehicle->id,
+            0U,
+            mk_traffic_vehicle_block_radius_m(vehicle),
+            vehicle->position_m,
+            movement_target
+        )) {
+        mk_traffic_vehicle_set_route_failure(vehicle, "traffic_blocked");
+        vehicle->has_destination = false;
+        mk_game_update_traffic_vehicle_occupants(game, vehicle);
+        return;
+    }
+
+    vehicle->position_m = movement_target;
     vehicle->facing_degrees = atan2f(dy, dx) * 57.2957795f;
     mk_game_refresh_traffic_vehicle_topology(game, vehicle);
     mk_game_update_traffic_vehicle_occupants(game, vehicle);
@@ -5215,6 +5354,7 @@ mk_result_t mk_game_issue_traffic_vehicle_move_order(
 ) {
     mk_traffic_vehicle_t *vehicle;
     mk_result_t route_result;
+    bool require_route;
 
     if (game == NULL || vehicle_id == 0U) {
         return MK_ERROR_INVALID_ARGUMENT;
@@ -5233,7 +5373,10 @@ mk_result_t mk_game_issue_traffic_vehicle_move_order(
         return MK_ERROR_INVALID_DATA;
     }
 
-    route_result = mk_game_try_assign_traffic_vehicle_route(game, vehicle, target_level_id, target_position_m, false);
+    require_route = target_level_id != NULL
+        && target_level_id[0] != '\0'
+        && strcmp(target_level_id, mk_traffic_vehicle_current_level_id(game, vehicle)) != 0;
+    route_result = mk_game_try_assign_traffic_vehicle_route(game, vehicle, target_level_id, target_position_m, require_route);
     if (route_result != MK_OK) {
         return route_result;
     }

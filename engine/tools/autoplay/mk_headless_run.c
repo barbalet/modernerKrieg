@@ -170,6 +170,28 @@ static const char *mk_headless_status_name(mk_unit_status_t status) {
     }
 }
 
+static const char *mk_headless_traffic_vehicle_kind_name(mk_traffic_vehicle_kind_t kind) {
+    switch (kind) {
+        case MK_TRAFFIC_VEHICLE_BUS:
+            return "bus";
+        case MK_TRAFFIC_VEHICLE_MOTORCYCLE:
+            return "motorcycle";
+        case MK_TRAFFIC_VEHICLE_CAR:
+        default:
+            return "car";
+    }
+}
+
+static const char *mk_headless_traffic_boarding_mode_name(mk_traffic_boarding_mode_t mode) {
+    switch (mode) {
+        case MK_TRAFFIC_BOARD_ON:
+            return "on";
+        case MK_TRAFFIC_BOARD_INSIDE:
+        default:
+            return "inside";
+    }
+}
+
 static void mk_headless_print_tick(FILE *stream, const mk_game_t *game) {
     size_t unit_index;
     size_t civilian_index;
@@ -197,6 +219,7 @@ static void mk_headless_print_tick(FILE *stream, const mk_game_t *game) {
     }
 
     fprintf(stream, " | contacts=%u civilian_risk=%d", (unsigned)game->contact_report_count, civilian_risk);
+    fprintf(stream, " traffic_vehicles=%u", (unsigned)game->traffic_vehicle_count);
     fprintf(stream, "\n");
 }
 
@@ -265,10 +288,11 @@ static void mk_headless_print_replay_header(FILE *stream, const mk_game_t *game,
     );
     fprintf(
         stream,
-        "event tick=%u kind=start units=%u civilians=%u objectives=%u contacts=%u\n",
+        "event tick=%u kind=start units=%u civilians=%u traffic_vehicles=%u objectives=%u contacts=%u\n",
         game->tick,
         (unsigned)game->unit_count,
         (unsigned)game->civilian_count,
+        (unsigned)game->traffic_vehicle_count,
         (unsigned)game->objective_count,
         (unsigned)game->contact_report_count
     );
@@ -310,6 +334,7 @@ static void mk_headless_print_replay_tick(
     mk_score_t score;
     size_t unit_index;
     size_t civilian_index;
+    size_t vehicle_index;
     size_t objective_index;
     size_t contact_index;
 
@@ -380,6 +405,40 @@ static void mk_headless_print_replay_tick(
             civilian->compliance,
             civilian->protected_noncombatant ? 1 : 0,
             civilian->sprite_id
+        );
+    }
+
+    for (vehicle_index = 0; vehicle_index < game->traffic_vehicle_count; ++vehicle_index) {
+        const mk_traffic_vehicle_t *vehicle = &game->traffic_vehicles[vehicle_index];
+
+        fprintf(
+            stream,
+            "event tick=%u kind=traffic_vehicle id=%u scenario=\"%s\" name=\"%s\" vehicle_kind=%s boarding=%s sprite=\"%s\" node=\"%s\" level=\"%s\" x=%.2f y=%.2f dest_x=%.2f dest_y=%.2f has_destination=%d has_route=%d route_step=%u route_steps=%u route_cost=%d route_failures=%u route_reason=\"%s\" facing=%.2f seats=%d occupied=%d active=%d blocks_movement=%d\n",
+            game->tick,
+            vehicle->id,
+            vehicle->scenario_id,
+            vehicle->name,
+            mk_headless_traffic_vehicle_kind_name(vehicle->kind),
+            mk_headless_traffic_boarding_mode_name(vehicle->boarding_mode),
+            vehicle->sprite_id,
+            vehicle->topology_node_id,
+            vehicle->level_id,
+            vehicle->position_m.x,
+            vehicle->position_m.y,
+            vehicle->destination_m.x,
+            vehicle->destination_m.y,
+            vehicle->has_destination ? 1 : 0,
+            vehicle->has_route ? 1 : 0,
+            (unsigned)vehicle->route_step_index,
+            (unsigned)vehicle->route_step_count,
+            vehicle->route_total_cost,
+            (unsigned)vehicle->route_failure_count,
+            vehicle->route_failure_reason,
+            vehicle->facing_degrees,
+            vehicle->seat_capacity,
+            vehicle->occupied_seats,
+            vehicle->active ? 1 : 0,
+            vehicle->blocks_movement ? 1 : 0
         );
     }
 

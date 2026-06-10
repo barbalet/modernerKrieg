@@ -750,6 +750,7 @@ mk_result_t mk_board_view_collect_traffic_vehicle_markers(
         out_markers[marker_index].seat_capacity = vehicle->seat_capacity;
         out_markers[marker_index].occupied_seats = vehicle->occupied_seats;
         out_markers[marker_index].active = vehicle->active;
+        out_markers[marker_index].blocks_movement = vehicle->blocks_movement;
         marker_index += 1U;
     }
 

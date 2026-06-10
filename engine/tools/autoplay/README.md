@@ -6,7 +6,7 @@ The first tool, `mk_headless_run`, loads a MOSUL scenario and advances it for a 
 
 The `mk_ai_battle` tool runs repeated MOSUL AI-vs-AI battles with both tactical sides controlled by AI. It is available from CMake and from the checked-in `modernerKriegAIBattles.xcodeproj` command-line project. It can sweep deterministic seed ranges and fail a batch when settlement, stall, or score expectations are not met. The stall watchdog hashes units, civilians, contact reports, searched terrain/zones, and portal breach state so interaction progress counts as real battle progress.
 
-The `mk_replay_validate` tool validates the first line-oriented `.mkreplay` event format, can assert final replay result/outcome fields, and can print a compact tick-by-tick playback summary from the validated event stream. Score events include objective, contested, interaction, and civilian-risk fields.
+The `mk_replay_validate` tool validates the first line-oriented `.mkreplay` event format, can assert final replay result/outcome fields, and can print a compact tick-by-tick playback summary from the validated event stream. Score events include objective, contested, interaction, and civilian-risk fields; traffic vehicle events include position, destination, route, seat, active, and blocking state.
 
 Useful options:
 
@@ -16,7 +16,7 @@ Useful options:
 - `--seed N`: override the scenario seed for repeatable variants.
 - `--quiet`: suppress console transcript output.
 - `--transcript PATH`: write the run transcript to a file.
-- `--replay PATH`: write a versioned replay/event file with unit, objective, score, contact, and end records.
+- `--replay PATH`: write a versioned replay/event file with unit, civilian, traffic vehicle, objective, score, contact, and end records.
 - `--ai-only`: let tactical AI controllers issue orders for both non-civilian sides before each tick.
 - `--aar`: append a deterministic after-action summary after the result line.
 - `--briefing`: print or record the scenario briefing before the first tick.

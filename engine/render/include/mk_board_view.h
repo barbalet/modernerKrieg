@@ -41,6 +41,7 @@ typedef struct {
     int seat_capacity;
     int occupied_seats;
     bool active;
+    bool blocks_movement;
 } mk_traffic_vehicle_marker_t;
 
 typedef enum {

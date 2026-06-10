@@ -247,6 +247,83 @@ static mk_scenario_definition_t make_east_mosul_block_scenario_fixture(void) {
     return scenario;
 }
 
+static mk_scenario_definition_t make_traffic_vehicle_route_scenario(void) {
+    mk_scenario_definition_t scenario;
+    mk_gameplay_area_t area = make_test_gameplay_area();
+    mk_weapon_profile_t rifle;
+    mk_soldier_t soldier;
+    mk_unit_t unit;
+    mk_traffic_vehicle_t vehicle;
+
+    memset(&scenario, 0, sizeof(scenario));
+    strcpy(scenario.name, "Traffic Vehicle Route Scenario");
+    scenario.seed = 66;
+    scenario.map = mk_make_map("Traffic Route Map", 100.0f, 100.0f);
+    assert(mk_scenario_set_gameplay_area(&scenario, &area) == MK_OK);
+
+    rifle = mk_make_weapon("M4", 300, 2, 35, 8);
+
+    unit = mk_make_unit("Route Passenger One", MK_SIDE_PLAYER, MK_TRAINING_REGULAR, mk_vec2(5.0f, 5.0f));
+    soldier = mk_make_soldier("Rifleman One", MK_ROLE_RIFLEMAN, rifle);
+    assert(mk_unit_add_soldier(&unit, &soldier, NULL) == MK_OK);
+    assert(mk_scenario_add_unit(&scenario, &unit, NULL) == MK_OK);
+
+    unit = mk_make_unit("Route Passenger Two", MK_SIDE_PLAYER, MK_TRAINING_REGULAR, mk_vec2(6.0f, 5.0f));
+    soldier = mk_make_soldier("Rifleman Two", MK_ROLE_RIFLEMAN, rifle);
+    assert(mk_unit_add_soldier(&unit, &soldier, NULL) == MK_OK);
+    assert(mk_scenario_add_unit(&scenario, &unit, NULL) == MK_OK);
+
+    unit = mk_make_unit("Route Passenger Three", MK_SIDE_PLAYER, MK_TRAINING_REGULAR, mk_vec2(7.0f, 5.0f));
+    soldier = mk_make_soldier("Rifleman Three", MK_ROLE_RIFLEMAN, rifle);
+    assert(mk_unit_add_soldier(&unit, &soldier, NULL) == MK_OK);
+    assert(mk_scenario_add_unit(&scenario, &unit, NULL) == MK_OK);
+
+    vehicle = mk_make_traffic_vehicle("route_bus", "Route Bus", MK_TRAFFIC_VEHICLE_BUS, mk_vec2(5.0f, 5.0f));
+    strcpy(vehicle.level_id, "ground");
+    assert(mk_scenario_add_traffic_vehicle(&scenario, &vehicle, NULL) == MK_OK);
+
+    vehicle = mk_make_traffic_vehicle(
+        "route_motorcycle",
+        "Route Motorcycle",
+        MK_TRAFFIC_VEHICLE_MOTORCYCLE,
+        mk_vec2(30.0f, 5.0f)
+    );
+    strcpy(vehicle.level_id, "ground");
+    assert(mk_scenario_add_traffic_vehicle(&scenario, &vehicle, NULL) == MK_OK);
+
+    return scenario;
+}
+
+static mk_scenario_definition_t make_traffic_vehicle_blocking_scenario(void) {
+    mk_scenario_definition_t scenario;
+    mk_weapon_profile_t rifle;
+    mk_soldier_t soldier;
+    mk_unit_t unit;
+    mk_traffic_vehicle_t vehicle;
+
+    memset(&scenario, 0, sizeof(scenario));
+    strcpy(scenario.name, "Traffic Vehicle Blocking Scenario");
+    scenario.seed = 77;
+    scenario.map = mk_make_map("Traffic Blocking Map", 100.0f, 100.0f);
+
+    rifle = mk_make_weapon("M4", 300, 2, 35, 8);
+    unit = mk_make_unit("Blocked Team", MK_SIDE_PLAYER, MK_TRAINING_REGULAR, mk_vec2(5.0f, 5.0f));
+    soldier = mk_make_soldier("Blocked Rifleman", MK_ROLE_RIFLEMAN, rifle);
+    assert(mk_unit_add_soldier(&unit, &soldier, NULL) == MK_OK);
+    assert(mk_scenario_add_unit(&scenario, &unit, NULL) == MK_OK);
+
+    vehicle = mk_make_traffic_vehicle("unit_blocker", "Unit Blocker", MK_TRAFFIC_VEHICLE_CAR, mk_vec2(14.0f, 5.0f));
+    assert(mk_scenario_add_traffic_vehicle(&scenario, &vehicle, NULL) == MK_OK);
+
+    vehicle = mk_make_traffic_vehicle("moving_car", "Moving Car", MK_TRAFFIC_VEHICLE_CAR, mk_vec2(5.0f, 20.0f));
+    assert(mk_scenario_add_traffic_vehicle(&scenario, &vehicle, NULL) == MK_OK);
+
+    vehicle = mk_make_traffic_vehicle("vehicle_blocker", "Vehicle Blocker", MK_TRAFFIC_VEHICLE_BUS, mk_vec2(16.0f, 20.0f));
+    assert(mk_scenario_add_traffic_vehicle(&scenario, &vehicle, NULL) == MK_OK);
+
+    return scenario;
+}
+
 static void test_version_is_present(void) {
     assert(strcmp(mk_version(), "0.1.0") == 0);
 }
@@ -963,6 +1040,9 @@ static void test_snapshot_is_stable_copy(void) {
     assert(snapshot.civilian_group_count == 4);
     assert(snapshot.civilian_count == 7);
     assert(snapshot.traffic_vehicle_count == 6);
+    assert(strcmp(snapshot.traffic_vehicles[0].scenario_id, "north_market_bus") == 0);
+    assert(snapshot.traffic_vehicles[0].active);
+    assert(snapshot.traffic_vehicles[0].blocks_movement);
     assert(snapshot.map.tile_count == 100);
     assert(snapshot.controllers[1].side == MK_SIDE_OPFOR);
     assert(snapshot.forces[1].faction_id == 2);
@@ -975,9 +1055,11 @@ static void test_snapshot_is_stable_copy(void) {
     game.units[0].suppression = 99;
     game.controllers[0].kind = MK_CONTROLLER_HUMAN;
     game.civilians[0].stress = 99;
+    game.traffic_vehicles[0].position_m.x = 999.0f;
     assert(snapshot.units[0].suppression == 4);
     assert(snapshot.controllers[0].kind == MK_CONTROLLER_TACTICAL_AI);
     assert(snapshot.civilians[0].stress == 0);
+    assert(snapshot.traffic_vehicles[0].position_m.x != 999.0f);
 }
 
 static void test_pick_select_and_move_order(void) {
@@ -1583,45 +1665,159 @@ static void test_after_action_report_is_stable(void) {
     assert(strstr(report.summary, "ticks=5") != NULL);
 }
 
-static void test_traffic_vehicle_boarding_moves_units(void) {
-    mk_scenario_definition_t scenario = make_east_mosul_block_scenario_fixture();
-    mk_game_t game;
-    mk_traffic_vehicle_t *bus;
+static void test_traffic_vehicle_runtime_routes_boarding_and_determinism(void) {
+    mk_scenario_definition_t scenario = make_traffic_vehicle_route_scenario();
+    mk_game_t first;
+    mk_game_t second;
+    mk_game_t failure_game;
+    mk_game_snapshot_t snapshot;
+    mk_traffic_vehicle_t *first_bus;
+    mk_traffic_vehicle_t *second_bus;
     mk_traffic_vehicle_t *motorcycle;
-    mk_unit_t *unit;
-    mk_vec2_t bus_start;
+    mk_unit_t *first_unit;
+    mk_unit_t *second_unit;
+    mk_unit_t *third_unit;
+    int tick;
 
-    assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
-    assert(game.traffic_vehicle_count == 6);
+    assert(mk_game_load_scenario(&first, &scenario) == MK_OK);
+    assert(mk_game_load_scenario(&second, &scenario) == MK_OK);
 
-    bus = mk_game_find_traffic_vehicle(&game, 1);
-    motorcycle = mk_game_find_traffic_vehicle(&game, 5);
-    unit = mk_game_find_unit(&game, 1);
-    assert(bus != NULL);
+    assert(mk_game_issue_traffic_vehicle_move_order(&first, 1, "roof", mk_vec2(12.0f, 20.0f)) == MK_OK);
+    assert(mk_game_issue_traffic_vehicle_move_order(&second, 1, "roof", mk_vec2(12.0f, 20.0f)) == MK_OK);
+    assert(mk_game_board_traffic_vehicle(&first, 1, 1) == MK_OK);
+    assert(mk_game_board_traffic_vehicle(&second, 1, 1) == MK_OK);
+
+    first_bus = mk_game_find_traffic_vehicle(&first, 1);
+    second_bus = mk_game_find_traffic_vehicle(&second, 1);
+    first_unit = mk_game_find_unit(&first, 1);
+    assert(first_bus != NULL);
+    assert(second_bus != NULL);
+    assert(first_unit != NULL);
+    assert(first_bus->boarding_mode == MK_TRAFFIC_BOARD_INSIDE);
+    assert(first_bus->has_destination);
+    assert(first_bus->has_route);
+    assert(first_bus->route_step_count == 3);
+    assert(first_bus->route_uses_vertical_transition);
+    assert(first_bus->embarked_unit_count == 1);
+    assert(first_bus->occupied_seats == 1);
+    assert_close(first_unit->position_m.x, first_bus->position_m.x);
+    assert_close(first_unit->position_m.y, first_bus->position_m.y);
+
+    for (tick = 0; tick < 4; ++tick) {
+        mk_game_step(&first);
+        mk_game_step(&second);
+    }
+
+    assert_close(first_bus->position_m.x, second_bus->position_m.x);
+    assert_close(first_bus->position_m.y, second_bus->position_m.y);
+    assert_close(first.units[0].position_m.x, second.units[0].position_m.x);
+    assert_close(first.units[0].position_m.y, second.units[0].position_m.y);
+    assert(first_bus->route_step_index == second_bus->route_step_index);
+    assert(first_bus->occupied_seats == second_bus->occupied_seats);
+
+    assert(mk_game_snapshot(&first, &snapshot) == MK_OK);
+    assert(snapshot.traffic_vehicle_count == 2);
+    assert(snapshot.traffic_vehicles[0].occupied_seats == 1);
+    assert(snapshot.traffic_vehicles[0].blocks_movement);
+
+    for (tick = 0; tick < 20 && first_bus->has_destination; ++tick) {
+        mk_game_step(&first);
+    }
+
+    assert(!first_bus->has_destination);
+    assert(!first_bus->has_route);
+    assert(strcmp(first_bus->level_id, "roof") == 0);
+    assert(first_bus->route_vertical_transitions_completed == 1U);
+    assert_close(first_bus->position_m.x, 12.0f);
+    assert_close(first_bus->position_m.y, 20.0f);
+    assert_close(first_unit->position_m.x, first_bus->position_m.x);
+    assert_close(first_unit->position_m.y, first_bus->position_m.y);
+    assert(strcmp(first_unit->level_id, "roof") == 0);
+
+    assert(mk_game_unboard_traffic_vehicle(&first, first_bus->id, first_unit->id) == MK_OK);
+    assert(first_bus->embarked_unit_count == 0);
+    assert(first_bus->occupied_seats == 0);
+    assert(first_unit->order == MK_ORDER_HOLD);
+    assert(strcmp(first_unit->level_id, "roof") == 0);
+
+    motorcycle = mk_game_find_traffic_vehicle(&first, 2);
+    second_unit = mk_game_find_unit(&first, 2);
+    third_unit = mk_game_find_unit(&first, 3);
     assert(motorcycle != NULL);
-    assert(unit != NULL);
-    assert(bus->boarding_mode == MK_TRAFFIC_BOARD_INSIDE);
+    assert(second_unit != NULL);
+    assert(third_unit != NULL);
     assert(motorcycle->boarding_mode == MK_TRAFFIC_BOARD_ON);
-
-    bus_start = bus->position_m;
-    assert(mk_game_board_traffic_vehicle(&game, bus->id, unit->id) == MK_OK);
-    assert(bus->embarked_unit_count == 1);
-    assert(bus->occupied_seats == 1);
-    assert_close(unit->position_m.x, bus->position_m.x);
-    assert_close(unit->position_m.y, bus->position_m.y);
-
-    mk_game_step(&game);
-    assert(mk_vec2_distance(bus->position_m, bus_start) > 0.0f);
-    assert_close(unit->position_m.x, bus->position_m.x);
-    assert_close(unit->position_m.y, bus->position_m.y);
-
-    assert(mk_game_unboard_traffic_vehicle(&game, bus->id, unit->id) == MK_OK);
-    assert(bus->embarked_unit_count == 0);
-    assert(bus->occupied_seats == 0);
-
-    assert(mk_game_board_traffic_vehicle(&game, motorcycle->id, unit->id) == MK_OK);
+    assert(mk_game_board_traffic_vehicle(&first, motorcycle->id, second_unit->id) == MK_OK);
     assert(motorcycle->embarked_unit_count == 1);
     assert(motorcycle->occupied_seats == 1);
+    assert(mk_game_board_traffic_vehicle(&first, motorcycle->id, third_unit->id) == MK_ERROR_CAPACITY);
+    assert(motorcycle->occupied_seats == 1);
+
+    assert(mk_game_board_traffic_vehicle(&first, first_bus->id, second_unit->id) == MK_OK);
+    assert(motorcycle->embarked_unit_count == 0);
+    assert(motorcycle->occupied_seats == 0);
+    assert(first_bus->embarked_unit_count == 1);
+    assert(first_bus->occupied_seats == 1);
+    assert_close(second_unit->position_m.x, first_bus->position_m.x);
+    assert_close(second_unit->position_m.y, first_bus->position_m.y);
+
+    assert(mk_game_load_scenario(&failure_game, &scenario) == MK_OK);
+    strcpy(failure_game.gameplay_area.topology_portals[0].state, "locked");
+    assert(mk_game_issue_traffic_vehicle_move_order(&failure_game, 1, "roof", mk_vec2(12.0f, 20.0f))
+        == MK_ERROR_NOT_FOUND);
+    first_bus = mk_game_find_traffic_vehicle(&failure_game, 1);
+    assert(first_bus != NULL);
+    assert(!first_bus->has_destination);
+    assert(!first_bus->has_route);
+    assert(strcmp(first_bus->route_failure_reason, "unreachable") == 0);
+}
+
+static void test_traffic_vehicle_runtime_blocking(void) {
+    mk_scenario_definition_t scenario = make_traffic_vehicle_blocking_scenario();
+    mk_game_t game;
+    mk_unit_t *unit;
+    mk_traffic_vehicle_t *unit_blocker;
+    mk_traffic_vehicle_t *moving_car;
+    mk_traffic_vehicle_t *vehicle_blocker;
+
+    assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
+    unit = mk_game_find_unit(&game, 1);
+    unit_blocker = mk_game_find_traffic_vehicle(&game, 1);
+    moving_car = mk_game_find_traffic_vehicle(&game, 2);
+    vehicle_blocker = mk_game_find_traffic_vehicle(&game, 3);
+    assert(unit != NULL);
+    assert(unit_blocker != NULL);
+    assert(moving_car != NULL);
+    assert(vehicle_blocker != NULL);
+    assert(unit_blocker->blocks_movement);
+    assert(vehicle_blocker->blocks_movement);
+
+    assert(mk_game_issue_move_order(&game, unit->id, mk_vec2(18.0f, 5.0f)) == MK_OK);
+    mk_game_step(&game);
+    assert_close(unit->position_m.x, 5.0f);
+    assert_close(unit->position_m.y, 5.0f);
+    assert(!unit->has_move_target);
+    assert(unit->order == MK_ORDER_HOLD);
+    assert(unit->route_failure_count == 1U);
+    assert(strcmp(unit->route_failure_reason, "traffic_blocked") == 0);
+
+    unit_blocker->blocks_movement = false;
+    assert(mk_game_issue_move_order(&game, unit->id, mk_vec2(18.0f, 5.0f)) == MK_OK);
+    mk_game_step(&game);
+    assert(unit->position_m.x > 5.0f);
+
+    assert(mk_game_issue_traffic_vehicle_move_order(&game, moving_car->id, NULL, mk_vec2(24.0f, 20.0f)) == MK_OK);
+    mk_game_step(&game);
+    assert_close(moving_car->position_m.x, 5.0f);
+    assert_close(moving_car->position_m.y, 20.0f);
+    assert(!moving_car->has_destination);
+    assert(moving_car->route_failure_count == 1U);
+    assert(strcmp(moving_car->route_failure_reason, "traffic_blocked") == 0);
+
+    vehicle_blocker->blocks_movement = false;
+    assert(mk_game_issue_traffic_vehicle_move_order(&game, moving_car->id, NULL, mk_vec2(24.0f, 20.0f)) == MK_OK);
+    mk_game_step(&game);
+    assert(moving_car->position_m.x > 5.0f);
 }
 
 static void test_invalid_scenario_is_rejected(void) {
@@ -1697,7 +1893,8 @@ int main(void) {
     test_objective_control_and_scoring();
     test_score_uses_scenario_weights();
     test_after_action_report_is_stable();
-    test_traffic_vehicle_boarding_moves_units();
+    test_traffic_vehicle_runtime_routes_boarding_and_determinism();
+    test_traffic_vehicle_runtime_blocking();
     test_invalid_scenario_is_rejected();
 
     puts("mk_core_tests: ok");

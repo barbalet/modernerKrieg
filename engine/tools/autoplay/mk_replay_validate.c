@@ -21,11 +21,13 @@ typedef struct {
     uint32_t expected_steps;
     uint32_t expected_units;
     uint32_t expected_civilians;
+    uint32_t expected_traffic_vehicles;
     uint32_t expected_objectives;
     uint32_t initial_contacts;
     uint32_t current_tick;
     uint32_t current_units;
     uint32_t current_civilians;
+    uint32_t current_traffic_vehicles;
     uint32_t current_objectives;
     uint32_t current_scores;
     uint32_t current_contacts;
@@ -271,6 +273,11 @@ static bool mk_replay_finalize_tick(
         return mk_replay_fail(config, line_number, "tick does not contain the expected civilian records");
     }
 
+    if (state->expected_traffic_vehicles > 0U
+        && state->current_traffic_vehicles != state->expected_traffic_vehicles) {
+        return mk_replay_fail(config, line_number, "tick does not contain the expected traffic vehicle records");
+    }
+
     if (state->current_objectives != state->expected_objectives) {
         return mk_replay_fail(config, line_number, "tick does not contain the expected objective records");
     }
@@ -291,9 +298,10 @@ static bool mk_replay_finalize_tick(
 
         if (in_range) {
             printf(
-                "replay tick=%u units=%u objectives=%u contacts=%u score=%d outcome=%s controlled=%u contested=%u interaction=%d civilian_risk=%d\n",
+                "replay tick=%u units=%u traffic_vehicles=%u objectives=%u contacts=%u score=%d outcome=%s controlled=%u contested=%u interaction=%d civilian_risk=%d\n",
                 state->current_tick,
                 state->current_units,
+                state->current_traffic_vehicles,
                 state->current_objectives,
                 state->current_contacts,
                 state->current_score,
@@ -332,6 +340,7 @@ static bool mk_replay_begin_tick(
     state->current_tick = tick;
     state->current_units = 0;
     state->current_civilians = 0;
+    state->current_traffic_vehicles = 0;
     state->current_objectives = 0;
     state->current_scores = 0;
     state->current_contacts = 0;
@@ -391,6 +400,9 @@ static bool mk_replay_validate_start_event(
         || !mk_replay_read_field_u32(line, "objectives", &state->expected_objectives)
         || !mk_replay_read_field_u32(line, "contacts", &state->initial_contacts)) {
         return mk_replay_fail(config, line_number, "start event is missing required counts");
+    }
+    if (!mk_replay_read_field_u32(line, "traffic_vehicles", &state->expected_traffic_vehicles)) {
+        state->expected_traffic_vehicles = 0U;
     }
 
     state->total_contacts = state->initial_contacts;
@@ -526,6 +538,54 @@ static bool mk_replay_validate_civilian_event(
     }
 
     state->current_civilians += 1U;
+    return true;
+}
+
+static bool mk_replay_validate_traffic_vehicle_event(
+    const mk_replay_validate_config_t *config,
+    mk_replay_state_t *state,
+    const char *line,
+    uint32_t line_number
+) {
+    static const char *const kinds[] = {"car", "bus", "motorcycle"};
+    static const char *const boardings[] = {"inside", "on"};
+    char word[32];
+    uint32_t id;
+    int scratch_int;
+
+    if (state == NULL || !state->have_start) {
+        return mk_replay_fail(config, line_number, "traffic vehicle event appeared before start");
+    }
+
+    if (!mk_replay_read_field_u32(line, "id", &id)
+        || id == 0U
+        || !mk_replay_has_quoted_field(line, "scenario")
+        || !mk_replay_has_quoted_field(line, "name")
+        || !mk_replay_read_enum(line, "vehicle_kind", kinds, sizeof(kinds) / sizeof(kinds[0]), word, sizeof(word))
+        || !mk_replay_read_enum(line, "boarding", boardings, sizeof(boardings) / sizeof(boardings[0]), word, sizeof(word))
+        || !mk_replay_has_quoted_field(line, "sprite")
+        || !mk_replay_has_quoted_field(line, "node")
+        || !mk_replay_has_quoted_field(line, "level")
+        || !mk_replay_read_field_number(line, "x")
+        || !mk_replay_read_field_number(line, "y")
+        || !mk_replay_read_field_number(line, "dest_x")
+        || !mk_replay_read_field_number(line, "dest_y")
+        || !mk_replay_validate_bool_field(line, "has_destination")
+        || !mk_replay_validate_bool_field(line, "has_route")
+        || !mk_replay_read_field_u32(line, "route_step", &id)
+        || !mk_replay_read_field_u32(line, "route_steps", &id)
+        || !mk_replay_read_field_i32(line, "route_cost", &scratch_int)
+        || !mk_replay_read_field_u32(line, "route_failures", &id)
+        || !mk_replay_has_quoted_field(line, "route_reason")
+        || !mk_replay_read_field_number(line, "facing")
+        || !mk_replay_read_field_i32(line, "seats", &scratch_int)
+        || !mk_replay_read_field_i32(line, "occupied", &scratch_int)
+        || !mk_replay_validate_bool_field(line, "active")
+        || !mk_replay_validate_bool_field(line, "blocks_movement")) {
+        return mk_replay_fail(config, line_number, "traffic vehicle event is missing required fields");
+    }
+
+    state->current_traffic_vehicles += 1U;
     return true;
 }
 
@@ -779,6 +839,10 @@ static bool mk_replay_validate_event(
         return mk_replay_validate_civilian_event(config, state, line, line_number);
     }
 
+    if (strcmp(kind, "traffic_vehicle") == 0) {
+        return mk_replay_validate_traffic_vehicle_event(config, state, line, line_number);
+    }
+
     if (strcmp(kind, "gameplay_area") == 0) {
         return mk_replay_validate_gameplay_area_event(config, state, line, tick, line_number);
     }
@@ -992,10 +1056,11 @@ int main(int argc, char **argv) {
 
     if (!config.quiet) {
         printf(
-            "replay ok path=\"%s\" ticks=%u units=%u objectives=%u contacts=%u score=%d outcome=%s result=%s\n",
+            "replay ok path=\"%s\" ticks=%u units=%u traffic_vehicles=%u objectives=%u contacts=%u score=%d outcome=%s result=%s\n",
             config.path,
             state.final_tick,
             state.expected_units,
+            state.expected_traffic_vehicles,
             state.expected_objectives,
             state.total_contacts,
             state.final_score,
