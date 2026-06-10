@@ -41,6 +41,140 @@ static void load_default_data_scenario(mk_scenario_definition_t *out_scenario) {
     MK_TEST_ASSERT(mk_mosul_load_scenario_file(path, MK_TEST_PROJECT_ROOT, out_scenario) == MK_OK);
 }
 
+typedef struct {
+    const char *scenario_id;
+    const char *name;
+    const char *sprite_id;
+    mk_traffic_vehicle_kind_t kind;
+    mk_traffic_boarding_mode_t boarding_mode;
+    float position_x;
+    float position_y;
+    float destination_x;
+    float destination_y;
+    float speed_m_per_tick;
+    float facing_degrees;
+    int seat_capacity;
+} expected_traffic_vehicle_t;
+
+static const expected_traffic_vehicle_t k_expected_market_traffic_vehicles[] = {
+    {
+        "north_market_bus",
+        "North Market Bus",
+        "traffic_city_bus_intact_north",
+        MK_TRAFFIC_VEHICLE_BUS,
+        MK_TRAFFIC_BOARD_INSIDE,
+        242.0f,
+        382.0f,
+        242.0f,
+        232.0f,
+        5.5f,
+        270.0f,
+        24
+    },
+    {
+        "south_market_bus",
+        "South Market Bus",
+        "traffic_city_bus_intact_north",
+        MK_TRAFFIC_VEHICLE_BUS,
+        MK_TRAFFIC_BOARD_INSIDE,
+        258.0f,
+        472.0f,
+        258.0f,
+        318.0f,
+        5.0f,
+        270.0f,
+        24
+    },
+    {
+        "market_west_car",
+        "Market West Car",
+        "traffic_civilian_car_intact_north",
+        MK_TRAFFIC_VEHICLE_CAR,
+        MK_TRAFFIC_BOARD_INSIDE,
+        226.0f,
+        234.0f,
+        166.0f,
+        234.0f,
+        7.5f,
+        180.0f,
+        4
+    },
+    {
+        "market_east_car",
+        "Market East Car",
+        "traffic_civilian_car_intact_north",
+        MK_TRAFFIC_VEHICLE_CAR,
+        MK_TRAFFIC_BOARD_INSIDE,
+        322.0f,
+        236.0f,
+        406.0f,
+        236.0f,
+        7.0f,
+        0.0f,
+        4
+    },
+    {
+        "souq_motorcycle",
+        "Souq Motorcycle",
+        "traffic_motorcycle_intact_north",
+        MK_TRAFFIC_VEHICLE_MOTORCYCLE,
+        MK_TRAFFIC_BOARD_ON,
+        350.0f,
+        252.0f,
+        284.0f,
+        252.0f,
+        10.0f,
+        180.0f,
+        1
+    },
+    {
+        "east_shopfront_car",
+        "East Shopfront Car",
+        "traffic_civilian_car_intact_north",
+        MK_TRAFFIC_VEHICLE_CAR,
+        MK_TRAFFIC_BOARD_INSIDE,
+        438.0f,
+        238.0f,
+        386.0f,
+        238.0f,
+        6.5f,
+        180.0f,
+        4
+    }
+};
+
+static void assert_market_traffic_vehicle_records(const mk_traffic_vehicle_t *vehicles, size_t count) {
+    size_t index;
+
+    MK_TEST_ASSERT(vehicles != NULL);
+    MK_TEST_ASSERT(count == sizeof(k_expected_market_traffic_vehicles) / sizeof(k_expected_market_traffic_vehicles[0]));
+
+    for (index = 0; index < count; ++index) {
+        const expected_traffic_vehicle_t *expected = &k_expected_market_traffic_vehicles[index];
+        const mk_traffic_vehicle_t *vehicle = &vehicles[index];
+
+        MK_TEST_ASSERT(vehicle->id == (uint32_t)(index + 1));
+        MK_TEST_ASSERT(strcmp(vehicle->scenario_id, expected->scenario_id) == 0);
+        MK_TEST_ASSERT(strcmp(vehicle->name, expected->name) == 0);
+        MK_TEST_ASSERT(strcmp(vehicle->sprite_id, expected->sprite_id) == 0);
+        MK_TEST_ASSERT(strcmp(vehicle->level_id, "level_01_ground") == 0);
+        MK_TEST_ASSERT(strcmp(vehicle->destination_level_id, "level_01_ground") == 0);
+        MK_TEST_ASSERT(vehicle->kind == expected->kind);
+        MK_TEST_ASSERT(vehicle->boarding_mode == expected->boarding_mode);
+        MK_TEST_ASSERT_CLOSE(vehicle->position_m.x, expected->position_x);
+        MK_TEST_ASSERT_CLOSE(vehicle->position_m.y, expected->position_y);
+        MK_TEST_ASSERT(vehicle->has_destination);
+        MK_TEST_ASSERT_CLOSE(vehicle->destination_m.x, expected->destination_x);
+        MK_TEST_ASSERT_CLOSE(vehicle->destination_m.y, expected->destination_y);
+        MK_TEST_ASSERT_CLOSE(vehicle->speed_m_per_tick, expected->speed_m_per_tick);
+        MK_TEST_ASSERT_CLOSE(vehicle->facing_degrees, expected->facing_degrees);
+        MK_TEST_ASSERT(vehicle->seat_capacity == expected->seat_capacity);
+        MK_TEST_ASSERT(vehicle->occupied_seats == 0);
+        MK_TEST_ASSERT(vehicle->active);
+        MK_TEST_ASSERT(vehicle->blocks_movement);
+    }
+}
+
 static void test_default_scenario_data_matches_fixture_shape(void) {
     mk_scenario_definition_t loaded;
     mk_scenario_definition_t fixture;
@@ -121,13 +255,7 @@ static void test_default_scenario_data_matches_fixture_shape(void) {
     MK_TEST_ASSERT(strcmp(loaded.civilians[6].archetype_id, "wounded_bystander") == 0);
     MK_TEST_ASSERT(strcmp(loaded.civilians[6].topology_node_id, "market_stalls_ground") == 0);
     MK_TEST_ASSERT(loaded.civilians[6].risk == 1);
-    MK_TEST_ASSERT(strcmp(loaded.traffic_vehicles[0].scenario_id, "north_market_bus") == 0);
-    MK_TEST_ASSERT(loaded.traffic_vehicles[0].kind == MK_TRAFFIC_VEHICLE_BUS);
-    MK_TEST_ASSERT(loaded.traffic_vehicles[0].seat_capacity == 24);
-    MK_TEST_ASSERT(loaded.traffic_vehicles[0].boarding_mode == MK_TRAFFIC_BOARD_INSIDE);
-    MK_TEST_ASSERT(strcmp(loaded.traffic_vehicles[4].scenario_id, "souq_motorcycle") == 0);
-    MK_TEST_ASSERT(loaded.traffic_vehicles[4].kind == MK_TRAFFIC_VEHICLE_MOTORCYCLE);
-    MK_TEST_ASSERT(loaded.traffic_vehicles[4].boarding_mode == MK_TRAFFIC_BOARD_ON);
+    assert_market_traffic_vehicle_records(loaded.traffic_vehicles, loaded.traffic_vehicle_count);
     MK_TEST_ASSERT(strcmp(loaded.units[3].template_id, "rooftop_watcher") == 0);
     MK_TEST_ASSERT(strcmp(loaded.units[3].level_id, "level_04_roof_access") == 0);
     MK_TEST_ASSERT(strcmp(loaded.units[3].topology_node_id, "hotel_roof_access") == 0);
@@ -275,6 +403,8 @@ static void test_public_default_scenario_uses_data_file(void) {
     MK_TEST_ASSERT(game.civilian_archetype_count == 4);
     MK_TEST_ASSERT(game.civilian_group_count == 4);
     MK_TEST_ASSERT(game.civilian_count == 7);
+    MK_TEST_ASSERT(game.traffic_vehicle_count == 6);
+    assert_market_traffic_vehicle_records(game.traffic_vehicles, game.traffic_vehicle_count);
     MK_TEST_ASSERT(game.unit_count == 6);
     MK_TEST_ASSERT(mk_gameplay_area_is_loaded(&game.gameplay_area));
     MK_TEST_ASSERT(game.gameplay_area.level_count == 4);
