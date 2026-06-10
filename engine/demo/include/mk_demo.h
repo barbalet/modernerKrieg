@@ -47,6 +47,7 @@ typedef struct {
 typedef struct {
     uint32_t tick;
     uint32_t selected_unit_id;
+    uint32_t selected_traffic_vehicle_id;
     uint32_t unit_count;
     uint32_t civilian_count;
     uint32_t objective_count;
@@ -112,6 +113,8 @@ typedef struct {
     char asset_path[MK_PATH_CAPACITY];
     mk_side_t side;
     mk_order_t order;
+    mk_traffic_vehicle_kind_t traffic_vehicle_kind;
+    mk_traffic_boarding_mode_t boarding_mode;
     mk_vec2_t position_m;
     mk_vec2_t target_position_m;
     mk_vec2_t screen_position_px;
@@ -120,6 +123,9 @@ typedef struct {
     float screen_radius_px;
     float facing_degrees;
     int intensity;
+    int seat_capacity;
+    int occupied_seats;
+    bool blocks_movement;
     bool selected;
 } mk_demo_draw_command_t;
 
@@ -195,6 +201,21 @@ mk_result_t mk_demo_session_issue_selected_move_screen(
     mk_demo_session_t *session,
     mk_vec2_t screen_position_px
 );
+mk_result_t mk_demo_session_issue_selected_traffic_vehicle_move_screen(
+    mk_demo_session_t *session,
+    mk_vec2_t screen_position_px
+);
+mk_result_t mk_demo_session_board_unit_traffic_vehicle(
+    mk_demo_session_t *session,
+    uint32_t unit_id,
+    uint32_t vehicle_id
+);
+mk_result_t mk_demo_session_unboard_unit_traffic_vehicle(
+    mk_demo_session_t *session,
+    uint32_t unit_id,
+    uint32_t vehicle_id
+);
+mk_result_t mk_demo_session_board_selected_unit_to_selected_traffic_vehicle(mk_demo_session_t *session);
 
 #ifdef __cplusplus
 }

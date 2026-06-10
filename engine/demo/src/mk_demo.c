@@ -20,6 +20,7 @@ struct mk_demo_session {
     bool has_game;
     bool has_snapshot;
     bool ai_only;
+    uint32_t selected_traffic_vehicle_id;
     float screen_width_px;
     float screen_height_px;
     float margin_px;
@@ -63,7 +64,7 @@ static bool mk_demo_copy_traffic_vehicle_runtime_path(
     }
 
     if (item_id == NULL) {
-        mk_demo_copy_text(destination, capacity, sprite_id);
+        destination[0] = '\0';
         return false;
     }
 
@@ -466,6 +467,7 @@ mk_result_t mk_demo_session_load_scenario(
     }
 
     session->has_game = true;
+    session->selected_traffic_vehicle_id = 0U;
     result = mk_board_view_fit_map(
         &session->view,
         &session->game.map,
@@ -548,6 +550,7 @@ mk_result_t mk_demo_session_summary(mk_demo_session_t *session, mk_demo_summary_
     memset(out_summary, 0, sizeof(*out_summary));
     out_summary->tick = session->snapshot.tick;
     out_summary->selected_unit_id = session->snapshot.selected_unit_id;
+    out_summary->selected_traffic_vehicle_id = session->selected_traffic_vehicle_id;
     out_summary->unit_count = (uint32_t)session->snapshot.unit_count;
     out_summary->civilian_count = (uint32_t)session->snapshot.civilian_count;
     out_summary->objective_count = (uint32_t)session->snapshot.objective_count;
@@ -747,12 +750,13 @@ mk_result_t mk_demo_session_debug_text(
             out_text,
             capacity,
             &length,
-            "counts units=%u civilians=%u objectives=%u contacts=%u selected=%u\n",
+            "counts units=%u civilians=%u objectives=%u contacts=%u selected=%u selected_vehicle=%u\n",
             (unsigned)summary.unit_count,
             (unsigned)summary.civilian_count,
             (unsigned)summary.objective_count,
             (unsigned)summary.contact_report_count,
-            (unsigned)summary.selected_unit_id
+            (unsigned)summary.selected_unit_id,
+            (unsigned)summary.selected_traffic_vehicle_id
         )
         || !mk_demo_append_text(
             out_text,
@@ -976,12 +980,12 @@ mk_result_t mk_demo_session_collect_draw_commands(
             vehicle->position_m
         );
 
-        (void)mk_demo_copy_traffic_vehicle_runtime_path(
-            command.asset_path,
-            sizeof(command.asset_path),
-            vehicle->sprite_id
-        );
+        if (!mk_demo_copy_traffic_vehicle_runtime_path(command.asset_path, sizeof(command.asset_path), vehicle->sprite_id)) {
+            return MK_ERROR_INVALID_DATA;
+        }
         command.side = MK_SIDE_CIVILIAN;
+        command.traffic_vehicle_kind = vehicle->kind;
+        command.boarding_mode = vehicle->boarding_mode;
         command.screen_position_px = vehicle->screen_position_px;
         command.target_position_m = vehicle->position_m;
         command.target_screen_position_px = vehicle->screen_position_px;
@@ -989,6 +993,10 @@ mk_result_t mk_demo_session_collect_draw_commands(
         command.screen_radius_px = command.radius_m * session->view.scale_px_per_m;
         command.facing_degrees = vehicle->facing_degrees;
         command.intensity = (int)vehicle->occupied_seats;
+        command.seat_capacity = vehicle->seat_capacity;
+        command.occupied_seats = vehicle->occupied_seats;
+        command.blocks_movement = vehicle->blocks_movement;
+        command.selected = vehicle->vehicle_id == session->selected_traffic_vehicle_id;
         result = mk_demo_push_draw_command(out_commands, command_capacity, &command_index, &command);
         if (result != MK_OK) {
             return result;
@@ -1335,8 +1343,13 @@ mk_result_t mk_demo_session_select_screen(
     }
 
     if (pick.kind == MK_DEMO_PICK_UNIT) {
+        session->selected_traffic_vehicle_id = 0U;
         result = mk_game_select_unit(&session->game, pick.id);
+    } else if (pick.kind == MK_DEMO_PICK_TRAFFIC_VEHICLE) {
+        session->selected_traffic_vehicle_id = pick.id;
+        result = MK_OK;
     } else {
+        session->selected_traffic_vehicle_id = 0U;
         result = mk_game_clear_selection(&session->game);
     }
     if (result != MK_OK) {
@@ -1388,4 +1401,88 @@ mk_result_t mk_demo_session_issue_selected_move_screen(
     }
 
     return result;
+}
+
+mk_result_t mk_demo_session_issue_selected_traffic_vehicle_move_screen(
+    mk_demo_session_t *session,
+    mk_vec2_t screen_position_px
+) {
+    mk_vec2_t position_m;
+    mk_result_t result;
+
+    if (session == NULL || !session->has_game || !mk_demo_board_is_ready(session)) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+    if (session->selected_traffic_vehicle_id == 0U) {
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    position_m = mk_board_view_screen_to_map(&session->view, screen_position_px);
+    result = mk_game_issue_traffic_vehicle_move_order(
+        &session->game,
+        session->selected_traffic_vehicle_id,
+        NULL,
+        position_m
+    );
+    if (result == MK_OK) {
+        session->counters.order_requests += 1;
+        (void)mk_demo_refresh_snapshot(session);
+    }
+
+    return result;
+}
+
+mk_result_t mk_demo_session_board_unit_traffic_vehicle(
+    mk_demo_session_t *session,
+    uint32_t unit_id,
+    uint32_t vehicle_id
+) {
+    mk_result_t result;
+
+    if (session == NULL || !session->has_game || unit_id == 0U || vehicle_id == 0U) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    result = mk_game_board_traffic_vehicle(&session->game, vehicle_id, unit_id);
+    if (result == MK_OK) {
+        session->counters.order_requests += 1;
+        (void)mk_demo_refresh_snapshot(session);
+    }
+
+    return result;
+}
+
+mk_result_t mk_demo_session_unboard_unit_traffic_vehicle(
+    mk_demo_session_t *session,
+    uint32_t unit_id,
+    uint32_t vehicle_id
+) {
+    mk_result_t result;
+
+    if (session == NULL || !session->has_game || unit_id == 0U || vehicle_id == 0U) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+
+    result = mk_game_unboard_traffic_vehicle(&session->game, vehicle_id, unit_id);
+    if (result == MK_OK) {
+        session->counters.order_requests += 1;
+        (void)mk_demo_refresh_snapshot(session);
+    }
+
+    return result;
+}
+
+mk_result_t mk_demo_session_board_selected_unit_to_selected_traffic_vehicle(mk_demo_session_t *session) {
+    if (session == NULL || !session->has_game) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+    if (session->snapshot.selected_unit_id == 0U || session->selected_traffic_vehicle_id == 0U) {
+        return MK_ERROR_NOT_FOUND;
+    }
+
+    return mk_demo_session_board_unit_traffic_vehicle(
+        session,
+        session->snapshot.selected_unit_id,
+        session->selected_traffic_vehicle_id
+    );
 }
