@@ -168,8 +168,9 @@ Traffic vehicles are now represented as dynamic runtime sprites rather than scen
 
 ## Dynamic Vehicle And Map Cleanup Cycles
 
-Current active cycle: cycle 3, vehicle-free map rerender. Last completed cycle:
-cycle 2, asset audit. Last updated: 2026-06-09.
+Current active cycle: cycle 3, vehicle-free map rerender. Status: active,
+blocked on an exact 7,000 px geometry-preserving map renderer. Last completed
+cycle: cycle 2, asset audit. Last updated: 2026-06-09.
 
 When work advances, update this tracker in the same commit as the relevant
 code, art, or asset changes. Keep exactly one cycle marked `active` until the
@@ -183,6 +184,11 @@ cycle should leave the repository in a testable state.
 Cycle 2 audit artifact:
 
 - `docs/market_commercial_streets_vehicle_bake_audit.md`
+
+Cycle 3 current artifacts:
+
+- `docs/market_commercial_streets_vehicle_free_rerender_attempt.md`
+- `assets/mosul/runtime/maps/market_commercial_streets_2003/candidates/vehicle_free_candidate_1254.png`
 
 | Cycle | Status | Name | Exit Criteria |
 | --- | --- | --- | --- |
