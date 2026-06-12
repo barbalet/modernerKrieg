@@ -454,6 +454,60 @@ static const expected_traffic_vehicle_t k_expected_market_traffic_vehicles[] = {
     }
 };
 
+static bool is_main_road_static_traffic_id(const char *scenario_id) {
+    static const char *const main_road_static_ids[] = {
+        "central_avenue_static_car_north",
+        "central_avenue_static_car_mid",
+        "central_avenue_static_bus_mid",
+        "south_avenue_static_car_upper",
+        "south_avenue_static_bus_mid",
+        "south_avenue_static_car_lower",
+        "west_market_static_car_approach",
+        "west_market_static_van_awning",
+        "east_market_static_car_inner",
+        "east_market_static_car_outer",
+        "souq_lane_static_motorcycle",
+        "souq_lane_static_car",
+        "east_shopfront_static_car_inner",
+        "east_shopfront_static_car_outer",
+        "west_entry_static_car",
+        "west_entry_static_van",
+        "north_avenue_static_car_roofline",
+        "north_avenue_static_car_market"
+    };
+    size_t index;
+
+    if (scenario_id == NULL) {
+        return false;
+    }
+
+    for (index = 0; index < sizeof(main_road_static_ids) / sizeof(main_road_static_ids[0]); ++index) {
+        if (strcmp(scenario_id, main_road_static_ids[index]) == 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static const mk_traffic_vehicle_t *find_traffic_vehicle_by_scenario_id(
+    const mk_traffic_vehicle_t *vehicles,
+    size_t count,
+    const char *scenario_id
+) {
+    size_t index;
+
+    MK_TEST_ASSERT(vehicles != NULL);
+    MK_TEST_ASSERT(scenario_id != NULL);
+    for (index = 0; index < count; ++index) {
+        if (strcmp(vehicles[index].scenario_id, scenario_id) == 0) {
+            return &vehicles[index];
+        }
+    }
+
+    return NULL;
+}
+
 static void assert_market_traffic_vehicle_records(const mk_traffic_vehicle_t *vehicles, size_t count) {
     size_t index;
 
@@ -777,6 +831,82 @@ static void test_scenario_variant_smokes_load(void) {
         MK_TEST_ASSERT(mk_mosul_load_scenario_file(path, MK_TEST_PROJECT_ROOT, &scenario) == MK_OK);
         MK_TEST_ASSERT(mk_gameplay_area_topology_is_loaded(&scenario.gameplay_area));
     }
+}
+
+static void test_clear_roads_scenario_variants_load(void) {
+    char path[512];
+    mk_scenario_definition_t clear_roads;
+    mk_scenario_definition_t nonblocking_static_roads;
+    mk_game_t game;
+    const mk_traffic_vehicle_t *vehicle;
+    size_t index;
+
+    make_project_path(
+        path,
+        sizeof(path),
+        "game/mosul/scenarios/market_commercial_streets_clear_roads_2003.mkscenario"
+    );
+    MK_TEST_ASSERT(mk_mosul_load_scenario_file(path, MK_TEST_PROJECT_ROOT, &clear_roads) == MK_OK);
+    MK_TEST_ASSERT(strcmp(clear_roads.name, "Market Commercial Streets Clear Roads 2003") == 0);
+    MK_TEST_ASSERT(clear_roads.traffic_vehicle_count == 8);
+    MK_TEST_ASSERT(find_traffic_vehicle_by_scenario_id(
+        clear_roads.traffic_vehicles,
+        clear_roads.traffic_vehicle_count,
+        "north_market_bus"
+    ) != NULL);
+    MK_TEST_ASSERT(find_traffic_vehicle_by_scenario_id(
+        clear_roads.traffic_vehicles,
+        clear_roads.traffic_vehicle_count,
+        "east_market_static_car_inner"
+    ) == NULL);
+    MK_TEST_ASSERT(find_traffic_vehicle_by_scenario_id(
+        clear_roads.traffic_vehicles,
+        clear_roads.traffic_vehicle_count,
+        "southeast_static_car_courtyard"
+    ) != NULL);
+    for (index = 0; index < clear_roads.traffic_vehicle_count; ++index) {
+        MK_TEST_ASSERT(!is_main_road_static_traffic_id(clear_roads.traffic_vehicles[index].scenario_id));
+    }
+    MK_TEST_ASSERT(mk_game_load_scenario(&game, &clear_roads) == MK_OK);
+    MK_TEST_ASSERT(game.traffic_vehicle_count == clear_roads.traffic_vehicle_count);
+
+    make_project_path(
+        path,
+        sizeof(path),
+        "game/mosul/scenarios/market_commercial_streets_nonblocking_static_roads_2003.mkscenario"
+    );
+    MK_TEST_ASSERT(mk_mosul_load_scenario_file(path, MK_TEST_PROJECT_ROOT, &nonblocking_static_roads) == MK_OK);
+    MK_TEST_ASSERT(strcmp(
+        nonblocking_static_roads.name,
+        "Market Commercial Streets Nonblocking Static Roads 2003"
+    ) == 0);
+    MK_TEST_ASSERT(nonblocking_static_roads.traffic_vehicle_count == EXPECTED_MARKET_TRAFFIC_VEHICLE_COUNT);
+    for (index = 0; index < nonblocking_static_roads.traffic_vehicle_count; ++index) {
+        const mk_traffic_vehicle_t *current = &nonblocking_static_roads.traffic_vehicles[index];
+
+        if (is_main_road_static_traffic_id(current->scenario_id)) {
+            MK_TEST_ASSERT(!current->has_destination);
+            MK_TEST_ASSERT(!current->blocks_movement);
+        }
+    }
+    vehicle = find_traffic_vehicle_by_scenario_id(
+        nonblocking_static_roads.traffic_vehicles,
+        nonblocking_static_roads.traffic_vehicle_count,
+        "market_east_car"
+    );
+    MK_TEST_ASSERT(vehicle != NULL);
+    MK_TEST_ASSERT(vehicle->has_destination);
+    MK_TEST_ASSERT(vehicle->blocks_movement);
+    vehicle = find_traffic_vehicle_by_scenario_id(
+        nonblocking_static_roads.traffic_vehicles,
+        nonblocking_static_roads.traffic_vehicle_count,
+        "southeast_static_car_courtyard"
+    );
+    MK_TEST_ASSERT(vehicle != NULL);
+    MK_TEST_ASSERT(!vehicle->has_destination);
+    MK_TEST_ASSERT(vehicle->blocks_movement);
+    MK_TEST_ASSERT(mk_game_load_scenario(&game, &nonblocking_static_roads) == MK_OK);
+    MK_TEST_ASSERT(game.traffic_vehicle_count == nonblocking_static_roads.traffic_vehicle_count);
 }
 
 static void test_missing_asset_manifest_is_rejected(void) {
@@ -1145,6 +1275,7 @@ int main(void) {
     test_control_smoke_scenario_loads();
     test_contested_risk_smoke_scenario_loads();
     test_scenario_variant_smokes_load();
+    test_clear_roads_scenario_variants_load();
     test_missing_asset_manifest_is_rejected();
     test_market_scenario_requires_building_level_manifest();
     test_market_scenario_requires_topology_manifest();
