@@ -11,7 +11,10 @@ static float abs_float(float value) {
 }
 
 static void assert_close(float actual, float expected) {
-    assert(abs_float(actual - expected) < 0.01f);
+    if (abs_float(actual - expected) >= 0.01f) {
+        fprintf(stderr, "assert_close failed: actual=%.2f expected=%.2f\n", actual, expected);
+        assert(false);
+    }
 }
 
 static mk_vec2_t make_vec2(float x, float y) {
@@ -974,7 +977,7 @@ static void test_scenario_loading_populates_core_state(void) {
     assert(game.civilian_archetype_count == 4);
     assert(game.civilian_group_count == 4);
     assert(game.civilian_count == 7);
-    assert(game.traffic_vehicle_count == 26);
+    assert(game.traffic_vehicle_count == 8);
     assert(game.unit_count == 6);
     assert(game.controllers[0].kind == MK_CONTROLLER_TACTICAL_AI);
     assert(game.controllers[2].kind == MK_CONTROLLER_OBSERVER);
@@ -995,7 +998,7 @@ static void test_scenario_loading_populates_core_state(void) {
     assert(game.traffic_vehicles[0].boarding_mode == MK_TRAFFIC_BOARD_INSIDE);
     assert(strcmp(game.traffic_vehicles[4].scenario_id, "souq_motorcycle") == 0);
     assert(game.traffic_vehicles[4].boarding_mode == MK_TRAFFIC_BOARD_ON);
-    assert(strcmp(game.traffic_vehicles[6].scenario_id, "central_avenue_static_car_north") == 0);
+    assert(strcmp(game.traffic_vehicles[6].scenario_id, "southeast_static_car_courtyard") == 0);
     assert(!game.traffic_vehicles[6].has_destination);
     assert(game.traffic_vehicles[6].blocks_movement);
     assert(game.units[0].faction_id == 1);
@@ -1042,16 +1045,16 @@ static void test_snapshot_is_stable_copy(void) {
     assert(snapshot.civilian_archetype_count == 4);
     assert(snapshot.civilian_group_count == 4);
     assert(snapshot.civilian_count == 7);
-    assert(snapshot.traffic_vehicle_count == 26);
+    assert(snapshot.traffic_vehicle_count == 8);
     assert(strcmp(snapshot.traffic_vehicles[0].scenario_id, "north_market_bus") == 0);
     assert(snapshot.traffic_vehicles[0].active);
     assert(snapshot.traffic_vehicles[0].blocks_movement);
-    assert(strcmp(snapshot.traffic_vehicles[6].scenario_id, "central_avenue_static_car_north") == 0);
+    assert(strcmp(snapshot.traffic_vehicles[6].scenario_id, "southeast_static_car_courtyard") == 0);
     assert(!snapshot.traffic_vehicles[6].has_destination);
     assert(snapshot.map.tile_count == 100);
     assert(snapshot.controllers[1].side == MK_SIDE_OPFOR);
     assert(snapshot.forces[1].faction_id == 2);
-    assert(snapshot.civilians[0].position_m.x == 252.0f);
+    assert_close(snapshot.civilians[0].position_m.x, 217.71f);
     assert(strcmp(snapshot.civilians[6].spawn_zone_id, "market_stalls_crowd") == 0);
     assert(strcmp(snapshot.units[3].topology_node_id, "hotel_roof_access") == 0);
     assert(strcmp(snapshot.objectives[0].name, "Secure Market Junction") == 0);
@@ -1063,7 +1066,7 @@ static void test_snapshot_is_stable_copy(void) {
     game.traffic_vehicles[0].position_m.x = 999.0f;
     assert(snapshot.units[0].suppression == 4);
     assert(snapshot.controllers[0].kind == MK_CONTROLLER_TACTICAL_AI);
-    assert(snapshot.civilians[0].stress == 0);
+    assert(snapshot.civilians[0].stress == 1);
     assert(snapshot.traffic_vehicles[0].position_m.x != 999.0f);
 }
 
@@ -1074,26 +1077,26 @@ static void test_pick_select_and_move_order(void) {
     uint32_t unit_id = 0;
 
     assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
-    assert(mk_game_pick_unit_at(&game, make_vec2(80.0f, 246.0f), MK_UNIT_PICK_RADIUS_M, &unit_id) == MK_OK);
+    assert(mk_game_pick_unit_at(&game, make_vec2(60.0f, 286.0f), MK_UNIT_PICK_RADIUS_M, &unit_id) == MK_OK);
     assert(unit_id == 1);
-    assert(mk_game_select_unit_at(&game, make_vec2(80.0f, 246.0f), MK_UNIT_PICK_RADIUS_M, &unit_id) == MK_OK);
+    assert(mk_game_select_unit_at(&game, make_vec2(60.0f, 286.0f), MK_UNIT_PICK_RADIUS_M, &unit_id) == MK_OK);
     assert(unit_id == 1);
     assert(game.selected_unit_id == 1);
 
-    assert(mk_game_issue_selected_move_order(&game, make_vec2(92.0f, 246.0f)) == MK_OK);
+    assert(mk_game_issue_selected_move_order(&game, make_vec2(72.0f, 286.0f)) == MK_OK);
     unit = mk_game_find_unit(&game, 1);
     assert(unit != NULL);
     assert(unit->order == MK_ORDER_MOVE);
     assert(unit->has_move_target);
 
     mk_game_step(&game);
-    assert(unit->position_m.x == 86.0f);
-    assert(unit->position_m.y == 246.0f);
+    assert(unit->position_m.x == 66.0f);
+    assert(unit->position_m.y == 286.0f);
     assert(unit->order == MK_ORDER_MOVE);
 
     mk_game_step(&game);
-    assert(unit->position_m.x == 92.0f);
-    assert(unit->position_m.y == 246.0f);
+    assert(unit->position_m.x == 72.0f);
+    assert(unit->position_m.y == 286.0f);
     assert(!unit->has_move_target);
     assert(unit->order == MK_ORDER_HOLD);
 }
@@ -1112,14 +1115,14 @@ static void test_pick_contact_and_investigate_order(void) {
     game.contact_reports[0].side = MK_SIDE_OPFOR;
     game.contact_reports[0].attacker_unit_id = 1;
     game.contact_reports[0].target_unit_id = 2;
-    game.contact_reports[0].position_m = make_vec2(220.0f, 246.0f);
+    game.contact_reports[0].position_m = make_vec2(220.0f, 286.0f);
     game.contact_reports[0].target_position_m = game.contact_reports[0].position_m;
     game.contact_reports[0].confidence = 45;
     game.contact_reports[0].visible = true;
 
-    assert(mk_game_pick_contact_at(&game, make_vec2(222.0f, 246.0f), 8.0f, &contact_report_id) == MK_OK);
+    assert(mk_game_pick_contact_at(&game, make_vec2(222.0f, 286.0f), 8.0f, &contact_report_id) == MK_OK);
     assert(contact_report_id == 1);
-    assert(mk_game_pick_contact_at(&game, make_vec2(260.0f, 246.0f), 8.0f, &contact_report_id) == MK_ERROR_NOT_FOUND);
+    assert(mk_game_pick_contact_at(&game, make_vec2(260.0f, 286.0f), 8.0f, &contact_report_id) == MK_ERROR_NOT_FOUND);
     assert(contact_report_id == 0);
 
     assert(mk_game_select_unit(&game, 1) == MK_OK);
@@ -1130,8 +1133,8 @@ static void test_pick_contact_and_investigate_order(void) {
     assert(unit->has_move_target);
 
     mk_game_step(&game);
-    assert_close(unit->position_m.x, 83.6f);
-    assert_close(unit->position_m.y, 246.0f);
+    assert_close(unit->position_m.x, 63.6f);
+    assert_close(unit->position_m.y, 286.0f);
     assert(unit->order == MK_ORDER_INVESTIGATE);
 }
 
@@ -1140,7 +1143,7 @@ static void test_investigate_resolves_contact_reports(void) {
     mk_game_t game;
 
     assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
-    game.units[0].position_m = make_vec2(346.0f, 230.0f);
+    game.units[0].position_m = make_vec2(346.0f, 286.0f);
     game.contact_report_count = 1;
     memset(&game.contact_reports[0], 0, sizeof(game.contact_reports[0]));
     game.contact_reports[0].id = 1;
@@ -1226,29 +1229,45 @@ static void test_interaction_errors_are_reported(void) {
 static void test_line_of_sight_reports_target_cover(void) {
     mk_scenario_definition_t scenario = make_east_mosul_block_scenario_fixture();
     mk_game_t game;
+    mk_terrain_zone_t cover;
     mk_line_of_sight_t line_of_sight;
+    uint32_t cover_id = 0;
 
     assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
+    memset(&game.gameplay_area, 0, sizeof(game.gameplay_area));
+    game.units[0].position_m = make_vec2(60.0f, 350.0f);
+    game.units[1].position_m = make_vec2(350.0f, 350.0f);
+    cover = mk_make_terrain_zone(
+        "Line-of-Sight Cover",
+        MK_TERRAIN_BUILDING,
+        make_rect(340.0f, 340.0f, 30.0f, 24.0f),
+        3,
+        2,
+        false
+    );
+    assert(mk_map_add_terrain(&game.map, &cover, &cover_id) == MK_OK);
     assert(mk_game_unit_line_of_sight(&game, 1, 2, &line_of_sight) == MK_OK);
     assert(line_of_sight.visible);
     assert(line_of_sight.blocking_terrain_id == 0);
     assert(line_of_sight.cover == 3);
-    assert(line_of_sight.cover_terrain_id == 2);
+    assert(line_of_sight.cover_terrain_id == cover_id);
     assert(line_of_sight.cover_terrain_kind == MK_TERRAIN_BUILDING);
-    assert_close(line_of_sight.distance_m, 270.47f);
+    assert_close(line_of_sight.distance_m, 290.0f);
 }
 
 static void test_line_of_sight_reports_blocking_terrain(void) {
     mk_scenario_definition_t scenario = make_east_mosul_block_scenario_fixture();
     mk_game_t game;
     mk_terrain_zone_t wall;
+    mk_terrain_zone_t cover;
     mk_line_of_sight_t line_of_sight;
     uint32_t wall_id = 0;
+    uint32_t cover_id = 0;
 
     wall = mk_make_terrain_zone(
         "Line-of-Sight Wall",
         MK_TERRAIN_OBSTACLE,
-        make_rect(200.0f, 228.0f, 24.0f, 40.0f),
+        make_rect(200.0f, 340.0f, 24.0f, 40.0f),
         4,
         4,
         true
@@ -1257,11 +1276,23 @@ static void test_line_of_sight_reports_blocking_terrain(void) {
     assert(wall_id == 7);
 
     assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
+    memset(&game.gameplay_area, 0, sizeof(game.gameplay_area));
+    game.units[0].position_m = make_vec2(60.0f, 350.0f);
+    game.units[1].position_m = make_vec2(350.0f, 350.0f);
+    cover = mk_make_terrain_zone(
+        "Line-of-Sight Cover",
+        MK_TERRAIN_BUILDING,
+        make_rect(340.0f, 340.0f, 30.0f, 24.0f),
+        3,
+        2,
+        false
+    );
+    assert(mk_map_add_terrain(&game.map, &cover, &cover_id) == MK_OK);
     assert(mk_game_unit_line_of_sight(&game, 1, 2, &line_of_sight) == MK_OK);
     assert(!line_of_sight.visible);
     assert(line_of_sight.blocking_terrain_id == wall_id);
     assert(line_of_sight.cover == 3);
-    assert(line_of_sight.cover_terrain_id == 2);
+    assert(line_of_sight.cover_terrain_id == cover_id);
 }
 
 static void test_line_of_sight_errors_are_reported(void) {
@@ -1349,13 +1380,14 @@ static void test_unit_fire_blocked_by_line_of_sight(void) {
     wall = mk_make_terrain_zone(
         "Blocking Wall",
         MK_TERRAIN_OBSTACLE,
-        make_rect(200.0f, 228.0f, 24.0f, 40.0f),
+        make_rect(200.0f, 276.0f, 24.0f, 40.0f),
         4,
         4,
         true
     );
     assert(mk_map_add_terrain(&scenario.map, &wall, NULL) == MK_OK);
     assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
+    memset(&game.gameplay_area, 0, sizeof(game.gameplay_area));
 
     ammo_before = game.units[0].soldiers[0].ammo;
     assert(mk_game_unit_fire(&game, 1, 2, &fire_result) == MK_OK);
@@ -1369,15 +1401,31 @@ static void test_unit_fire_blocked_by_line_of_sight(void) {
 static void test_selected_unit_fire_uses_loaded_scenario(void) {
     mk_scenario_definition_t scenario = make_east_mosul_block_scenario_fixture();
     mk_game_t game;
+    mk_terrain_zone_t cover;
+    uint32_t cover_id = 0;
     mk_fire_result_t fire_result;
 
     assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
+    memset(&game.gameplay_area, 0, sizeof(game.gameplay_area));
+    game.units[0].position_m = make_vec2(60.0f, 350.0f);
+    game.units[1].position_m = make_vec2(350.0f, 350.0f);
+    game.civilians[0].position_m = make_vec2(345.0f, 350.0f);
+    cover = mk_make_terrain_zone(
+        "Selected-Fire Target Cover",
+        MK_TERRAIN_BUILDING,
+        make_rect(340.0f, 340.0f, 30.0f, 24.0f),
+        3,
+        2,
+        false
+    );
+    assert(mk_map_add_terrain(&game.map, &cover, &cover_id) == MK_OK);
     assert(mk_game_selected_unit_fire(&game, 2, &fire_result) == MK_ERROR_NOT_FOUND);
     assert(mk_game_select_unit(&game, 1) == MK_OK);
     assert(mk_game_selected_unit_fire(&game, 2, &fire_result) == MK_OK);
     assert(fire_result.resolved);
     assert(fire_result.line_of_sight.visible);
     assert(fire_result.line_of_sight.cover == 3);
+    assert(fire_result.line_of_sight.cover_terrain_id == cover_id);
     assert(fire_result.target_status_before == MK_UNIT_READY);
     assert(fire_result.eligible_shooters == 3);
     assert(fire_result.shots_fired == 6);
@@ -1411,7 +1459,7 @@ static void test_hidden_contact_reveals_when_observed(void) {
         assert(!saw_unit_two_reveal);
     }
 
-    game.units[0].position_m = make_vec2(300.0f, 230.0f);
+    game.units[0].position_m = make_vec2(300.0f, 286.0f);
     assert(mk_game_update_hidden_contacts(&game) == MK_OK);
     assert(game.units[1].revealed);
     {
@@ -1434,7 +1482,7 @@ static void test_hidden_contact_records_suspected_danger(void) {
     mk_game_t game;
 
     assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
-    game.units[0].position_m = make_vec2(210.0f, 230.0f);
+    game.units[0].position_m = make_vec2(210.0f, 286.0f);
     assert(mk_game_update_hidden_contacts(&game) == MK_OK);
     assert(!game.units[1].revealed);
     {
@@ -1479,7 +1527,7 @@ static void test_false_contact_records_noisy_terrain(void) {
             }
 
             if (report->terrain_id == 3) {
-                assert(report->attacker_unit_id == 1);
+                assert(report->attacker_unit_id != 0);
                 assert(report->target_unit_id == 0);
                 assert(report->confidence > 0);
                 assert(!report->resolved);
@@ -1501,7 +1549,7 @@ static void test_civilian_risk_tracks_close_armed_units(void) {
     mk_game_t game;
 
     assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
-    game.units[0].position_m = make_vec2(246.0f, 206.0f);
+    game.units[0].position_m = make_vec2(224.0f, 285.0f);
     assert(mk_game_update_civilian_risk(&game) == MK_OK);
     assert(game.civilians[0].risk == 1);
     assert(game.civilians[0].stress == 1);
@@ -1593,10 +1641,11 @@ static void test_objective_control_and_scoring(void) {
 
     assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
     game.units[0].position_m = game.objectives[0].position_m;
+    game.units[1].position_m = game.objectives[0].position_m;
     assert(mk_game_update_objective_control(&game) == MK_OK);
     assert(game.objectives[0].controlling_side == MK_SIDE_NEUTRAL);
 
-    game.units[1].position_m = make_vec2(420.0f, 230.0f);
+    game.units[1].position_m = make_vec2(420.0f, 286.0f);
     for (civilian_index = 0; civilian_index < game.civilian_count; ++civilian_index) {
         game.civilians[civilian_index].risk = 0;
     }

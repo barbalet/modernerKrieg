@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "id": "market_commercial_streets_demo_2003_vehicle_free_try1",
+  "display_name": "2003 Market / Commercial Streets Vehicle-Free Try 1",
+  "era": "2003",
+  "real_world_size_m": [
+    500,
+    500
+  ],
+  "overview_pixel_size": [
+    7000,
+    7000
+  ],
+  "overview_pixels_per_meter": 14,
+  "full_combat_pixels_per_meter": 70,
+  "full_combat_pixel_size": [
+    35000,
+    35000
+  ],
+  "art_style": "approved MOSUL black-and-white contemporary graphite line art; dense realistic top-down urban detail; no static traffic vehicle ink requested",
+  "source_lineart_reference": "/Users/barbalet/.codex/generated_images/019eb3ce-3c03-7cb0-9bde-4bee16629ccc/ig_01cdf5735bc4816d016a2b7d7aee80819880e9d09838c3df49.png",
+  "workflow": "Recovered original image-generation source plus deterministic 7000px layer-stack post-process; candidate only, not live gameplay asset.",
+  "composite": {
+    "id": "minimap_composite",
+    "path": "00_minimap_composite.png",
+    "mode": "opaque_grayscale"
+  },
+  "layers": [
+    {
+      "id": "ground",
+      "path": "01_ground_level.png",
+      "mode": "opaque_grayscale",
+      "z_index": 0
+    },
+    {
+      "id": "level_2",
+      "path": "02_level_2_alpha.png",
+      "mode": "rgba_alpha_overlay",
+      "z_index": 1
+    },
+    {
+      "id": "level_3",
+      "path": "03_level_3_alpha.png",
+      "mode": "rgba_alpha_overlay",
+      "z_index": 2
+    },
+    {
+      "id": "roof_access",
+      "path": "04_roof_access_alpha.png",
+      "mode": "rgba_alpha_overlay",
+      "z_index": 3
+    }
+  ],
+  "display_overviews": [
+    {
+      "id": "minimap_preview",
+      "path": "preview_1400.png",
+      "mode": "opaque_grayscale"
+    },
+    {
+      "id": "multistorey_lineart_overview",
+      "path": "06_multistorey_lineart_overview.png",
+      "mode": "opaque_grayscale"
+    },
+    {
+      "id": "multistorey_lineart_preview",
+      "path": "preview_multistorey_lineart_1400.png",
+      "mode": "opaque_grayscale"
+    }
+  ],
+  "multistorey_mask": {
+    "path": "05_multistorey_mask.png",
+    "preview_path": "preview_multistorey_mask_1400.png",
+    "lineart_overview_path": "06_multistorey_lineart_overview.png",
+    "mode": "opaque_grayscale",
+    "black": "single-layer terrain, road, courtyard, stall, open lot, or building without authored upper floor",
+    "white": "building footprint requiring one or more transparent upper-level PNG overlays",
+    "note": "This binary mask is renderer data, not presentation art."
+  }
+}

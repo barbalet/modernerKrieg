@@ -2,7 +2,7 @@
 
 Cycle 8 is the verification and polish pass for dynamic Mosul traffic vehicles.
 It turns the software-verifiable checks into repeatable CTest coverage and
-records the remaining map-art blocker plainly.
+verifies them against the promoted vehicle-free map.
 
 ## Automated Checks
 
@@ -24,31 +24,27 @@ headless replay from the default 2003 Market / Commercial Streets scenario and
 checks that:
 
 - the gameplay area reports the expected `7000 x 7000` tactical map metadata
-- the replay reports twenty-six traffic vehicle records
+- the replay reports eight traffic vehicle records
 - every tick contains a complete record for each vehicle
 - every vehicle record uses a known traffic sprite ID
 - every vehicle exposes valid kind, boarding mode, seat, occupancy, active, and
   movement-blocker fields
 - at least three traffic vehicles move by at least one meter during the smoke
   pass
-- at least twenty traffic vehicles begin without destinations, proving parked
-  vehicles are represented as static runtime blockers rather than ignored map
-  artwork
+- at least two traffic vehicles begin without destinations, proving parked
+  courtyard vehicles are represented as static runtime blockers rather than
+  ignored map artwork
 
 This gives the renderer and gameplay layer a repeatable in-game proof that
 traffic vehicles are dynamic runtime entities rather than static map marks.
-For the current map art, it also prevents moving vehicles from overrunning
-known baked vehicle marks by mirroring those marks as static traffic records.
 
 ## Visual Map Status
 
-The approved runtime Market / Commercial Streets map PNGs still contain baked
-vehicle ink. Cycle 3 remains blocked until an exact `7000 x 7000`
-geometry-preserving line-art map renderer is available.
-
-Cycle 8 does not edit the map PNGs by hand, does not use Pillow cleanup, and
-does not patch baked vehicles with simplified marks. The current software path
-is ready for a vehicle-free map once the approved renderer supplies it.
+The approved runtime Market / Commercial Streets map PNGs are now the cycle 3
+vehicle-free rerender. The live source/runtime level stack, building-level
+manifest, topology manifest, scenario placements, LOS samples, movement samples,
+and smoke expectations were reauthored together so the C gameplay data matches
+the new map geometry.
 
 ## Local Verification
 

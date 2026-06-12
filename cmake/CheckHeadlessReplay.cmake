@@ -64,7 +64,7 @@ endif()
 foreach(required_playback
     "replay tick=2"
     "replay tick=3"
-    "score=-53"
+    "score=-93"
     "outcome=failure")
   string(FIND "${playback_output}" "${required_playback}" found_playback)
   if(found_playback EQUAL -1)

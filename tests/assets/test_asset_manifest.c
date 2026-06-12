@@ -147,21 +147,21 @@ static void test_building_level_manifest_loads_multistorey_stack(void) {
     wall = mk_asset_find_building_feature(&manifest, "souq_west_outer_wall_ground");
     MK_TEST_ASSERT(wall != NULL);
     MK_TEST_ASSERT(strcmp(wall->kind, "wall") == 0);
-    MK_TEST_ASSERT(mk_asset_building_feature_contains_pixel(wall, 840, 1500));
-    MK_TEST_ASSERT(mk_asset_building_level_blocks_los_at_pixel(&manifest, "level_01_ground", 840, 1500));
-    MK_TEST_ASSERT(mk_asset_building_level_blocks_movement_at_pixel(&manifest, "level_01_ground", 840, 1500));
+    MK_TEST_ASSERT(mk_asset_building_feature_contains_pixel(wall, 1390, 1300));
+    MK_TEST_ASSERT(mk_asset_building_level_blocks_los_at_pixel(&manifest, "level_01_ground", 1390, 1300));
+    MK_TEST_ASSERT(mk_asset_building_level_blocks_movement_at_pixel(&manifest, "level_01_ground", 1390, 1300));
 
     door = mk_asset_find_building_feature(&manifest, "souq_west_door_ground");
     MK_TEST_ASSERT(door != NULL);
     MK_TEST_ASSERT(strcmp(door->kind, "door") == 0);
-    MK_TEST_ASSERT(!mk_asset_building_level_blocks_los_at_pixel(&manifest, "level_01_ground", 840, 2200));
-    MK_TEST_ASSERT(!mk_asset_building_level_blocks_movement_at_pixel(&manifest, "level_01_ground", 840, 2200));
+    MK_TEST_ASSERT(!mk_asset_building_level_blocks_los_at_pixel(&manifest, "level_01_ground", 1390, 1560));
+    MK_TEST_ASSERT(!mk_asset_building_level_blocks_movement_at_pixel(&manifest, "level_01_ground", 1390, 1560));
 
     window = mk_asset_find_building_feature(&manifest, "souq_east_window_ground");
     MK_TEST_ASSERT(window != NULL);
     MK_TEST_ASSERT(strcmp(window->kind, "window") == 0);
-    MK_TEST_ASSERT(!mk_asset_building_level_blocks_los_at_pixel(&manifest, "level_01_ground", 2110, 1720));
-    MK_TEST_ASSERT(mk_asset_building_level_blocks_movement_at_pixel(&manifest, "level_01_ground", 2110, 1720));
+    MK_TEST_ASSERT(!mk_asset_building_level_blocks_los_at_pixel(&manifest, "level_01_ground", 2300, 1320));
+    MK_TEST_ASSERT(mk_asset_building_level_blocks_movement_at_pixel(&manifest, "level_01_ground", 2300, 1320));
     MK_TEST_ASSERT(!mk_asset_building_level_blocks_los_at_pixel(&manifest, "level_01_ground", 100, 100));
     MK_TEST_ASSERT(!mk_asset_building_level_blocks_movement_at_pixel(&manifest, "level_01_ground", 100, 100));
 

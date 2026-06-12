@@ -9,7 +9,10 @@ static float abs_float(float value) {
 }
 
 static void assert_close(float actual, float expected) {
-    assert(abs_float(actual - expected) < 0.01f);
+    if (abs_float(actual - expected) >= 0.01f) {
+        fprintf(stderr, "assert_close failed: actual=%.2f expected=%.2f\n", actual, expected);
+        assert(false);
+    }
 }
 
 static mk_vec2_t make_vec2(float x, float y) {
@@ -37,7 +40,7 @@ static mk_game_snapshot_t make_snapshot(void) {
 static void test_fit_and_round_trip(void) {
     mk_game_snapshot_t snapshot = make_snapshot();
     mk_board_view_t view;
-    mk_vec2_t map_position = make_vec2(80.0f, 246.0f);
+    mk_vec2_t map_position = make_vec2(60.0f, 286.0f);
     mk_vec2_t screen_position;
     mk_vec2_t round_trip;
 
@@ -49,8 +52,8 @@ static void test_fit_and_round_trip(void) {
     assert_close(view.scale_px_per_m, 1.088f);
 
     screen_position = mk_board_view_map_to_screen(&view, map_position);
-    assert_close(screen_position.x, 135.04f);
-    assert_close(screen_position.y, 315.65f);
+    assert_close(screen_position.x, 113.28f);
+    assert_close(screen_position.y, 359.17f);
 
     round_trip = mk_board_view_screen_to_map(&view, screen_position);
     assert_close(round_trip.x, map_position.x);
@@ -101,8 +104,8 @@ static void test_soldier_markers_from_snapshot(void) {
     assert(markers[0].soldier_id == 1);
     assert(markers[0].role == MK_ROLE_LEADER);
     assert(markers[0].selected_unit);
-    assert_close(markers[0].position_m.x, 76.0f);
-    assert_close(markers[0].position_m.y, 243.0f);
+    assert_close(markers[0].position_m.x, 56.0f);
+    assert_close(markers[0].position_m.y, 283.0f);
 
     assert(markers[3].unit_id == 3);
     assert(markers[3].role == MK_ROLE_CIVILIAN);
@@ -141,7 +144,7 @@ static void test_tactical_overlays_from_snapshot(void) {
     assert(mk_mosul_make_east_block_scenario(&scenario) == MK_OK);
     assert(mk_game_load_scenario(&game, &scenario) == MK_OK);
     assert(mk_game_select_unit(&game, 1) == MK_OK);
-    assert(mk_game_issue_selected_move_order(&game, make_vec2(112.0f, 246.0f)) == MK_OK);
+    assert(mk_game_issue_selected_move_order(&game, make_vec2(92.0f, 286.0f)) == MK_OK);
     game.units[1].suppression = 9;
     game.units[1].status = MK_UNIT_PINNED;
     game.units[1].soldiers[0].casualty = true;
@@ -151,7 +154,7 @@ static void test_tactical_overlays_from_snapshot(void) {
     snapshot.units[0].has_route = true;
     snapshot.units[0].route_step_count = 2;
     snapshot.units[0].route_step_index = 1;
-    snapshot.units[0].route_waypoints_m[1] = make_vec2(96.0f, 240.0f);
+    snapshot.units[0].route_waypoints_m[1] = make_vec2(76.0f, 286.0f);
     snapshot.contact_report_count = 3;
     snapshot.contact_reports[0].id = 1;
     snapshot.contact_reports[0].kind = MK_CONTACT_REPORT_FIRE;
@@ -200,13 +203,13 @@ static void test_tactical_overlays_from_snapshot(void) {
         } else if (overlay->kind == MK_TACTICAL_OVERLAY_MOVE_ROUTE) {
             saw_route = true;
             assert(overlay->unit_id == 1);
-            assert_close(overlay->target_position_m.x, 96.0f);
-            assert_close(overlay->target_position_m.y, 240.0f);
+            assert_close(overlay->target_position_m.x, 76.0f);
+            assert_close(overlay->target_position_m.y, 286.0f);
             assert(overlay->intensity == 1);
         } else if (overlay->kind == MK_TACTICAL_OVERLAY_MOVE_TARGET) {
             saw_target = true;
             assert(overlay->unit_id == 1);
-            assert_close(overlay->position_m.x, 112.0f);
+            assert_close(overlay->position_m.x, 92.0f);
         } else if (overlay->kind == MK_TACTICAL_OVERLAY_FIRE) {
             saw_fire = true;
             assert(overlay->unit_id == 1);
@@ -264,18 +267,18 @@ static void test_tactical_overlays_from_snapshot(void) {
         } else if (overlay->kind == MK_TACTICAL_OVERLAY_BREACH_SEARCH) {
             saw_breach_search = true;
             assert(overlay->terrain_id == 4);
-            assert_close(overlay->position_m.x, 295.0f);
-            assert_close(overlay->position_m.y, 226.0f);
+            assert_close(overlay->position_m.x, 134.0f);
+            assert_close(overlay->position_m.y, 146.0f);
         } else if (overlay->kind == MK_TACTICAL_OVERLAY_ROOFTOP_ACCESS) {
             saw_rooftop_access = true;
             assert(overlay->terrain_id == 5);
-            assert_close(overlay->position_m.x, 364.0f);
-            assert_close(overlay->position_m.y, 166.0f);
+            assert_close(overlay->position_m.x, 397.0f);
+            assert_close(overlay->position_m.y, 42.0f);
         } else if (overlay->kind == MK_TACTICAL_OVERLAY_SEARCH_CACHE) {
             saw_search_cache = true;
             assert(overlay->terrain_id == 6);
-            assert_close(overlay->position_m.x, 224.0f);
-            assert_close(overlay->position_m.y, 328.0f);
+            assert_close(overlay->position_m.x, 297.5f);
+            assert_close(overlay->position_m.y, 313.0f);
         }
     }
 

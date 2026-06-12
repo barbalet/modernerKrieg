@@ -42,7 +42,7 @@ static mk_result_t mk_mosul_add_core_terrain(mk_scenario_definition_t *scenario)
     mk_terrain_zone_t road = mk_make_terrain_zone(
         "Commercial Street",
         MK_TERRAIN_ROAD,
-        mk_mosul_rect(0.0f, 220.0f, 500.0f, 52.0f),
+        mk_mosul_rect(0.0f, 270.0f, 500.0f, 60.0f),
         0,
         1,
         false
@@ -50,7 +50,7 @@ static mk_result_t mk_mosul_add_core_terrain(mk_scenario_definition_t *scenario)
     mk_terrain_zone_t compound = mk_make_terrain_zone(
         "Market Shops",
         MK_TERRAIN_BUILDING,
-        mk_mosul_rect(286.0f, 152.0f, 104.0f, 128.0f),
+        mk_mosul_rect(98.0f, 75.0f, 68.0f, 70.0f),
         3,
         2,
         true
@@ -58,7 +58,7 @@ static mk_result_t mk_mosul_add_core_terrain(mk_scenario_definition_t *scenario)
     mk_terrain_zone_t rubble = mk_make_terrain_zone(
         "Blocked Alley",
         MK_TERRAIN_RUBBLE,
-        mk_mosul_rect(180.0f, 296.0f, 76.0f, 68.0f),
+        mk_mosul_rect(236.0f, 236.0f, 64.0f, 50.0f),
         2,
         3,
         true
@@ -66,7 +66,7 @@ static mk_result_t mk_mosul_add_core_terrain(mk_scenario_definition_t *scenario)
     mk_terrain_zone_t breach = mk_make_terrain_zone(
         "Shopfront Breach Point",
         MK_TERRAIN_BREACH_POINT,
-        mk_mosul_rect(286.0f, 214.0f, 18.0f, 24.0f),
+        mk_mosul_rect(126.0f, 142.0f, 16.0f, 8.0f),
         2,
         3,
         false
@@ -74,7 +74,7 @@ static mk_result_t mk_mosul_add_core_terrain(mk_scenario_definition_t *scenario)
     mk_terrain_zone_t rooftop = mk_make_terrain_zone(
         "Roof Stair Access",
         MK_TERRAIN_ROOFTOP,
-        mk_mosul_rect(352.0f, 154.0f, 24.0f, 24.0f),
+        mk_mosul_rect(385.0f, 30.0f, 24.0f, 24.0f),
         2,
         2,
         false
@@ -82,7 +82,7 @@ static mk_result_t mk_mosul_add_core_terrain(mk_scenario_definition_t *scenario)
     mk_terrain_zone_t cache = mk_make_terrain_zone(
         "Possible Weapons Cache",
         MK_TERRAIN_SUSPECTED_IED,
-        mk_mosul_rect(210.0f, 316.0f, 28.0f, 24.0f),
+        mk_mosul_rect(282.0f, 300.0f, 31.0f, 26.0f),
         1,
         2,
         false
@@ -128,7 +128,7 @@ static mk_result_t mk_mosul_configure_tiles(mk_scenario_definition_t *scenario) 
 
     for (x = 0; x < 10; ++x) {
         mk_map_tile_t road = mk_make_map_tile(
-            mk_ivec2(x, 4),
+            mk_ivec2(x, 5),
             MK_TERRAIN_ROAD,
             0,
             0,
@@ -263,7 +263,7 @@ static mk_result_t mk_mosul_add_objectives(mk_scenario_definition_t *scenario) {
     mk_objective_t objective = mk_make_objective(
         "Secure Market Junction",
         MK_OBJECTIVE_CONTROL,
-        mk_mosul_vec2(330.0f, 238.0f),
+        mk_mosul_vec2(250.0f, 285.0f),
         28.0f,
         5
     );
@@ -283,7 +283,7 @@ static mk_result_t mk_mosul_add_cts_unit(
         "US Patrol Element",
         MK_SIDE_PLAYER,
         MK_TRAINING_VETERAN,
-        mk_mosul_vec2(80.0f, 246.0f)
+        mk_mosul_vec2(60.0f, 286.0f)
     );
     mk_soldier_t soldier;
     mk_result_t result;
@@ -329,7 +329,7 @@ static mk_result_t mk_mosul_add_defender_unit(
         "Armed Threat Cell",
         MK_SIDE_OPFOR,
         MK_TRAINING_REGULAR,
-        mk_mosul_vec2(350.0f, 230.0f)
+        mk_mosul_vec2(350.0f, 286.0f)
     );
     mk_soldier_t soldier;
     mk_result_t result;
@@ -370,10 +370,10 @@ static mk_result_t mk_mosul_add_civilians(
         "Sheltered Civilians",
         MK_SIDE_CIVILIAN,
         MK_TRAINING_UNTRAINED,
-        mk_mosul_vec2(252.0f, 206.0f)
+        mk_mosul_vec2(220.0f, 285.0f)
     );
     mk_soldier_t soldier = mk_make_soldier("Civilian Adult", MK_ROLE_CIVILIAN, unarmed);
-    mk_civilian_t civilian = mk_make_civilian("Civilian Adult", faction_id, mk_mosul_vec2(252.0f, 206.0f));
+    mk_civilian_t civilian = mk_make_civilian("Civilian Adult", faction_id, mk_mosul_vec2(220.0f, 285.0f));
     mk_result_t result;
 
     unit.faction_id = faction_id;

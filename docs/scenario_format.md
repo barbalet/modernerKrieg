@@ -146,8 +146,8 @@ traffic_vehicle.0.name=North Market Bus
 traffic_vehicle.0.kind=bus
 traffic_vehicle.0.sprite_id=traffic_city_bus_intact_north
 traffic_vehicle.0.level_id=level_01_ground
-traffic_vehicle.0.position=242,382
-traffic_vehicle.0.destination=242,232
+traffic_vehicle.0.position=246,382
+traffic_vehicle.0.destination=246,230
 traffic_vehicle.0.destination_level_id=level_01_ground
 traffic_vehicle.0.speed_m_per_tick=5.5
 traffic_vehicle.0.facing_degrees=270
@@ -260,7 +260,7 @@ Objectives require a formal `name` and may include a short `label` for HUDs, rep
 objective.0.name=Secure Market Junction
 objective.0.label=Market Junction
 objective.0.kind=control
-objective.0.position=330,238
+objective.0.position=250,285
 objective.0.radius_m=28
 objective.0.value=5
 ```

@@ -17,7 +17,7 @@
     35000,
     35000
   ],
-  "art_style": "approved MOSUL black-and-white contemporary graphite line art; dense realistic top-down urban detail; no stick art, no schematic placeholder art",
+  "art_style": "approved MOSUL black-and-white contemporary graphite line art; dense realistic top-down urban detail; no stick art, no schematic placeholder art; no baked static traffic vehicle ink",
   "composite": {
     "id": "minimap_composite",
     "path": "00_minimap_composite.png",
@@ -75,5 +75,5 @@
       "mode": "opaque_grayscale"
     }
   ],
-  "source_lineart_reference": "/Users/barbalet/.codex/generated_images/019e950b-525e-7881-939d-af918f4040ab/ig_043be3cb4a71a86d016a242fbe0e808198b53578531d69372b.png"
+  "source_lineart_reference": "/Users/barbalet/.codex/generated_images/019eb3ce-3c03-7cb0-9bde-4bee16629ccc/ig_01cdf5735bc4816d016a2b7d7aee80819880e9d09838c3df49.png"
 }

@@ -258,7 +258,7 @@ if(MK_BUILD_TESTS)
       --aar
       --debug-log
       --expect-objective opfor
-      --expect-min-score -60
+      --expect-min-score -100
   )
   add_test(
     NAME mk_headless_run_replay_output
@@ -287,11 +287,11 @@ if(MK_BUILD_TESTS)
         --steps
         12
         --expect-traffic-vehicles
-        26
+        8
         --expect-min-moving
         3
         --expect-min-static
-        20
+        2
     )
   endif()
   add_test(

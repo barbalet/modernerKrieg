@@ -97,15 +97,15 @@ static void test_basic_ai_emits_orders_for_both_sides(void) {
     MK_TEST_ASSERT(game.units[0].order == MK_ORDER_MOVE);
     MK_TEST_ASSERT(game.units[0].order_source == MK_ORDER_SOURCE_AI);
     MK_TEST_ASSERT(game.units[0].has_move_target);
-    MK_TEST_ASSERT_CLOSE(game.units[0].target_position_m.x, 330.0f);
-    MK_TEST_ASSERT_CLOSE(game.units[0].target_position_m.y, 238.0f);
+    MK_TEST_ASSERT_CLOSE(game.units[0].target_position_m.x, 250.0f);
+    MK_TEST_ASSERT_CLOSE(game.units[0].target_position_m.y, 285.0f);
 
     MK_TEST_ASSERT(game.units[1].side == MK_SIDE_OPFOR);
     MK_TEST_ASSERT(game.units[1].order == MK_ORDER_MOVE);
     MK_TEST_ASSERT(game.units[1].order_source == MK_ORDER_SOURCE_AI);
     MK_TEST_ASSERT(game.units[1].has_move_target);
-    MK_TEST_ASSERT_CLOSE(game.units[1].target_position_m.x, 330.0f);
-    MK_TEST_ASSERT_CLOSE(game.units[1].target_position_m.y, 238.0f);
+    MK_TEST_ASSERT_CLOSE(game.units[1].target_position_m.x, 250.0f);
+    MK_TEST_ASSERT_CLOSE(game.units[1].target_position_m.y, 285.0f);
 
     MK_TEST_ASSERT(game.units[2].side == MK_SIDE_CIVILIAN);
     MK_TEST_ASSERT(game.units[2].order == MK_ORDER_HOLD);
@@ -132,7 +132,7 @@ static void test_basic_ai_run_is_deterministic(void) {
     MK_TEST_ASSERT_CLOSE(first.units[1].position_m.y, second.units[1].position_m.y);
     MK_TEST_ASSERT(first.units[0].order == MK_ORDER_INVESTIGATE);
     MK_TEST_ASSERT(first.units[1].order == second.units[1].order);
-    MK_TEST_ASSERT(first.units[1].order == MK_ORDER_HOLD);
+    MK_TEST_ASSERT(first.units[1].order == MK_ORDER_MOVE);
     MK_TEST_ASSERT(first.units[2].order == MK_ORDER_HOLD);
 }
 
@@ -142,26 +142,27 @@ static void test_basic_ai_advances_expected_positions_and_respects_traffic(void)
     MK_TEST_ASSERT(mk_ai_issue_basic_orders(&game) == MK_OK);
     mk_game_step(&game);
 
-    MK_TEST_ASSERT_CLOSE(game.units[0].position_m.x, 86.00f);
-    MK_TEST_ASSERT_CLOSE(game.units[0].position_m.y, 245.81f);
-    MK_TEST_ASSERT_CLOSE(game.units[1].position_m.x, 350.00f);
-    MK_TEST_ASSERT_CLOSE(game.units[1].position_m.y, 230.00f);
-    MK_TEST_ASSERT(game.units[1].order == MK_ORDER_HOLD);
-    MK_TEST_ASSERT(!game.units[1].has_move_target);
-    MK_TEST_ASSERT(game.units[1].route_failure_count == 1U);
-    MK_TEST_ASSERT(strcmp(game.units[1].route_failure_reason, "traffic_blocked") == 0);
-    MK_TEST_ASSERT_CLOSE(game.units[2].position_m.x, 252.0f);
-    MK_TEST_ASSERT_CLOSE(game.units[2].position_m.y, 206.0f);
+    MK_TEST_ASSERT_CLOSE(game.units[0].position_m.x, 66.00f);
+    MK_TEST_ASSERT_CLOSE(game.units[0].position_m.y, 285.97f);
+    MK_TEST_ASSERT_CLOSE(game.units[1].position_m.x, 344.00f);
+    MK_TEST_ASSERT_CLOSE(game.units[1].position_m.y, 285.94f);
+    MK_TEST_ASSERT(game.units[1].order == MK_ORDER_MOVE);
+    MK_TEST_ASSERT(game.units[1].has_move_target);
+    MK_TEST_ASSERT(game.units[1].route_failure_count == 0U);
+    MK_TEST_ASSERT_CLOSE(game.units[2].position_m.x, 220.0f);
+    MK_TEST_ASSERT_CLOSE(game.units[2].position_m.y, 285.0f);
 }
 
 static void test_basic_ai_suppresses_at_close_range(void) {
     mk_game_t game = make_loaded_game();
 
-    game.units[0].position_m = mk_test_vec2(250.0f, 230.0f);
-    game.units[1].position_m = mk_test_vec2(350.0f, 230.0f);
+    memset(&game.gameplay_area, 0, sizeof(game.gameplay_area));
+    test_disable_protected_civilians(&game);
+    game.units[0].position_m = mk_test_vec2(250.0f, 285.0f);
+    game.units[1].position_m = mk_test_vec2(350.0f, 285.0f);
     game.units[1].hidden = false;
     game.units[1].revealed = true;
-    game.civilians[0].position_m = mk_test_vec2(252.0f, 180.0f);
+    game.civilians[0].position_m = mk_test_vec2(252.0f, 235.0f);
     MK_TEST_ASSERT(mk_ai_issue_basic_orders(&game) == MK_OK);
     MK_TEST_ASSERT(game.units[0].order == MK_ORDER_SUPPRESS);
     MK_TEST_ASSERT(game.units[1].order == MK_ORDER_SUPPRESS);
@@ -170,8 +171,8 @@ static void test_basic_ai_suppresses_at_close_range(void) {
 static void test_basic_ai_player_holds_near_civilian(void) {
     mk_game_t game = make_loaded_game();
 
-    game.units[0].position_m = mk_test_vec2(252.0f, 220.0f);
-    game.units[1].position_m = mk_test_vec2(350.0f, 230.0f);
+    game.units[0].position_m = mk_test_vec2(224.0f, 285.0f);
+    game.units[1].position_m = mk_test_vec2(350.0f, 285.0f);
     MK_TEST_ASSERT(mk_ai_issue_basic_orders(&game) == MK_OK);
     MK_TEST_ASSERT(game.units[0].order == MK_ORDER_HOLD);
     MK_TEST_ASSERT(game.units[0].order_source == MK_ORDER_SOURCE_AI);
@@ -181,11 +182,11 @@ static void test_basic_ai_player_holds_near_civilian(void) {
 static void test_basic_ai_player_holds_risky_fire_lane(void) {
     mk_game_t game = make_loaded_game();
 
-    game.units[0].position_m = mk_test_vec2(250.0f, 230.0f);
-    game.units[1].position_m = mk_test_vec2(350.0f, 230.0f);
+    game.units[0].position_m = mk_test_vec2(250.0f, 285.0f);
+    game.units[1].position_m = mk_test_vec2(350.0f, 285.0f);
     game.units[1].hidden = false;
     game.units[1].revealed = true;
-    game.civilians[0].position_m = mk_test_vec2(300.0f, 230.0f);
+    game.civilians[0].position_m = mk_test_vec2(300.0f, 285.0f);
     MK_TEST_ASSERT(mk_ai_issue_basic_orders(&game) == MK_OK);
     MK_TEST_ASSERT(game.units[0].order == MK_ORDER_HOLD);
     MK_TEST_ASSERT(game.units[0].order_source == MK_ORDER_SOURCE_AI);
@@ -243,7 +244,7 @@ static void test_basic_ai_investigates_suspected_contact(void) {
     game.contact_reports[0].side = MK_SIDE_OPFOR;
     game.contact_reports[0].attacker_unit_id = game.units[0].id;
     game.contact_reports[0].target_unit_id = game.units[1].id;
-    game.contact_reports[0].position_m = mk_test_vec2(220.0f, 246.0f);
+    game.contact_reports[0].position_m = mk_test_vec2(220.0f, 286.0f);
     game.contact_reports[0].target_position_m = game.contact_reports[0].position_m;
     game.contact_reports[0].confidence = 55;
     game.contact_reports[0].visible = true;
@@ -253,7 +254,7 @@ static void test_basic_ai_investigates_suspected_contact(void) {
     MK_TEST_ASSERT(game.units[0].order_source == MK_ORDER_SOURCE_AI);
     MK_TEST_ASSERT(game.units[0].has_move_target);
     MK_TEST_ASSERT_CLOSE(game.units[0].target_position_m.x, 220.0f);
-    MK_TEST_ASSERT_CLOSE(game.units[0].target_position_m.y, 246.0f);
+    MK_TEST_ASSERT_CLOSE(game.units[0].target_position_m.y, 286.0f);
 }
 
 static void test_basic_ai_overwatches_at_investigation_distance(void) {
@@ -266,7 +267,7 @@ static void test_basic_ai_overwatches_at_investigation_distance(void) {
     game.contact_reports[0].side = MK_SIDE_OPFOR;
     game.contact_reports[0].attacker_unit_id = game.units[0].id;
     game.contact_reports[0].target_unit_id = game.units[1].id;
-    game.contact_reports[0].position_m = mk_test_vec2(92.0f, 246.0f);
+    game.contact_reports[0].position_m = mk_test_vec2(72.0f, 286.0f);
     game.contact_reports[0].target_position_m = game.contact_reports[0].position_m;
     game.contact_reports[0].confidence = 55;
     game.contact_reports[0].visible = true;
@@ -415,7 +416,7 @@ static void test_basic_ai_transcript_is_deterministic(void) {
     MK_TEST_ASSERT(strcmp(first_transcript.text, second_transcript.text) == 0);
     MK_TEST_ASSERT(mk_test_transcript_contains(&first_transcript, "tick=3"));
     MK_TEST_ASSERT(mk_test_transcript_contains(&first_transcript, "player_order=investigate"));
-    MK_TEST_ASSERT(mk_test_transcript_contains(&first_transcript, "opfor_order=hold"));
+    MK_TEST_ASSERT(mk_test_transcript_contains(&first_transcript, "opfor_order=move"));
 }
 
 int main(void) {

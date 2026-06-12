@@ -1,6 +1,6 @@
-# Market / Commercial Streets Vehicle-Free Rerender Attempt
+# Market / Commercial Streets Vehicle-Free Rerender
 
-Last updated: 2026-06-09. This records the first cycle 3 rerender attempt for
+Last updated: 2026-06-12. This records the cycle 3 vehicle-free rerender for
 the 2003 Market / Commercial Streets demo.
 
 ## Goal
@@ -10,63 +10,64 @@ black-and-white contemporary graphite line-art style, with all baked cars,
 buses, motorcycles, trucks, vans, and wreck-like vehicle silhouettes removed
 from the base map art.
 
-Cycle 3 is not complete yet because the generated candidate is not a safe
-drop-in replacement for the existing 7,000 px gameplay-aligned map stack.
-
 ## Method
 
 Tool path used:
 
 - built-in Codex image generation tool
 - existing map loaded as the visual edit/reference target
-- no Pillow cleanup
-- no local blur/fill/inpaint patching
+- no manual Pillow cleanup
+- no local blur/fill/inpaint patching over vehicle marks
 - no stick art or schematic replacement art
 
 Generated candidates:
 
 - `assets/mosul/runtime/maps/market_commercial_streets_2003/candidates/vehicle_free_candidate_first_pass_1254.png`
 - `assets/mosul/runtime/maps/market_commercial_streets_2003/candidates/vehicle_free_candidate_1254.png`
+- `assets/mosul/runtime/maps/market_commercial_streets_2003/candidates/vehicle_free_rerender_try1_7000/`
 
-The second candidate is the better review image. It removes the baked traffic
-clutter and keeps the same general dense top-down market line-art style.
+The second `1254 x 1254` candidate is the better first-pass review image. It
+removes the baked traffic clutter and keeps the same general dense top-down
+market line-art style.
+
+On 2026-06-11, the original local source workflow was recovered from session
+history and rerun with a vehicle-free source prompt. That workflow uses a
+generated square source image, then a deterministic Pillow post-process to
+produce exact `7000 x 7000` ground/composite/multistorey PNGs and `1400 x 1400`
+previews. The output is saved under
+`vehicle_free_rerender_try1_7000/`.
 
 ## Result
 
-The candidate output is useful as visual direction, but it is not accepted as
-the live map layer for these reasons:
+The `vehicle_free_rerender_try1_7000/` output was promoted to the live source
+and runtime map stack after the gameplay data was reauthored to match the new
+geometry. It was not a drop-in pixel replacement for the old map, so the
+promotion also updated the building-level manifest, topology graph, line of
+sight samples, movement/blocking samples, scenario placements, and tests.
 
-- output size is 1,254 x 1,254, not the required 7,000 x 7,000 source/runtime
-  overview scale
-- generated building footprints, wall edges, awning positions, and street
-  widths are close but not pixel-aligned with the existing building-level JSON,
-  topology graph, LOS rectangles, movement blockers, and runtime upper-floor
-  overlays
-- replacing `level_01_ground.png` with this candidate would desynchronize the
-  renderer from the C gameplay data
-
-The live gameplay assets therefore remain unchanged:
+Updated live runtime assets:
 
 - `assets/mosul/runtime/maps/market_commercial_streets_2003/overview.png`
 - `assets/mosul/runtime/maps/market_commercial_streets_2003/levels/level_01_ground.png`
-- source 7,000 px map PNGs under `assets/mosul/source/maps/...`
+- `assets/mosul/runtime/maps/market_commercial_streets_2003/levels/level_02_roofs_and_second_floor.png`
+- `assets/mosul/runtime/maps/market_commercial_streets_2003/levels/level_03_upper_floor.png`
+- `assets/mosul/runtime/maps/market_commercial_streets_2003/levels/level_04_roof_access.png`
 
-## Required To Complete Cycle 3
+Updated live source assets:
 
-A valid cycle 3 completion still requires a true vehicle-free 7,000 px rerender
-that preserves the current gameplay geometry. Acceptable paths are:
+- `assets/mosul/source/maps/market_commercial_streets_demo_2003/assets/map_data/market_commercial_streets_demo_7000/`
+- `assets/mosul/source/maps/market_commercial_streets_demo_2003/imgs/market_commercial_streets_demo_7000/`
 
-- rerun the original approved map renderer/source workflow with the audited
-  vehicle clusters removed before rendering
-- use a true image-editing/inpainting workflow that preserves the exact source
-  pixels outside the audited vehicle bounds and regenerates only those regions
-  in matching graphite line art
-- regenerate the building-level JSON, topology graph, LOS blockers, movement
-  blockers, and upper-floor overlays to match a redesigned full-map rerender
+The default scenario now declares eight traffic vehicles: six moving road
+vehicles and two courtyard parked vehicles. The main roads no longer use static
+cover-up vehicle records. The 26-record static-road layout remains available as
+`market_commercial_streets_nonblocking_static_roads_2003.mkscenario` for
+comparison and regression coverage.
 
-The preferred path is the first one: rerender from the original map source with
-vehicles omitted. The third path is much larger and should not be treated as a
-simple art cleanup.
+Cycle 3 is complete through the larger reauthoring path: the base map art has
+no baked static traffic vehicle ink, and the upper-story overlays, building
+levels, topology, LOS checks, movement blockers, scenario data, and C tests now
+match the promoted vehicle-free map.
 
 ## Prompt Summary
 

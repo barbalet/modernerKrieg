@@ -194,9 +194,9 @@ def main() -> int:
     parser.add_argument("--replay", required=True, help="replay path to create and inspect")
     parser.add_argument("--scenario", default=None, help="optional scenario path")
     parser.add_argument("--steps", type=int, default=12, help="headless tick count")
-    parser.add_argument("--expect-traffic-vehicles", type=int, default=26)
+    parser.add_argument("--expect-traffic-vehicles", type=int, default=8)
     parser.add_argument("--expect-min-moving", type=int, default=3)
-    parser.add_argument("--expect-min-static", type=int, default=20)
+    parser.add_argument("--expect-min-static", type=int, default=2)
     args = parser.parse_args()
 
     try:

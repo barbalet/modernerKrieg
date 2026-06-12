@@ -162,17 +162,20 @@ Current runtime product:
 
 - `assets/mosul/runtime/maps/market_commercial_streets_2003/overview.png`: copied from the source `preview_1400.png` as the first runtime map overview.
 - `assets/mosul/runtime/maps/market_commercial_streets_2003/levels/`: copied from the source 7,000 px ground, roof/second-floor, upper-floor, and roof-access line-art layers.
-
-Traffic vehicles are now represented as dynamic runtime sprites rather than scenario data baked into the map. The current approved 7,000 px Market / Commercial Streets map layers still contain visible static traffic vehicle ink and should be rerendered from approved line-art map source without baked cars, buses, or motorcycles once that source renderer is available. Do not patch those map layers with simplified icon art, stick art, or blur/fill cleanup.
 - `assets/mosul/runtime/sprites/rendered/`: copied from the MOSUL render pipeline as the first complete runtime-facing sprite set.
+
+Traffic vehicles are represented as dynamic runtime sprites rather than
+scenario data baked into the map. The current approved 7,000 px Market /
+Commercial Streets map layers are the vehicle-free cycle 3 rerender and do not
+contain the old static traffic vehicle ink. The default scenario carries six
+moving road vehicles plus two courtyard parked vehicles; the older 26-record
+static-road layout remains only as the explicit nonblocking comparison
+scenario.
 
 ## Dynamic Vehicle And Map Cleanup Cycles
 
-Current active cycle: cycle 8, verification and polish. Last completed cycle:
-cycle 7, renderer and interaction pass. Blocked cycles: cycle 3,
-vehicle-free map rerender, and the final visual-map signoff portion of cycle 8,
-both blocked on an exact 7,000 px geometry-preserving map renderer. Last
-updated: 2026-06-10.
+Current active cycle: none. Last completed cycle: cycle 8, verification and
+polish. Blocked cycles: none. Last updated: 2026-06-12.
 
 When work advances, update this tracker in the same commit as the relevant
 code, art, or asset changes. Keep exactly one cycle marked `active` until the
@@ -191,6 +194,10 @@ Cycle 3 current artifacts:
 
 - `docs/market_commercial_streets_vehicle_free_rerender_attempt.md`
 - `assets/mosul/runtime/maps/market_commercial_streets_2003/candidates/vehicle_free_candidate_1254.png`
+- `assets/mosul/runtime/maps/market_commercial_streets_2003/candidates/vehicle_free_rerender_try1_7000/`
+- `assets/mosul/runtime/maps/market_commercial_streets_2003/levels/`
+- `assets/mosul/manifests/market_commercial_streets_2003_building_levels.json`
+- `assets/mosul/manifests/market_commercial_streets_2003_topology.json`
 
 Cycle 4 validation artifacts:
 
@@ -233,9 +240,9 @@ Cycle 8 verification artifacts:
 | --- | --- | --- | --- |
 | 1 | completed | Submodule hygiene | `mosul` and `modernerKrieg` are fast-forwarded to the tips of `main`, and the nested gitlink updates are committed upward so every repository records the same baseline. |
 | 2 | completed | Asset audit | Every baked car, bus, motorcycle, and vehicle-like mark in the Market / Commercial Streets map layers is identified and classified as removable background traffic, dynamic traffic, abandoned cover, or destroyed terrain. |
-| 3 | blocked | Vehicle-free map rerender | The approved 7,000 px line-art map overview and level PNGs are regenerated without baked traffic vehicles, with no Pillow cleanup, blur/fill inpainting, stick art, or simplified replacement marks. |
+| 3 | completed | Vehicle-free map rerender | The approved 7,000 px line-art map overview and level PNGs are regenerated without baked traffic vehicles, and the building levels, topology, LOS/movement samples, upper-floor overlays, scenario placements, and tests have been reauthored to match the new geometry. |
 | 4 | completed | Dynamic vehicle asset validation | Cars, buses, and motorcycles exist as generated `1024 x 1024` RGBA runtime sprites with alpha edges, matching the established line-art style and render manifest IDs. |
 | 5 | completed | Scenario and data integration | `traffic_vehicle.*` records define positions, destinations, speed, facing, seat capacity, boarding mode, active state, and movement blocking. |
 | 6 | completed | Runtime behavior | Path following, routing failures, occupant position updates, entering/exiting cars and buses, mounting/dismounting motorcycles, collision, blocking, save/snapshot, replay, and deterministic AI behavior are verified. |
 | 7 | completed | Renderer and interaction pass | Traffic vehicles draw only from runtime RGBA sprites, expose picking/selection and boarding controls, and keep source angle art out of the live renderer path. |
-| 8 | active, software checks automated | Verification and polish | CTests, asset manifest validation, alpha-edge validation, and an in-game smoke pass prove dynamic vehicles move as runtime entities. Final vehicle-free base-map visual signoff remains blocked by cycle 3. |
+| 8 | completed | Verification and polish | CTests, asset manifest validation, alpha-edge validation, and an in-game smoke pass prove dynamic vehicles move as runtime entities on the promoted vehicle-free base map. |
