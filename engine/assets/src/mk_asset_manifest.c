@@ -1052,6 +1052,7 @@ mk_result_t mk_asset_load_map_manifest(
     const char *manifest_type;
     int layer_count;
     int layer_index;
+    bool runtime_overview_available;
     mk_result_t result;
 
     if (out_manifest == NULL) {
@@ -1085,6 +1086,8 @@ mk_result_t mk_asset_load_map_manifest(
         return MK_ERROR_INVALID_DATA;
     }
 
+    runtime_overview_available = mk_asset_file_exists(project_root, out_manifest->runtime_overview_path);
+
     if (out_manifest->world_width_m <= 0.0f
         || out_manifest->world_height_m <= 0.0f
         || out_manifest->pixels_per_meter <= 0.0f
@@ -1092,7 +1095,7 @@ mk_result_t mk_asset_load_map_manifest(
         || layer_count > MK_ASSET_MAX_MAP_LAYERS
         || !mk_asset_path_is_safe(out_manifest->source_root)
         || !mk_asset_path_is_safe(out_manifest->runtime_root)
-        || !mk_asset_file_exists(project_root, out_manifest->overview_path)) {
+        || (!runtime_overview_available && !mk_asset_file_exists(project_root, out_manifest->overview_path))) {
         return MK_ERROR_INVALID_DATA;
     }
 
@@ -1113,7 +1116,7 @@ mk_result_t mk_asset_load_map_manifest(
 
         mk_asset_make_indexed_key(key, sizeof(key), "layer", (size_t)layer_index, "path");
         if (!mk_asset_required_text(&entries, key, layer->path, sizeof(layer->path))
-            || !mk_asset_file_exists(project_root, layer->path)) {
+            || (!runtime_overview_available && !mk_asset_file_exists(project_root, layer->path))) {
             return MK_ERROR_INVALID_DATA;
         }
 
@@ -1145,6 +1148,7 @@ mk_result_t mk_asset_load_sprite_manifest(
     int sheet_count;
     int frame_count;
     int index;
+    bool runtime_sprites_available;
     mk_result_t result;
 
     if (out_manifest == NULL) {
@@ -1190,6 +1194,10 @@ mk_result_t mk_asset_load_sprite_manifest(
         return MK_ERROR_INVALID_DATA;
     }
 
+    runtime_sprites_available =
+        out_manifest->runtime_rendered_count > 0
+        && out_manifest->runtime_render_manifest[0] != '\0';
+
     out_manifest->sheet_count = (size_t)sheet_count;
     for (index = 0; index < sheet_count; ++index) {
         mk_asset_sprite_sheet_t *sheet = &out_manifest->sheets[index];
@@ -1202,7 +1210,7 @@ mk_result_t mk_asset_load_sprite_manifest(
 
         mk_asset_make_indexed_key(key, sizeof(key), "sheet", (size_t)index, "path");
         if (!mk_asset_required_text(&entries, key, sheet->path, sizeof(sheet->path))
-            || !mk_asset_file_exists(project_root, sheet->path)) {
+            || (!runtime_sprites_available && !mk_asset_file_exists(project_root, sheet->path))) {
             return MK_ERROR_INVALID_DATA;
         }
 

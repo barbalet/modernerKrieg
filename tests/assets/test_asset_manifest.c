@@ -107,6 +107,38 @@ static void test_map_manifest_loads_market_layers(void) {
     MK_TEST_ASSERT(file_exists(runtime_path));
 }
 
+static void test_map_manifest_accepts_runtime_only_bundle(void) {
+    char path[512];
+    mk_asset_map_manifest_t manifest;
+
+    make_binary_path(path, sizeof(path), "runtime_only.mapmanifest");
+    write_text_file(
+        path,
+        "manifest_type=map\n"
+        "id=runtime_only\n"
+        "name=Runtime Only Map\n"
+        "world_width_m=500\n"
+        "world_height_m=500\n"
+        "pixels_per_meter=14\n"
+        "origin=top_left\n"
+        "source_root=assets/mosul/source/maps/missing_source\n"
+        "runtime_root=assets/mosul/runtime/maps/market_commercial_streets_2003\n"
+        "layer_count=1\n"
+        "layer.0.id=ground\n"
+        "layer.0.kind=base\n"
+        "layer.0.path=assets/mosul/source/maps/missing_source/ground.png\n"
+        "layer.0.z=0\n"
+        "layer.0.alpha=opaque\n"
+        "overview_path=assets/mosul/source/maps/missing_source/preview.png\n"
+        "runtime_overview_path=assets/mosul/runtime/maps/market_commercial_streets_2003/overview.png\n"
+        "collision_output_path=assets/mosul/maps/runtime_only_collision.mask\n"
+        "navigation_output_path=assets/mosul/maps/runtime_only_navigation.grid\n"
+    );
+
+    MK_TEST_ASSERT(mk_asset_load_map_manifest(path, MK_TEST_PROJECT_ROOT, &manifest) == MK_OK);
+    MK_TEST_ASSERT(strcmp(manifest.runtime_overview_path, "assets/mosul/runtime/maps/market_commercial_streets_2003/overview.png") == 0);
+}
+
 static void test_building_level_manifest_loads_multistorey_stack(void) {
     char path[512];
     char level_path[512];
@@ -259,6 +291,45 @@ static void test_sprite_manifest_loads_first_frames(void) {
     MK_TEST_ASSERT(frame != NULL);
     MK_TEST_ASSERT(strcmp(frame->sheet, "vehicles_128") == 0);
     MK_TEST_ASSERT(strcmp(frame->role, "traffic_bus") == 0);
+}
+
+static void test_sprite_manifest_accepts_runtime_only_bundle(void) {
+    char path[512];
+    mk_asset_sprite_manifest_t manifest;
+
+    make_binary_path(path, sizeof(path), "runtime_only.spritemanifest");
+    write_text_file(
+        path,
+        "manifest_type=sprites\n"
+        "id=runtime_only_sprites\n"
+        "name=Runtime Only Sprites\n"
+        "fallback_runtime_id=runtime_frame\n"
+        "runtime_pipeline_manifest=assets/mosul/runtime/sprites/manifest.json\n"
+        "runtime_render_manifest=assets/mosul/runtime/sprites/rendered/render_manifest.json\n"
+        "runtime_rendered_count=1088\n"
+        "sheet_count=1\n"
+        "sheet.0.id=runtime_sheet\n"
+        "sheet.0.path=assets/mosul/source/sprite_sheets/missing_source.png\n"
+        "sheet.0.tile_width=128\n"
+        "sheet.0.tile_height=128\n"
+        "sheet.0.pivot_x=64\n"
+        "sheet.0.pivot_y=64\n"
+        "frame_count=1\n"
+        "frame.0.id=runtime_frame\n"
+        "frame.0.runtime_id=runtime_frame\n"
+        "frame.0.sheet=runtime_sheet\n"
+        "frame.0.side=player\n"
+        "frame.0.role=rifleman\n"
+        "frame.0.state=ready\n"
+        "frame.0.facing=north\n"
+        "frame.0.x=0\n"
+        "frame.0.y=0\n"
+        "frame.0.scale_m=2.0\n"
+    );
+
+    MK_TEST_ASSERT(mk_asset_load_sprite_manifest(path, MK_TEST_PROJECT_ROOT, &manifest) == MK_OK);
+    MK_TEST_ASSERT(strcmp(manifest.runtime_render_manifest, "assets/mosul/runtime/sprites/rendered/render_manifest.json") == 0);
+    MK_TEST_ASSERT(manifest.runtime_rendered_count == 1088);
 }
 
 static void test_sprite_render_manifest_loads_all_runtime_facings(void) {
@@ -566,9 +637,11 @@ static void test_topology_manifest_rejects_one_way_portal(void) {
 
 int main(void) {
     test_map_manifest_loads_market_layers();
+    test_map_manifest_accepts_runtime_only_bundle();
     test_building_level_manifest_loads_multistorey_stack();
     test_topology_manifest_loads_market_graph();
     test_sprite_manifest_loads_first_frames();
+    test_sprite_manifest_accepts_runtime_only_bundle();
     test_sprite_render_manifest_loads_all_runtime_facings();
     test_marker_manifest_loads_tactical_markers();
     test_missing_map_layer_is_rejected();
