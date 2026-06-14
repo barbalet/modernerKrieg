@@ -34,7 +34,7 @@ to remain coherent.
 The current runtime sprites include wounded and dead states. Those states are
 not the model by themselves. They are the visual vocabulary for model state.
 
-![Runtime infantry example](../assets/mosul/runtime/sprites/rendered/infantry_128/allied/us_army_rifleman/standing/north.png)
+![Runtime infantry example](../assets/shared/runtime/sprites/rendered/infantry_128/allied/us_army_rifleman/standing/north.png)
 
 ## Civilian Risk
 

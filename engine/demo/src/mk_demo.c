@@ -71,7 +71,7 @@ static bool mk_demo_copy_traffic_vehicle_runtime_path(
     written = snprintf(
         destination,
         capacity,
-        "assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/civilian/%s/intact/north.png",
+        "assets/shared/runtime/sprites/rendered/traffic_vehicles_1024/civilian/%s/intact/north.png",
         item_id
     );
     return written > 0 && (size_t)written < capacity;

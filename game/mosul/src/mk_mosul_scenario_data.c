@@ -871,7 +871,8 @@ static bool mk_mosul_asset_path_is_safe(const char *path) {
     }
 
     return strncmp(path, "assets/mosul/", 13) == 0
-        || strncmp(path, "assets/fallujah/", 16) == 0;
+        || strncmp(path, "assets/fallujah/", 16) == 0
+        || strncmp(path, "assets/shared/", 14) == 0;
 }
 
 static bool mk_mosul_make_project_path(

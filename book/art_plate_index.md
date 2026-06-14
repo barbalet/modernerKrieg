@@ -75,12 +75,12 @@ Review questions:
 
 | Plate | Path | Why It Matters |
 | --- | --- | --- |
-| <img src="../assets/mosul/source/sprite_sheets/08_combatants_topdown_128.png" alt="Combatants source sheet" width="220"> | [`../assets/mosul/source/sprite_sheets/08_combatants_topdown_128.png`](../assets/mosul/source/sprite_sheets/08_combatants_topdown_128.png) | Combatant source roles and top-down silhouette language. |
-| <img src="../assets/mosul/source/sprite_sheets/12_us_ally_troops_topdown_128.png" alt="U.S. troops source sheet" width="220"> | [`../assets/mosul/source/sprite_sheets/12_us_ally_troops_topdown_128.png`](../assets/mosul/source/sprite_sheets/12_us_ally_troops_topdown_128.png) | Allied troops and role silhouettes. |
-| <img src="../assets/mosul/source/sprite_sheets/14_us_ally_vehicles_topdown_128.png" alt="Vehicles source sheet" width="220"> | [`../assets/mosul/source/sprite_sheets/14_us_ally_vehicles_topdown_128.png`](../assets/mosul/source/sprite_sheets/14_us_ally_vehicles_topdown_128.png) | Vehicle source silhouettes. |
-| <img src="../assets/mosul/source/sprite_sheets/16_us_ally_weapons_topdown_128.png" alt="Weapons source sheet" width="220"> | [`../assets/mosul/source/sprite_sheets/16_us_ally_weapons_topdown_128.png`](../assets/mosul/source/sprite_sheets/16_us_ally_weapons_topdown_128.png) | Weapon source sprites and scale. |
-| <img src="../assets/mosul/source/sprite_sheets/18_combatants_stances_topdown_128.png" alt="Combatant stances source sheet" width="220"> | [`../assets/mosul/source/sprite_sheets/18_combatants_stances_topdown_128.png`](../assets/mosul/source/sprite_sheets/18_combatants_stances_topdown_128.png) | Standing, crouching, prone, wounded, and dead state vocabulary. |
-| <img src="../assets/mosul/source/sprite_sheets/19_civilian_states_topdown_128.png" alt="Civilian states source sheet" width="220"> | [`../assets/mosul/source/sprite_sheets/19_civilian_states_topdown_128.png`](../assets/mosul/source/sprite_sheets/19_civilian_states_topdown_128.png) | Civilian state vocabulary and review surface. |
+| <img src="../assets/shared/source/sprite_sheets/08_combatants_topdown_128.png" alt="Combatants source sheet" width="220"> | [`../assets/shared/source/sprite_sheets/08_combatants_topdown_128.png`](../assets/shared/source/sprite_sheets/08_combatants_topdown_128.png) | Combatant source roles and top-down silhouette language. |
+| <img src="../assets/shared/source/sprite_sheets/12_us_ally_troops_topdown_128.png" alt="U.S. troops source sheet" width="220"> | [`../assets/shared/source/sprite_sheets/12_us_ally_troops_topdown_128.png`](../assets/shared/source/sprite_sheets/12_us_ally_troops_topdown_128.png) | Allied troops and role silhouettes. |
+| <img src="../assets/shared/source/sprite_sheets/14_us_ally_vehicles_topdown_128.png" alt="Vehicles source sheet" width="220"> | [`../assets/shared/source/sprite_sheets/14_us_ally_vehicles_topdown_128.png`](../assets/shared/source/sprite_sheets/14_us_ally_vehicles_topdown_128.png) | Vehicle source silhouettes. |
+| <img src="../assets/shared/source/sprite_sheets/16_us_ally_weapons_topdown_128.png" alt="Weapons source sheet" width="220"> | [`../assets/shared/source/sprite_sheets/16_us_ally_weapons_topdown_128.png`](../assets/shared/source/sprite_sheets/16_us_ally_weapons_topdown_128.png) | Weapon source sprites and scale. |
+| <img src="../assets/shared/source/sprite_sheets/18_combatants_stances_topdown_128.png" alt="Combatant stances source sheet" width="220"> | [`../assets/shared/source/sprite_sheets/18_combatants_stances_topdown_128.png`](../assets/shared/source/sprite_sheets/18_combatants_stances_topdown_128.png) | Standing, crouching, prone, wounded, and dead state vocabulary. |
+| <img src="../assets/shared/source/sprite_sheets/19_civilian_states_topdown_128.png" alt="Civilian states source sheet" width="220"> | [`../assets/shared/source/sprite_sheets/19_civilian_states_topdown_128.png`](../assets/shared/source/sprite_sheets/19_civilian_states_topdown_128.png) | Civilian state vocabulary and review surface. |
 
 Review questions:
 
@@ -93,10 +93,10 @@ Review questions:
 
 | Plate | Path | Why It Matters |
 | --- | --- | --- |
-| <img src="../assets/mosul/runtime/sprites/rendered/infantry_128/allied/us_army_rifleman/standing/north.png" alt="U.S. rifleman north" width="96"> | [`../assets/mosul/runtime/sprites/rendered/infantry_128/allied/us_army_rifleman/standing/north.png`](../assets/mosul/runtime/sprites/rendered/infantry_128/allied/us_army_rifleman/standing/north.png) | Small infantry runtime sprite with alpha edges. |
-| <img src="../assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/standing/north.png" alt="Old man civilian north" width="96"> | [`../assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/standing/north.png`](../assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/standing/north.png) | Civilian runtime sprite and state/facing convention. |
-| <img src="../assets/mosul/runtime/sprites/rendered/weapons_128/m4_carbine/north.png" alt="M4 carbine north" width="96"> | [`../assets/mosul/runtime/sprites/rendered/weapons_128/m4_carbine/north.png`](../assets/mosul/runtime/sprites/rendered/weapons_128/m4_carbine/north.png) | Weapon runtime sprite and facing convention. |
-| <img src="../assets/mosul/runtime/sprites/rendered/vehicles_1024/allied/cargo_truck/intact/north.png" alt="Cargo truck north" width="160"> | [`../assets/mosul/runtime/sprites/rendered/vehicles_1024/allied/cargo_truck/intact/north.png`](../assets/mosul/runtime/sprites/rendered/vehicles_1024/allied/cargo_truck/intact/north.png) | Large vehicle sprite scale, state, and alpha edge review. |
+| <img src="../assets/shared/runtime/sprites/rendered/infantry_128/allied/us_army_rifleman/standing/north.png" alt="U.S. rifleman north" width="96"> | [`../assets/shared/runtime/sprites/rendered/infantry_128/allied/us_army_rifleman/standing/north.png`](../assets/shared/runtime/sprites/rendered/infantry_128/allied/us_army_rifleman/standing/north.png) | Small infantry runtime sprite with alpha edges. |
+| <img src="../assets/shared/runtime/sprites/rendered/civilians_128/civilian/old_man/standing/north.png" alt="Old man civilian north" width="96"> | [`../assets/shared/runtime/sprites/rendered/civilians_128/civilian/old_man/standing/north.png`](../assets/shared/runtime/sprites/rendered/civilians_128/civilian/old_man/standing/north.png) | Civilian runtime sprite and state/facing convention. |
+| <img src="../assets/shared/runtime/sprites/rendered/weapons_128/m4_carbine/north.png" alt="M4 carbine north" width="96"> | [`../assets/shared/runtime/sprites/rendered/weapons_128/m4_carbine/north.png`](../assets/shared/runtime/sprites/rendered/weapons_128/m4_carbine/north.png) | Weapon runtime sprite and facing convention. |
+| <img src="../assets/shared/runtime/sprites/rendered/vehicles_1024/allied/cargo_truck/intact/north.png" alt="Cargo truck north" width="160"> | [`../assets/shared/runtime/sprites/rendered/vehicles_1024/allied/cargo_truck/intact/north.png`](../assets/shared/runtime/sprites/rendered/vehicles_1024/allied/cargo_truck/intact/north.png) | Large vehicle sprite scale, state, and alpha edge review. |
 
 Review questions:
 
@@ -112,9 +112,9 @@ The visual plates are connected to these data files:
 - [`../assets/mosul/manifests/market_commercial_streets_2003.mapmanifest`](../assets/mosul/manifests/market_commercial_streets_2003.mapmanifest)
 - [`../assets/mosul/manifests/market_commercial_streets_2003_building_levels.json`](../assets/mosul/manifests/market_commercial_streets_2003_building_levels.json)
 - [`../assets/mosul/manifests/market_commercial_streets_2003_topology.json`](../assets/mosul/manifests/market_commercial_streets_2003_topology.json)
-- [`../assets/mosul/manifests/mosul_2003_sprites.spritemanifest`](../assets/mosul/manifests/mosul_2003_sprites.spritemanifest)
-- [`../assets/mosul/runtime/sprites/manifest.json`](../assets/mosul/runtime/sprites/manifest.json)
-- [`../assets/mosul/runtime/sprites/rendered/render_manifest.json`](../assets/mosul/runtime/sprites/rendered/render_manifest.json)
+- [`../assets/shared/manifests/shared_tactical_sprites.spritemanifest`](../assets/shared/manifests/shared_tactical_sprites.spritemanifest)
+- [`../assets/shared/runtime/sprites/manifest.json`](../assets/shared/runtime/sprites/manifest.json)
+- [`../assets/shared/runtime/sprites/rendered/render_manifest.json`](../assets/shared/runtime/sprites/rendered/render_manifest.json)
 
 If a plate changes, check whether a manifest needs to change. If a manifest
 changes, check whether a plate in this book now misleads the reader.

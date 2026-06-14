@@ -52,11 +52,11 @@ fully playable.
 
 The source sprite sheets show categories at a glance:
 
-![U.S. troops source sheet](../assets/mosul/source/sprite_sheets/12_us_ally_troops_topdown_128.png)
+![U.S. troops source sheet](../assets/shared/source/sprite_sheets/12_us_ally_troops_topdown_128.png)
 
-![Vehicles source sheet](../assets/mosul/source/sprite_sheets/14_us_ally_vehicles_topdown_128.png)
+![Vehicles source sheet](../assets/shared/source/sprite_sheets/14_us_ally_vehicles_topdown_128.png)
 
-![Weapons source sheet](../assets/mosul/source/sprite_sheets/16_us_ally_weapons_topdown_128.png)
+![Weapons source sheet](../assets/shared/source/sprite_sheets/16_us_ally_weapons_topdown_128.png)
 
 They are especially useful for design review. If a role exists in C but cannot
 be recognized in art, the mismatch is visible. If art exists for a state the
@@ -65,9 +65,9 @@ engine ignores, that mismatch is also visible.
 ## Runtime Render Manifest
 
 The compact C sprite manifest is
-[`../assets/mosul/manifests/mosul_2003_sprites.spritemanifest`](../assets/mosul/manifests/mosul_2003_sprites.spritemanifest).
+[`../assets/shared/manifests/shared_tactical_sprites.spritemanifest`](../assets/shared/manifests/shared_tactical_sprites.spritemanifest).
 The full runtime render manifest is
-[`../assets/mosul/runtime/sprites/rendered/render_manifest.json`](../assets/mosul/runtime/sprites/rendered/render_manifest.json).
+[`../assets/shared/runtime/sprites/rendered/render_manifest.json`](../assets/shared/runtime/sprites/rendered/render_manifest.json).
 
 The current runtime sprite set contains 1,088 PNGs:
 

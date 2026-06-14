@@ -8,7 +8,7 @@ and is now wired into cycle 8 CTest verification.
 Validated runtime traffic vehicle sprites under:
 
 ```text
-assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/
+assets/shared/runtime/sprites/rendered/traffic_vehicles_1024/
 ```
 
 Expected set:

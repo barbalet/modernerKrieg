@@ -10,7 +10,7 @@ This is one of the main ways `modernerKrieg` differs from
 `derZweiteWeltkrieg`. The older engine can reason with tabletop-style units and
 profiles. The Mosul demo needs unit orders with soldier-level consequences.
 
-![Combatant top-down source sheet](../assets/mosul/source/sprite_sheets/08_combatants_topdown_128.png)
+![Combatant top-down source sheet](../assets/shared/source/sprite_sheets/08_combatants_topdown_128.png)
 
 ## Unit Command, Soldier Consequence
 

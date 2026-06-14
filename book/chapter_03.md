@@ -132,7 +132,7 @@ The sprite side is already present. The runtime render manifest has 168
 civilian sprites across archetypes, states, and facings. The scenario loader
 validates civilian archetype sprite ids against the compact sprite manifest.
 
-![Civilian top-down source sheet](../assets/mosul/source/sprite_sheets/19_civilian_states_topdown_128.png)
+![Civilian top-down source sheet](../assets/shared/source/sprite_sheets/19_civilian_states_topdown_128.png)
 
 The next level of richness should come from group intent: market crowd,
 shopkeeper, family, wounded person, sheltering residents, evacuation stream, or

@@ -4,12 +4,13 @@
 
 ## Folders
 
-- `assets/mosul/source/`: unmodified source art, source maps, references, and provenance notes.
+- `assets/mosul/source/`: unmodified Mosul-specific source maps, line art, references, and provenance notes.
 - `assets/mosul/manifests/`: validated metadata that describes how source art maps to game/runtime concepts.
-- `assets/mosul/runtime/`: generated runtime images, tiles, atlases, and other rebuildable products.
+- `assets/mosul/runtime/`: generated Mosul-specific runtime map images, tiles, atlases, and other rebuildable products.
+- `assets/shared/source/`, `assets/shared/runtime/`, and `assets/shared/manifests/`: tactical sprite source sheets, rendered sprites, and manifests shared by Mosul and Fallujah.
 - `assets/mosul/maps/`: playable map products and tile/navigation metadata.
 - `assets/mosul/atlases/`: packed atlas sheets and atlas metadata.
-- `assets/mosul/sprites/`: engine-ready extracted sprites when sheets are sliced.
+- `assets/mosul/sprites/`: placeholder for Mosul-specific engine-ready sprites if needed outside the shared tactical set.
 
 ## Map Manifests
 
@@ -100,12 +101,12 @@ Sprite manifests describe source sheets, source-angle sprites, generated runtime
 
 The compact C-validated sprite manifest is:
 
-- `assets/mosul/manifests/mosul_2003_sprites.spritemanifest`
+- `assets/shared/manifests/shared_tactical_sprites.spritemanifest`
 
 The full imported render-pipeline manifests are loaded and validated by the C asset layer:
 
-- `assets/mosul/runtime/sprites/manifest.json`
-- `assets/mosul/runtime/sprites/rendered/render_manifest.json`
+- `assets/shared/runtime/sprites/manifest.json`
+- `assets/shared/runtime/sprites/rendered/render_manifest.json`
 
 The current runtime sprite set contains 1,088 PNGs, and tests assert that every render-manifest path exists:
 
@@ -162,7 +163,7 @@ Current runtime product:
 
 - `assets/mosul/runtime/maps/market_commercial_streets_2003/overview.png`: copied from the source `preview_1400.png` as the first runtime map overview.
 - `assets/mosul/runtime/maps/market_commercial_streets_2003/levels/`: copied from the source 7,000 px ground, roof/second-floor, upper-floor, and roof-access line-art layers.
-- `assets/mosul/runtime/sprites/rendered/`: copied from the MOSUL render pipeline as the first complete runtime-facing sprite set.
+- `assets/shared/runtime/sprites/rendered/`: copied from the MOSUL render pipeline as the first complete runtime-facing sprite set.
 
 Traffic vehicles are represented as dynamic runtime sprites rather than
 scenario data baked into the map. The current approved 7,000 px Market /

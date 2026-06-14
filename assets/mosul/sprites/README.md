@@ -1,5 +1,5 @@
 # Mosul Sprites
 
-This folder is for engine-ready Mosul sprites derived from approved source art.
+This folder is reserved for Mosul-specific engine-ready sprites if a future scenario needs sprites outside the shared tactical set.
 
-Do not place raw source plates here. Keep originals in `assets/mosul/source/` and only commit derived sprites when provenance, naming, pivot, facing, and scale are stable.
+Shared tactical sprite source sheets live under `assets/shared/source/sprite_sheets/`, and their rendered runtime products live under `assets/shared/runtime/sprites/`. Keep Mosul-specific raw source plates in `assets/mosul/source/`.

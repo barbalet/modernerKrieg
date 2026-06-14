@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "source_root": "assets/mosul/source/sprite_sheets/source_angles",
-  "output_root": "assets/mosul/runtime/sprites/rendered",
+  "source_root": "assets/shared/source/sprite_sheets/source_angles",
+  "output_root": "assets/shared/runtime/sprites/rendered",
   "source_angles": ["north", "north_east", "east"],
   "runtime_angles": {
     "north": { "source": "north", "flip_horizontal": false, "flip_vertical": false },

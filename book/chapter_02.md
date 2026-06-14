@@ -120,7 +120,7 @@ evacuate, and report. This is essential for Mosul. A game about a dense city
 cannot treat civilians as background art and still claim to model tactical
 restraint.
 
-![Civilian state sheet](../assets/mosul/source/sprite_sheets/19_civilian_states_topdown_128.png)
+![Civilian state sheet](../assets/shared/source/sprite_sheets/19_civilian_states_topdown_128.png)
 
 ## The Demo Session API
 

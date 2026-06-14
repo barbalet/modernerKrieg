@@ -39,7 +39,7 @@ Use the thumbnails for quick visual QA. Click any path to open the full asset in
 | `mosul/manifests/market_commercial_streets_2003_building_levels.json` | 1 |
 | `mosul/manifests/market_commercial_streets_2003_topology.json` | 1 |
 | `mosul/manifests/mosul_2003_markers.markermanifest` | 1 |
-| `mosul/manifests/mosul_2003_sprites.spritemanifest` | 1 |
+| `shared/manifests/shared_tactical_sprites.spritemanifest` | 1 |
 | `mosul/maps/README.md` | 1 |
 | `mosul/references/README.md` | 1 |
 | `mosul/runtime/.DS_Store` | 1 |
@@ -3772,7 +3772,7 @@ Use the thumbnails for quick visual QA. Click any path to open the full asset in
 | [`mosul/manifests/market_commercial_streets_2003_building_levels.json`](mosul/manifests/market_commercial_streets_2003_building_levels.json) | `json` | 10.9 KB |
 | [`mosul/manifests/market_commercial_streets_2003_topology.json`](mosul/manifests/market_commercial_streets_2003_topology.json) | `json` | 13.0 KB |
 | [`mosul/manifests/mosul_2003_markers.markermanifest`](mosul/manifests/mosul_2003_markers.markermanifest) | `markermanifest` | 2.8 KB |
-| [`mosul/manifests/mosul_2003_sprites.spritemanifest`](mosul/manifests/mosul_2003_sprites.spritemanifest) | `spritemanifest` | 2.4 KB |
+| [`shared/manifests/shared_tactical_sprites.spritemanifest`](shared/manifests/shared_tactical_sprites.spritemanifest) | `spritemanifest` | 2.4 KB |
 | [`mosul/manifests/README.md`](mosul/manifests/README.md) | `md` | 1.1 KB |
 
 ### `mosul/maps`
