@@ -18,7 +18,7 @@ after_action.partial=The patrol made progress, but civilian risk, casualties, or
 after_action.failure=The patrol did not secure the market junction within acceptable risk.
 
 asset.map_manifest=assets/mosul/manifests/market_commercial_streets_2003.mapmanifest
-asset.sprite_manifest=assets/mosul/manifests/mosul_2003_sprites.spritemanifest
+asset.sprite_manifest=assets/shared/manifests/shared_tactical_sprites.spritemanifest
 asset.building_level_manifest=assets/mosul/manifests/market_commercial_streets_2003_building_levels.json
 asset.topology_manifest=assets/mosul/manifests/market_commercial_streets_2003_topology.json
 

@@ -18,7 +18,7 @@ after_action.partial=The foothold held, but risk, casualties, or unresolved cont
 after_action.failure=The foothold failed to stabilize before the district became untenable.
 
 asset.map_manifest=assets/fallujah/manifests/southern_industrial_foothold_2004.mapmanifest
-asset.sprite_manifest=assets/mosul/manifests/mosul_2003_sprites.spritemanifest
+asset.sprite_manifest=assets/shared/manifests/shared_tactical_sprites.spritemanifest
 asset.building_level_manifest=assets/fallujah/manifests/southern_industrial_foothold_2004_building_levels.json
 asset.topology_manifest=assets/fallujah/manifests/southern_industrial_foothold_2004_topology.json
 

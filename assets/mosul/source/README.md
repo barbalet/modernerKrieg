@@ -1,26 +1,20 @@
 # Mosul Source Assets
 
-This directory is for original Mosul art and reference assets before they are cropped, sliced, recolored, packed into atlases, or otherwise transformed for the engine.
+This directory is for original Mosul-specific art and reference assets before they are cropped, recolored, copied into runtime map layers, or otherwise transformed for the engine.
 
 Use this folder for:
 
 - source line-art plates from the Mosul research/art brief
-- original top-down sprite sheets at 128 px scale
-- approved source-angle sprites for infantry, civilians, weapons, and vehicles
 - original map sketches, section maps, and battle-axis plates
-- raw vehicle, weapon, combatant, terrain, and civilian reference images
+- raw Mosul-specific vehicle, weapon, combatant, terrain, and civilian reference images
 - notes that document where an asset came from and what it is allowed to be used for
+
+Shared tactical sprite source sheets live under `assets/shared/source/sprite_sheets/` so Mosul and Fallujah can reuse the same top-down unit, civilian, weapon, and vehicle vocabulary.
 
 Suggested subfolders:
 
 ```text
 line_art/
-sprite_sheets/
-  source_angles/
-    infantry_128/
-    civilians_128/
-    weapons_128/
-    vehicles_1024/
 maps/
 references/
 notes/
@@ -28,11 +22,11 @@ notes/
 
 Keep source assets unmodified. Engine-ready files should live outside this folder, for example:
 
-- `assets/mosul/sprites/` for sliced or cleaned sprite PNGs
-- `assets/mosul/atlases/` for atlas metadata and packed sheets
-- `assets/mosul/maps/` for playable map data
+- `assets/shared/runtime/sprites/` for shared tactical sprite PNGs and render manifests
+- `assets/mosul/atlases/` for Mosul-specific atlas metadata and packed sheets if needed
+- `assets/mosul/maps/` for playable Mosul map data
 - `assets/mosul/runtime/maps/` for runtime floor PNGs generated or copied from approved source layers
 
 Every committed source asset should have clear provenance and usage rights. Do not add downloaded, copyrighted, private, or restricted material unless it is allowed to be stored in this repository.
 
-The current 2003 demo source-angle sprite set uses `north`, `north_east`, and `east` as the approved authored angles. Infantry sprites use `standing`, `crouch`, `prone`, `wounded`, and `dead` states. Civilian sprites use `standing`, `wounded`, and `dead` states for seven non-combatant archetypes. Combat/support vehicle sprites use `intact`, `damaged`, and `destroyed` states. Dynamic traffic vehicle sprites use an `intact` state and live under `traffic_vehicles_1024/`. Runtime-facing flips and generated products live outside this folder under `assets/mosul/runtime/sprites/`.
+The current shared source-angle sprite set uses `north`, `north_east`, and `east` as the approved authored angles. Infantry sprites use `standing`, `crouch`, `prone`, `wounded`, and `dead` states. Civilian sprites use `standing`, `wounded`, and `dead` states for seven non-combatant archetypes. Combat/support vehicle sprites use `intact`, `damaged`, and `destroyed` states. Dynamic traffic vehicle sprites use an `intact` state and live under `traffic_vehicles_1024/`. Runtime-facing flips and generated products live under `assets/shared/runtime/sprites/`.

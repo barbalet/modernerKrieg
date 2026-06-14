@@ -16,9 +16,10 @@ The project starts fresh as a portable C + CMake engine with native Mac and Wind
 - `tests/core/` contains headless C tests.
 - `tests/render/` contains renderer-independent board-view tests.
 - `docs/` contains architecture, build matrix, scenario-format, attribution, and milestone progress notes.
-- `assets/mosul/source/` contains raw Mosul source art and references for the 2003 Market / Commercial Streets demo.
-- `assets/mosul/runtime/` contains generated or copied runtime products, including the current map overview.
-- `assets/mosul/maps/`, `assets/mosul/atlases/`, and `assets/mosul/sprites/` are placeholders for generated/runtime-ready assets.
+- `assets/mosul/source/` contains Mosul-specific source maps, line-art plates, references, and provenance notes for the 2003 Market / Commercial Streets demo.
+- `assets/mosul/runtime/` contains Mosul-specific generated runtime map products, including the current map overview and building-level PNGs.
+- `assets/shared/source/`, `assets/shared/runtime/`, and `assets/shared/manifests/` contain tactical sprites and manifests shared by Mosul and Fallujah.
+- `assets/mosul/maps/`, `assets/mosul/atlases/`, and `assets/mosul/sprites/` are placeholders for Mosul-specific generated/runtime-ready assets.
 - `PLAN.md` describes the full engine and Mosul demo direction.
 
 ## Build
@@ -178,8 +179,8 @@ The public MOSUL demo target is the 2003 Market / Commercial Streets scenario: a
 - a JSON building-level manifest for walls, doors, windows, breach holes, stairs, roof edges, and storey regions
 - 128 px top-down combatant, stance, vehicle, and weapon sheets
 - complete source-angle infantry, civilian, weapon, combat/support vehicle, and dynamic traffic vehicle sprites
-- 1,088 rendered runtime-facing PNGs under `assets/mosul/runtime/sprites/rendered`
-- JSON sprite pipeline manifests under `assets/mosul/runtime/sprites/`, validated by the C asset loader
+- 1,088 rendered runtime-facing PNGs under `assets/shared/runtime/sprites/rendered`
+- JSON sprite pipeline manifests under `assets/shared/runtime/sprites/`, validated by the C asset loader
 - reference plates for combatants, weapons, vehicles, and urban tactics
 
 The current demo scenario now loads from validated data at `game/mosul/scenarios/market_commercial_streets_2003.mkscenario`. A C fixture remains available for tests so the data-backed path can be compared against the original scenario shape.
@@ -189,7 +190,7 @@ The first scenario and asset manifests are in place:
 - `game/mosul/scenarios/market_commercial_streets_2003.mkscenario`
 - `assets/mosul/manifests/market_commercial_streets_2003.mapmanifest`
 - `assets/mosul/manifests/market_commercial_streets_2003_building_levels.json`
-- `assets/mosul/manifests/mosul_2003_sprites.spritemanifest`
+- `assets/shared/manifests/shared_tactical_sprites.spritemanifest`
 - `assets/mosul/manifests/mosul_2003_markers.markermanifest`
 - `assets/mosul/runtime/maps/market_commercial_streets_2003/overview.png`
 - `assets/mosul/runtime/maps/market_commercial_streets_2003/levels/`

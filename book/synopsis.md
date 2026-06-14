@@ -103,9 +103,9 @@ The most important source files are:
   the multi-level building manifest.
 - [`../assets/mosul/manifests/market_commercial_streets_2003_topology.json`](../assets/mosul/manifests/market_commercial_streets_2003_topology.json),
   the tactical topology manifest.
-- [`../assets/mosul/manifests/mosul_2003_sprites.spritemanifest`](../assets/mosul/manifests/mosul_2003_sprites.spritemanifest),
+- [`../assets/shared/manifests/shared_tactical_sprites.spritemanifest`](../assets/shared/manifests/shared_tactical_sprites.spritemanifest),
   the compact sprite manifest used by C validation.
-- [`../assets/mosul/runtime/sprites/rendered/render_manifest.json`](../assets/mosul/runtime/sprites/rendered/render_manifest.json),
+- [`../assets/shared/runtime/sprites/rendered/render_manifest.json`](../assets/shared/runtime/sprites/rendered/render_manifest.json),
   the full runtime render manifest.
 
 ## The Book's Argument

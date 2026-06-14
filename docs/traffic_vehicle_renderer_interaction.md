@@ -8,7 +8,7 @@ base map does not get new vehicle marks added by the renderer.
 
 Traffic vehicle draw commands use only runtime RGBA sprite PNGs under:
 
-- `assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/`
+- `assets/shared/runtime/sprites/rendered/traffic_vehicles_1024/`
 
 The demo layer rejects traffic vehicle sprite IDs that cannot be mapped to an
 approved runtime PNG. It does not fall back to source-angle art, source

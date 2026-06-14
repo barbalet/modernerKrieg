@@ -170,10 +170,10 @@ def inspect_png(path: Path) -> PngStats:
 
 def validate(root: Path) -> list[str]:
     errors: list[str] = []
-    render_root = root / "assets/mosul/runtime/sprites/rendered"
+    render_root = root / "assets/shared/runtime/sprites/rendered"
     traffic_root = render_root / "traffic_vehicles_1024/civilian"
     manifest_path = render_root / "render_manifest.json"
-    compact_manifest_path = root / "assets/mosul/manifests/mosul_2003_sprites.spritemanifest"
+    compact_manifest_path = root / "assets/shared/manifests/shared_tactical_sprites.spritemanifest"
 
     render_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     render_entries = render_manifest.get("rendered", [])
@@ -189,7 +189,7 @@ def validate(root: Path) -> list[str]:
     for item in EXPECTED_ITEMS:
         for facing in EXPECTED_FACINGS:
             relative_path = (
-                f"assets/mosul/runtime/sprites/rendered/traffic_vehicles_1024/"
+                f"assets/shared/runtime/sprites/rendered/traffic_vehicles_1024/"
                 f"civilian/{item}/intact/{facing}.png"
             )
             path = root / relative_path

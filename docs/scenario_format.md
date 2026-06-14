@@ -16,7 +16,7 @@ Scenario files live in `game/mosul/scenarios/`. The default demo scenario is:
 game/mosul/scenarios/market_commercial_streets_2003.mkscenario
 ```
 
-Asset references inside a scenario must be repo-relative paths under `assets/mosul/`. The loader validates referenced map and sprite manifests before the scenario reaches the core. The optional `asset.building_level_manifest` reference validates the JSON floor stack, runtime PNG paths, wall/opening records, building regions, and map dimensions. The optional `asset.topology_manifest` reference validates the tactical topology graph tied to that building-level manifest; Market / Commercial Streets scenarios require both JSON references.
+Asset references inside a scenario must be repo-relative paths under `assets/mosul/`, `assets/fallujah/`, or `assets/shared/`. The loader validates referenced map and sprite manifests before the scenario reaches the core. The optional `asset.building_level_manifest` reference validates the JSON floor stack, runtime PNG paths, wall/opening records, building regions, and map dimensions. The optional `asset.topology_manifest` reference validates the tactical topology graph tied to that building-level manifest; Market / Commercial Streets scenarios require both JSON references.
 
 ## Sections
 

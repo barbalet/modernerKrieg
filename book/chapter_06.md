@@ -10,7 +10,7 @@ civilian archetypes, civilian groups, and civilian spawn zones. The runtime art
 includes civilian standing, wounded, and dead states across facings. This is a
 foundation worth protecting.
 
-![Civilian runtime example](../assets/mosul/runtime/sprites/rendered/civilians_128/civilian/old_man/standing/north.png)
+![Civilian runtime example](../assets/shared/runtime/sprites/rendered/civilians_128/civilian/old_man/standing/north.png)
 
 ## Why Civilian AI Belongs In C
 
@@ -117,7 +117,7 @@ The current runtime civilian sprites include standing, wounded, and dead
 states. Those images should be handled carefully. They exist to make the
 simulation accountable, not to sensationalize harm.
 
-![Civilian source state sheet](../assets/mosul/source/sprite_sheets/19_civilian_states_topdown_128.png)
+![Civilian source state sheet](../assets/shared/source/sprite_sheets/19_civilian_states_topdown_128.png)
 
 The renderer should make civilians visible enough that the player cannot
 pretend they are absent. The UI should also avoid turning them into visual
