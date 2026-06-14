@@ -154,7 +154,7 @@
       "transcript": "",
       "duration_seconds": 3.0,
       "loop_points_seconds": [0.0, 3.0],
-      "lufs": -30.0,
+      "lufs": -24.0,
       "tags": ["city", "low_tension", "bed"]
     },
     {
@@ -169,7 +169,7 @@
       "transcript": "",
       "duration_seconds": 3.0,
       "loop_points_seconds": [0.0, 3.0],
-      "lufs": -31.0,
+      "lufs": -25.0,
       "tags": ["city", "high_tension", "bed"]
     },
     {
@@ -184,7 +184,7 @@
       "transcript": "",
       "duration_seconds": 3.0,
       "loop_points_seconds": [0.0, 3.0],
-      "lufs": -29.5,
+      "lufs": -24.5,
       "tags": ["generator", "engine", "local_texture"]
     },
     {
@@ -199,7 +199,7 @@
       "transcript": "",
       "duration_seconds": 3.0,
       "loop_points_seconds": [0.0, 3.0],
-      "lufs": -30.0,
+      "lufs": -24.5,
       "tags": ["engine", "distant", "movement"]
     },
     {
@@ -216,7 +216,7 @@
       "review_status": "procedural_non_lexical_no_language",
       "duration_seconds": 3.0,
       "loop_points_seconds": [0.0, 3.0],
-      "lufs": -32.0,
+      "lufs": -28.0,
       "tags": ["civilian", "murmur", "speech", "low_tension", "bed"]
     },
     {
@@ -233,7 +233,7 @@
       "review_status": "procedural_non_lexical_no_language",
       "duration_seconds": 3.0,
       "loop_points_seconds": [0.0, 3.0],
-      "lufs": -33.0,
+      "lufs": -29.5,
       "tags": ["civilian", "murmur", "speech", "high_tension", "bed"]
     },
     {
