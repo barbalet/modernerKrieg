@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Generate first-pass Fallujah 2004 runtime map and scenario assets."""
+"""Generate Fallujah 2004 source-map, runtime map, and scenario assets."""
 
 from __future__ import annotations
 
 import json
+import math
 import struct
 import zlib
 from pathlib import Path
@@ -15,11 +16,43 @@ SCENARIO_ROOT = ROOT / "game" / "fallujah" / "scenarios"
 MAP_ID = "southern_industrial_foothold_2004"
 WORLD_M = 1600
 PIXELS = 2400
+PREVIEW_PIXELS = 1400
 PPM = PIXELS / WORLD_M
+SOURCE_MAP_ROOT = ASSET_ROOT / "source" / "maps" / MAP_ID
+SOURCE_MAP_DATA = SOURCE_MAP_ROOT / "assets" / "map_data" / f"{MAP_ID}_2400"
+SOURCE_IMG_DIR = SOURCE_MAP_ROOT / "imgs" / f"{MAP_ID}_2400"
+SOURCE_REFERENCE_DIR = SOURCE_MAP_ROOT / "references"
+VECTOR_PATH = SOURCE_MAP_ROOT / "vector" / "fallujah_sinaa_industrial_osm_20260614.json"
+DERIVED_TEXTURE_PATH = SOURCE_REFERENCE_DIR / "derived_satellite_graphite_texture.png"
+
+BUILDING_REGIONS = [
+    ("industrial_warehouse_west", 120, 930, 310, 210, 2),
+    ("repair_yards_east", 1030, 1030, 340, 250, 1),
+    ("district_office", 970, 610, 240, 210, 3),
+    ("residential_row_north", 520, 250, 390, 260, 2),
+    ("mosque_school_edge", 1130, 310, 250, 220, 2),
+    ("clinic_compound", 250, 620, 220, 170, 1),
+    ("market_shops", 580, 790, 320, 180, 2),
+    ("workshop_roof_watch", 1350, 760, 170, 210, 3),
+]
+
+# Reference-derived urban blocks around the real Sina'a / Industrial District street grid.
+# They are presentation art, not enterable gameplay buildings; gameplay blockers live in BUILDING_REGIONS.
+URBAN_FABRIC_ZONES = [
+    ("north_residential_grid", 350, 115, 980, 445, 34, 31, 0),
+    ("central_market_grid", 360, 560, 700, 360, 42, 34, 5),
+    ("southwest_industrial_yards", 85, 895, 640, 455, 64, 48, 11),
+    ("southeast_industrial_yards", 930, 840, 575, 520, 72, 54, 17),
+    ("southern_residential_fringe", 380, 1250, 650, 280, 48, 38, 23),
+]
 
 
 def px(meters: float) -> int:
     return int(round(meters * PPM))
+
+
+def meters(pixel: int) -> float:
+    return pixel / PPM
 
 
 def png_chunk(kind: bytes, payload: bytes) -> bytes:
@@ -31,7 +64,7 @@ def png_chunk(kind: bytes, payload: bytes) -> bytes:
     )
 
 
-def write_png(path: Path, width: int, height: int, pixels: bytearray) -> None:
+def write_png(path: Path, width: int, height: int, pixels: bytearray | bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     rows = bytearray()
     stride = width * 4
@@ -43,6 +76,46 @@ def write_png(path: Path, width: int, height: int, pixels: bytearray) -> None:
     payload = zlib.compress(bytes(rows), level=7)
     ihdr = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
     path.write_bytes(b"\x89PNG\r\n\x1a\n" + png_chunk(b"IHDR", ihdr) + png_chunk(b"IDAT", payload) + png_chunk(b"IEND", b""))
+
+
+def read_png_filter0_rgba(path: Path) -> tuple[int, int, bytearray] | None:
+    if not path.exists():
+        return None
+    data = path.read_bytes()
+    if not data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return None
+    offset = 8
+    width = height = 0
+    color_type = None
+    compressed = bytearray()
+    while offset + 8 <= len(data):
+        length = struct.unpack(">I", data[offset:offset + 4])[0]
+        kind = data[offset + 4:offset + 8]
+        payload = data[offset + 8:offset + 8 + length]
+        offset += 12 + length
+        if kind == b"IHDR":
+            width, height, bit_depth, color_type, compression, png_filter, interlace = struct.unpack(">IIBBBBB", payload)
+            if bit_depth != 8 or color_type != 6 or compression != 0 or png_filter != 0 or interlace != 0:
+                return None
+        elif kind == b"IDAT":
+            compressed.extend(payload)
+        elif kind == b"IEND":
+            break
+    if width <= 0 or height <= 0 or color_type != 6:
+        return None
+    raw = zlib.decompress(bytes(compressed))
+    stride = width * 4
+    pixels = bytearray(width * height * 4)
+    src = 0
+    for y in range(height):
+        filter_type = raw[src]
+        src += 1
+        if filter_type != 0:
+            return None
+        start = y * stride
+        pixels[start:start + stride] = raw[src:src + stride]
+        src += stride
+    return width, height, pixels
 
 
 def canvas(color: tuple[int, int, int, int]) -> bytearray:
@@ -82,14 +155,70 @@ def rect(
     if x1 <= x0 or y1 <= y0:
         return
 
-    row = bytes(color) * (x1 - x0)
-    for yy in range(y0, y1):
-        start = (yy * PIXELS + x0) * 4
-        if color[3] == 255:
+    if color[3] == 255:
+        row = bytes(color) * (x1 - x0)
+        for yy in range(y0, y1):
+            start = (yy * PIXELS + x0) * 4
             pixels[start:start + len(row)] = row
-        else:
-            for xx in range(x0, x1):
-                blend_pixel(pixels, xx, yy, color)
+        return
+
+    for yy in range(y0, y1):
+        for xx in range(x0, x1):
+            blend_pixel(pixels, xx, yy, color)
+
+
+def dot(
+    pixels: bytearray,
+    cx: int,
+    cy: int,
+    radius: int,
+    color: tuple[int, int, int, int],
+) -> None:
+    radius = max(1, radius)
+    r2 = radius * radius
+    for yy in range(cy - radius, cy + radius + 1):
+        if yy < 0 or yy >= PIXELS:
+            continue
+        for xx in range(cx - radius, cx + radius + 1):
+            if xx < 0 or xx >= PIXELS:
+                continue
+            dx = xx - cx
+            dy = yy - cy
+            d2 = dx * dx + dy * dy
+            if d2 > r2:
+                continue
+            falloff = 1.0 - d2 / (r2 + 1)
+            alpha = max(10, int(color[3] * (0.35 + 0.65 * falloff)))
+            blend_pixel(pixels, xx, yy, (color[0], color[1], color[2], alpha))
+
+
+def graphite_line(
+    pixels: bytearray,
+    x0: int,
+    y0: int,
+    x1: int,
+    y1: int,
+    color: tuple[int, int, int, int],
+    width: int = 3,
+    jitter: float = 1.0,
+    passes: int = 2,
+) -> None:
+    dx = x1 - x0
+    dy = y1 - y0
+    length = max(1.0, (dx * dx + dy * dy) ** 0.5)
+    nx = -dy / length
+    ny = dx / length
+    steps = max(1, int(length / 4.0))
+    radius = max(1, min(14, width // 2))
+    for p in range(passes):
+        phase = (p + 1) * 1.618
+        for step in range(steps + 1):
+            t = step / steps
+            wobble = math.sin(t * 19.13 + phase) * jitter + math.sin(t * 41.7 + phase * 0.37) * jitter * 0.42
+            pressure = 0.72 + 0.20 * math.sin(t * 9.7 + phase)
+            xx = int(round(x0 + dx * t + nx * wobble))
+            yy = int(round(y0 + dy * t + ny * wobble))
+            dot(pixels, xx, yy, radius, (color[0], color[1], color[2], int(color[3] * pressure)))
 
 
 def rect_outline(
@@ -101,43 +230,234 @@ def rect_outline(
     color: tuple[int, int, int, int],
     line: int = 3,
 ) -> None:
-    rect(pixels, x, y, width, line, color)
-    rect(pixels, x, y + height - line, width, line, color)
-    rect(pixels, x, y, line, height, color)
-    rect(pixels, x + width - line, y, line, height, color)
-
-
-def line(
-    pixels: bytearray,
-    x0: int,
-    y0: int,
-    x1: int,
-    y1: int,
-    color: tuple[int, int, int, int],
-    width: int = 3,
-) -> None:
-    dx = abs(x1 - x0)
-    dy = -abs(y1 - y0)
-    sx = 1 if x0 < x1 else -1
-    sy = 1 if y0 < y1 else -1
-    err = dx + dy
-    radius = max(1, width // 2)
-
-    while True:
-        rect(pixels, x0 - radius, y0 - radius, radius * 2 + 1, radius * 2 + 1, color)
-        if x0 == x1 and y0 == y1:
-            break
-        e2 = 2 * err
-        if e2 >= dy:
-            err += dy
-            x0 += sx
-        if e2 <= dx:
-            err += dx
-            y0 += sy
+    graphite_line(pixels, x, y, x + width, y, color, width=line, jitter=1.1, passes=2)
+    graphite_line(pixels, x, y + height, x + width, y + height, color, width=line, jitter=1.1, passes=2)
+    graphite_line(pixels, x, y, x, y + height, color, width=line, jitter=1.1, passes=2)
+    graphite_line(pixels, x + width, y, x + width, y + height, color, width=line, jitter=1.1, passes=2)
 
 
 def world_rect(x: float, y: float, width: float, height: float) -> tuple[int, int, int, int]:
     return px(x), px(y), px(width), px(height)
+
+
+def load_vector_map() -> dict[str, object]:
+    return json.loads(VECTOR_PATH.read_text(encoding="utf-8"))
+
+
+def points_px(feature: dict[str, object]) -> list[tuple[int, int]]:
+    points = feature.get("points_m", [])
+    return [(px(float(point[0])), px(float(point[1]))) for point in points]
+
+
+def hash01(seed: int, a: int, b: int) -> float:
+    value = (seed * 1103515245 + a * 73856093 + b * 19349663 + 0x9E3779B9) & 0xFFFFFFFF
+    value ^= value >> 13
+    value = (value * 1274126177) & 0xFFFFFFFF
+    return (value & 0xFFFFFF) / float(0x1000000)
+
+
+def graphite_canvas() -> bytearray:
+    pixels = canvas((27, 28, 29, 255))
+    stride = PIXELS * 4
+    for y in range(0, PIXELS, 2):
+        row = y * stride
+        for x in range(0, PIXELS, 2):
+            grain = ((x * 37 + y * 17 + (x // 11) * 13 + (y // 7) * 19) % 25) - 12
+            offset = row + x * 4
+            base = max(17, min(43, 29 + grain // 3))
+            pixels[offset] = base
+            pixels[offset + 1] = base + 1
+            pixels[offset + 2] = base + 2
+            if x + 1 < PIXELS:
+                pixels[offset + 4] = max(18, min(44, base + 2))
+                pixels[offset + 5] = max(19, min(45, base + 3))
+                pixels[offset + 6] = max(20, min(46, base + 4))
+    return pixels
+
+
+def overlay_texture(pixels: bytearray) -> None:
+    loaded = read_png_filter0_rgba(DERIVED_TEXTURE_PATH)
+    if loaded is None:
+        return
+    width, height, texture = loaded
+    if width != PIXELS or height != PIXELS:
+        return
+    for offset in range(0, len(pixels), 4):
+        alpha = texture[offset + 3]
+        if alpha == 0:
+            continue
+        blend_pixel(
+            pixels,
+            (offset // 4) % PIXELS,
+            (offset // 4) // PIXELS,
+            (texture[offset], texture[offset + 1], texture[offset + 2], min(92, alpha)),
+        )
+
+
+def fill_polygon(pixels: bytearray, points: list[tuple[int, int]], color: tuple[int, int, int, int]) -> None:
+    if len(points) < 3:
+        return
+    ys = [point[1] for point in points]
+    y0 = max(0, min(ys))
+    y1 = min(PIXELS - 1, max(ys))
+    for y in range(y0, y1 + 1):
+        intersections: list[int] = []
+        for index, (x_a, y_a) in enumerate(points):
+            x_b, y_b = points[(index + 1) % len(points)]
+            if y_a == y_b:
+                continue
+            if (y >= min(y_a, y_b)) and (y < max(y_a, y_b)):
+                t = (y - y_a) / (y_b - y_a)
+                intersections.append(int(round(x_a + (x_b - x_a) * t)))
+        intersections.sort()
+        for x_start, x_end in zip(intersections[0::2], intersections[1::2]):
+            rect(pixels, x_start, y, x_end - x_start + 1, 1, color)
+
+
+def draw_landuse(pixels: bytearray, vector: dict[str, object]) -> None:
+    for feature in vector.get("features", []):
+        if feature.get("kind") != "landuse":
+            continue
+        klass = feature.get("class")
+        pts = points_px(feature)
+        if klass == "industrial":
+            fill_polygon(pixels, pts, (70, 68, 60, 58))
+            edge = (157, 151, 130, 82)
+        else:
+            fill_polygon(pixels, pts, (54, 55, 51, 36))
+            edge = (119, 117, 105, 60)
+        for a, b in zip(pts, pts[1:] + pts[:1]):
+            graphite_line(pixels, a[0], a[1], b[0], b[1], edge, width=3, jitter=1.4, passes=1)
+
+
+def road_width_px(klass: str) -> int:
+    return {
+        "motorway": 22,
+        "motorway_link": 18,
+        "trunk": 19,
+        "trunk_link": 15,
+        "primary": 17,
+        "primary_link": 14,
+        "secondary": 14,
+        "secondary_link": 12,
+        "tertiary": 11,
+        "tertiary_link": 9,
+        "residential": 7,
+        "unclassified": 7,
+        "service": 5,
+        "track": 4,
+        "path": 3,
+        "footway": 3,
+    }.get(klass, 6)
+
+
+def draw_feature_polyline(
+    pixels: bytearray,
+    points: list[tuple[int, int]],
+    color: tuple[int, int, int, int],
+    width: int,
+    jitter: float,
+    passes: int,
+) -> None:
+    for a, b in zip(points, points[1:]):
+        graphite_line(pixels, a[0], a[1], b[0], b[1], color, width=width, jitter=jitter, passes=passes)
+
+
+def draw_transport_network(pixels: bytearray, vector: dict[str, object]) -> None:
+    road_features = [feature for feature in vector.get("features", []) if feature.get("kind") == "highway"]
+    rail_features = [feature for feature in vector.get("features", []) if feature.get("kind") == "railway"]
+    water_features = [feature for feature in vector.get("features", []) if feature.get("kind") == "waterway"]
+
+    for feature in water_features:
+        pts = points_px(feature)
+        draw_feature_polyline(pixels, pts, (80, 93, 95, 138), width=24, jitter=1.4, passes=2)
+        draw_feature_polyline(pixels, pts, (151, 166, 160, 58), width=12, jitter=1.0, passes=1)
+
+    for feature in road_features:
+        klass = str(feature.get("class", ""))
+        pts = points_px(feature)
+        width = road_width_px(klass)
+        draw_feature_polyline(pixels, pts, (22, 23, 23, 220), width=width + 6, jitter=1.3, passes=2)
+
+    for feature in road_features:
+        klass = str(feature.get("class", ""))
+        pts = points_px(feature)
+        width = road_width_px(klass)
+        edge_alpha = 150 if width >= 12 else 92
+        draw_feature_polyline(pixels, pts, (132, 128, 112, edge_alpha), width=max(2, width // 3), jitter=1.1, passes=1)
+        if width >= 12:
+            draw_feature_polyline(pixels, pts, (196, 188, 154, 84), width=2, jitter=0.7, passes=1)
+
+    for feature in rail_features:
+        pts = points_px(feature)
+        draw_feature_polyline(pixels, pts, (39, 40, 41, 230), width=9, jitter=0.7, passes=2)
+        draw_feature_polyline(pixels, pts, (168, 162, 134, 140), width=2, jitter=0.5, passes=1)
+        for a, b in zip(pts, pts[1:]):
+            dx = b[0] - a[0]
+            dy = b[1] - a[1]
+            length = max(1.0, (dx * dx + dy * dy) ** 0.5)
+            nx = -dy / length
+            ny = dx / length
+            for step in range(0, int(length), 28):
+                t = step / length
+                cx = a[0] + dx * t
+                cy = a[1] + dy * t
+                graphite_line(
+                    pixels,
+                    int(cx - nx * 7),
+                    int(cy - ny * 7),
+                    int(cx + nx * 7),
+                    int(cy + ny * 7),
+                    (176, 170, 144, 108),
+                    width=2,
+                    jitter=0.4,
+                    passes=1,
+                )
+
+
+def draw_door_gap(pixels: bytearray, rx: int, ry: int, rw: int, rh: int, door_width: int = 44) -> None:
+    door_x = rx + rw // 2 - door_width // 2
+    rect(pixels, door_x, ry + rh - 9, door_width, 12, (43, 44, 43, 235))
+    graphite_line(pixels, door_x, ry + rh - 12, door_x + door_width, ry + rh - 12, (218, 214, 191, 150), width=2, jitter=0.8, passes=1)
+
+
+def draw_windows(pixels: bytearray, rx: int, ry: int, rw: int, rh: int) -> None:
+    marks = [
+        (rx + rw // 3 - 14, ry + 2, 28, 5),
+        (rx + (2 * rw) // 3 - 14, ry + 2, 28, 5),
+        (rx + rw - 7, ry + rh // 2 - 18, 5, 36),
+    ]
+    for x, y, w, h in marks:
+        rect(pixels, x, y, w, h, (42, 43, 43, 190))
+        rect_outline(pixels, x, y, w, h, (214, 209, 186, 118), line=1)
+
+
+def graphite_fill_rect(
+    pixels: bytearray,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    color: tuple[int, int, int, int],
+    hatch: bool = False,
+) -> None:
+    rect(pixels, x, y, width, height, color)
+    if hatch:
+        spacing = max(18, min(52, (width + height) // 17))
+        start = x - height
+        end = x + width
+        for sx in range(start, end, spacing):
+            graphite_line(
+                pixels,
+                sx,
+                y + height - 3,
+                sx + height,
+                y + 3,
+                (95, 93, 84, 62),
+                width=2,
+                jitter=1.0,
+                passes=1,
+            )
 
 
 def draw_building(
@@ -146,93 +466,183 @@ def draw_building(
     y: float,
     width: float,
     height: float,
-    fill: tuple[int, int, int, int] = (56, 57, 58, 255),
-    edge: tuple[int, int, int, int] = (186, 184, 170, 255),
+    fill: tuple[int, int, int, int] = (58, 57, 54, 238),
+    edge: tuple[int, int, int, int] = (215, 210, 186, 210),
 ) -> None:
     rx, ry, rw, rh = world_rect(x, y, width, height)
-    rect(pixels, rx, ry, rw, rh, fill)
-    rect_outline(pixels, rx, ry, rw, rh, edge, line=3)
-    line(pixels, rx + 8, ry + 10, rx + rw - 10, ry + 10, (98, 97, 91, 255), width=2)
-    line(pixels, rx + 8, ry + rh - 10, rx + rw - 10, ry + rh - 10, (98, 97, 91, 255), width=2)
+    graphite_fill_rect(pixels, rx, ry, rw, rh, fill, hatch=True)
+    rect_outline(pixels, rx, ry, rw, rh, edge, line=4)
+    inset = max(10, min(rw, rh) // 18)
+    rect_outline(pixels, rx + inset, ry + inset, rw - inset * 2, rh - inset * 2, (118, 115, 104, 115), line=2)
+    graphite_line(pixels, rx + inset, ry + rh - inset, rx + rw - inset, ry + inset, (96, 94, 87, 70), width=2, jitter=1.1, passes=1)
+    draw_door_gap(pixels, rx, ry, rw, rh)
+    draw_windows(pixels, rx, ry, rw, rh)
+
+
+def draw_urban_fabric_zone(
+    pixels: bytearray,
+    zone: tuple[str, float, float, float, float, int, int, int],
+) -> None:
+    _, x, y, width, height, cell_w, cell_h, seed = zone
+    x0, y0, w, h = world_rect(x, y, width, height)
+    step_x = px(cell_w)
+    step_y = px(cell_h)
+    for yy in range(y0, y0 + h, step_y):
+        for xx in range(x0, x0 + w, step_x):
+            local_x = (xx - x0) // max(1, step_x)
+            local_y = (yy - y0) // max(1, step_y)
+            skip = hash01(seed, local_x, local_y)
+            if skip < 0.16:
+                continue
+            jitter_x = int((hash01(seed + 3, local_x, local_y) - 0.5) * step_x * 0.32)
+            jitter_y = int((hash01(seed + 7, local_x, local_y) - 0.5) * step_y * 0.32)
+            bw = max(px(18), int(step_x * (0.52 + hash01(seed + 11, local_x, local_y) * 0.36)))
+            bh = max(px(14), int(step_y * (0.50 + hash01(seed + 13, local_x, local_y) * 0.34)))
+            bx = xx + jitter_x
+            by = yy + jitter_y
+            if bx < 0 or by < 0 or bx + bw > PIXELS or by + bh > PIXELS:
+                continue
+            alpha = 54 + int(hash01(seed + 17, local_x, local_y) * 50)
+            rect_outline(pixels, bx, by, bw, bh, (138, 133, 116, alpha), line=2)
+            if hash01(seed + 19, local_x, local_y) > 0.55:
+                inset = max(4, min(bw, bh) // 5)
+                rect_outline(pixels, bx + inset, by + inset, bw - inset * 2, bh - inset * 2, (108, 105, 95, alpha // 2), line=1)
+            if hash01(seed + 23, local_x, local_y) > 0.68:
+                graphite_line(pixels, bx, by + bh // 2, bx + bw, by + bh // 2, (95, 92, 82, alpha // 2), width=1, jitter=0.7, passes=1)
+
+
+def draw_osm_building_footprints(pixels: bytearray, vector: dict[str, object]) -> None:
+    for feature in vector.get("features", []):
+        if feature.get("kind") != "building":
+            continue
+        pts = points_px(feature)
+        fill_polygon(pixels, pts, (67, 66, 61, 150))
+        for a, b in zip(pts, pts[1:]):
+            graphite_line(pixels, a[0], a[1], b[0], b[1], (204, 198, 174, 138), width=3, jitter=1.0, passes=1)
+
+
+def draw_grid_reference(pixels: bytearray) -> None:
+    for m in range(0, WORLD_M + 1, 200):
+        pos = px(m)
+        graphite_line(pixels, pos, 0, pos, PIXELS, (82, 80, 72, 26), width=1, jitter=1.5, passes=1)
+        graphite_line(pixels, 0, pos, PIXELS, pos, (82, 80, 72, 26), width=1, jitter=1.5, passes=1)
 
 
 def draw_ground() -> bytearray:
-    pixels = canvas((31, 32, 34, 255))
-
-    # Main roads and cordon approaches. These are intentionally free of vehicle ink.
-    road = (49, 51, 54, 255)
-    road_edge = (134, 134, 126, 255)
-    for args in [
-        (0, 830, 1600, 120),
-        (210, 0, 105, 1600),
-        (0, 1165, 1600, 105),
-        (850, 0, 95, 1600),
-        (1180, 0, 80, 1600),
-    ]:
-        rx, ry, rw, rh = world_rect(*args)
-        rect(pixels, rx, ry, rw, rh, road)
-        rect_outline(pixels, rx, ry, rw, rh, road_edge, line=2)
-
-    for x in range(px(0), px(1600), px(90)):
-        line(pixels, x, px(890), x + px(42), px(890), (92, 93, 90, 255), width=2)
-        line(pixels, x, px(1217), x + px(42), px(1217), (92, 93, 90, 255), width=2)
-    for y in range(px(0), px(1600), px(90)):
-        line(pixels, px(262), y, px(262), y + px(42), (92, 93, 90, 255), width=2)
-
-    # Industrial compounds, workshops, residential edge, and sensitive structures.
-    buildings = [
-        (120, 930, 310, 210),
-        (470, 980, 220, 190),
-        (1030, 1030, 340, 250),
-        (970, 610, 240, 210),
-        (1350, 760, 170, 210),
-        (520, 250, 390, 260),
-        (1130, 310, 250, 220),
-        (250, 620, 220, 170),
-        (580, 790, 320, 180),
-        (80, 1320, 360, 140),
-        (690, 1330, 290, 155),
-        (1260, 1320, 230, 150),
-    ]
-    for building in buildings:
-        draw_building(pixels, *building)
-
-    # Courtyards, walls, rubble, and alleys.
-    for args in [(80, 900, 380, 20), (80, 1145, 380, 20), (1000, 1000, 410, 22), (1000, 1305, 410, 22)]:
-        rect(pixels, *world_rect(*args), (154, 150, 135, 255))
-    for args in [(735, 930, 90, 55), (890, 720, 55, 80), (1220, 895, 65, 60)]:
-        rx, ry, rw, rh = world_rect(*args)
-        rect(pixels, rx, ry, rw, rh, (82, 78, 70, 255))
-        for i in range(0, rw, 18):
-            line(pixels, rx + i, ry, rx + max(0, i - 28), ry + rh, (174, 168, 142, 255), width=2)
-
-    # Fine alley texture.
-    for x in [360, 515, 650, 775, 1015, 1105, 1295, 1425]:
-        line(pixels, px(x), px(120), px(x), px(760), (78, 78, 75, 255), width=3)
-    for y in [160, 310, 460, 610, 740, 1010, 1390]:
-        line(pixels, px(330), px(y), px(1510), px(y), (78, 78, 75, 255), width=3)
-
+    vector = load_vector_map()
+    pixels = graphite_canvas()
+    overlay_texture(pixels)
+    draw_landuse(pixels, vector)
+    for zone in URBAN_FABRIC_ZONES:
+        draw_urban_fabric_zone(pixels, zone)
+    draw_osm_building_footprints(pixels, vector)
+    draw_transport_network(pixels, vector)
+    for building in BUILDING_REGIONS:
+        draw_building(pixels, *building[1:5])
+    draw_grid_reference(pixels)
     return pixels
 
 
 def draw_overlay(regions: list[tuple[str, float, float, float, float, int]], minimum_storeys: int) -> bytearray:
     pixels = canvas((0, 0, 0, 0))
-    fill = (210, 207, 188, 42)
-    edge = (230, 226, 200, 165)
-    stair = (120, 170, 190, 180)
+    fill = (203, 199, 175, 34)
+    edge = (235, 229, 203, 172)
+    stair = (122, 174, 194, 168)
 
     for _, x, y, width, height, storeys in regions:
         if storeys < minimum_storeys:
             continue
         rx, ry, rw, rh = world_rect(x, y, width, height)
-        rect(pixels, rx, ry, rw, rh, fill)
-        rect_outline(pixels, rx, ry, rw, rh, edge, line=3)
-        rect(pixels, rx + rw - 26, ry + 18, 16, 24, stair)
+        graphite_fill_rect(pixels, rx, ry, rw, rh, fill, hatch=True)
+        rect_outline(pixels, rx, ry, rw, rh, edge, line=4)
+        inset = max(10, min(rw, rh) // 16)
+        rect_outline(pixels, rx + inset, ry + inset, rw - inset * 2, rh - inset * 2, (226, 222, 196, 82), line=2)
+        rect(pixels, rx + rw - 30, ry + 18, 18, 28, stair)
+        graphite_line(pixels, rx + rw - 30, ry + 18, rx + rw - 12, ry + 46, (222, 238, 244, 116), width=2, jitter=0.9, passes=1)
 
     return pixels
 
 
+def draw_multistorey_mask(regions: list[tuple[str, float, float, float, float, int]]) -> bytearray:
+    pixels = canvas((0, 0, 0, 255))
+    for _, x, y, width, height, storeys in regions:
+        if storeys < 2:
+            continue
+        rx, ry, rw, rh = world_rect(x, y, width, height)
+        rect(pixels, rx, ry, rw, rh, (255, 255, 255, 255))
+    return pixels
+
+
+def compose_over(base: bytearray, overlay: bytearray) -> bytearray:
+    out = bytearray(base)
+    for offset in range(0, len(out), 4):
+        alpha = overlay[offset + 3]
+        if alpha == 0:
+            continue
+        x = (offset // 4) % PIXELS
+        y = (offset // 4) // PIXELS
+        blend_pixel(out, x, y, (overlay[offset], overlay[offset + 1], overlay[offset + 2], alpha))
+    return out
+
+
+def resize_nearest(pixels: bytearray, source_width: int, source_height: int, target: int) -> bytearray:
+    out = bytearray(target * target * 4)
+    for y in range(target):
+        sy = min(source_height - 1, int((y + 0.5) * source_height / target))
+        for x in range(target):
+            sx = min(source_width - 1, int((x + 0.5) * source_width / target))
+            src = (sy * source_width + sx) * 4
+            dst = (y * target + x) * 4
+            out[dst:dst + 4] = pixels[src:src + 4]
+    return out
+
+
+def map_layers_json() -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "id": MAP_ID,
+        "display_name": "Fallujah Southern Industrial Foothold 2004",
+        "era": "2004",
+        "real_world_size_m": [WORLD_M, WORLD_M],
+        "overview_pixel_size": [PIXELS, PIXELS],
+        "overview_pixels_per_meter": PPM,
+        "full_combat_pixels_per_meter": PPM,
+        "full_combat_pixel_size": [PIXELS, PIXELS],
+        "art_style": "approved Fallujah black-and-white contemporary graphite line art; OSM-derived real street grid; 1:10,000 Al Fallujah military/image graphic and 2002/2004 satellite references used for urban fabric correction; no stick art; no schematic placeholder art; no baked static traffic vehicle ink",
+        "composite": {
+            "id": "minimap_composite",
+            "path": "00_minimap_composite.png",
+            "mode": "opaque_grayscale",
+        },
+        "layers": [
+            {"id": "ground", "path": f"assets/map_data/{MAP_ID}_2400/01_ground_level.png", "mode": "opaque_grayscale", "z_index": 0},
+            {"id": "level_2", "path": f"assets/map_data/{MAP_ID}_2400/02_level_2_alpha.png", "mode": "rgba_alpha_overlay", "z_index": 1},
+            {"id": "level_3", "path": f"assets/map_data/{MAP_ID}_2400/03_level_3_alpha.png", "mode": "rgba_alpha_overlay", "z_index": 2},
+            {"id": "roof_access", "path": f"assets/map_data/{MAP_ID}_2400/04_roof_access_alpha.png", "mode": "rgba_alpha_overlay", "z_index": 3},
+        ],
+        "multistorey_mask": {
+            "path": f"assets/map_data/{MAP_ID}_2400/05_multistorey_mask.png",
+            "preview_path": f"assets/map_data/{MAP_ID}_2400/preview_multistorey_mask_1400.png",
+            "lineart_overview_path": "06_multistorey_lineart_overview.png",
+            "mode": "opaque_grayscale",
+            "black": "single-layer terrain, road, courtyard, open lot, or building without authored upper floor",
+            "white": "building footprint requiring one or more transparent upper-level PNG overlays",
+        },
+        "display_overviews": [
+            {"id": "minimap_preview", "path": "preview_1400.png", "mode": "opaque_grayscale"},
+            {"id": "multistorey_lineart_overview", "path": "06_multistorey_lineart_overview.png", "mode": "opaque_grayscale"},
+            {"id": "multistorey_lineart_preview", "path": "preview_multistorey_lineart_1400.png", "mode": "opaque_grayscale"},
+        ],
+        "source_vector_base": "vector/fallujah_sinaa_industrial_osm_20260614.json",
+        "source_references": "references/reference_sources.json",
+        "derived_reference_texture": "references/derived_satellite_graphite_texture.png",
+    }
+
+
 def map_manifest_text() -> str:
+    source_root = f"assets/fallujah/source/maps/{MAP_ID}"
+    source_map_data = f"{source_root}/assets/map_data/{MAP_ID}_2400"
+    runtime_root = f"assets/fallujah/runtime/maps/{MAP_ID}"
     return f"""manifest_type=map
 id={MAP_ID}
 name=Fallujah Southern Industrial Foothold 2004
@@ -240,31 +650,36 @@ world_width_m={WORLD_M}
 world_height_m={WORLD_M}
 pixels_per_meter={PPM:.2f}
 origin=top_left
-source_root=assets/fallujah/runtime/maps/{MAP_ID}
-runtime_root=assets/fallujah/runtime/maps/{MAP_ID}
-layer_count=4
+source_root={source_root}
+runtime_root={runtime_root}
+layer_count=5
 layer.0.id=ground
 layer.0.kind=base
-layer.0.path=assets/fallujah/runtime/maps/{MAP_ID}/levels/level_01_ground.png
+layer.0.path={source_map_data}/01_ground_level.png
 layer.0.z=0
 layer.0.alpha=opaque
 layer.1.id=level_2
 layer.1.kind=upper_floor
-layer.1.path=assets/fallujah/runtime/maps/{MAP_ID}/levels/level_02_roofs_and_second_floor.png
+layer.1.path={source_map_data}/02_level_2_alpha.png
 layer.1.z=10
 layer.1.alpha=premultiplied
 layer.2.id=level_3
 layer.2.kind=upper_floor
-layer.2.path=assets/fallujah/runtime/maps/{MAP_ID}/levels/level_03_upper_floor.png
+layer.2.path={source_map_data}/03_level_3_alpha.png
 layer.2.z=20
 layer.2.alpha=premultiplied
 layer.3.id=roof_access
 layer.3.kind=access
-layer.3.path=assets/fallujah/runtime/maps/{MAP_ID}/levels/level_04_roof_access.png
+layer.3.path={source_map_data}/04_roof_access_alpha.png
 layer.3.z=30
 layer.3.alpha=premultiplied
-overview_path=assets/fallujah/runtime/maps/{MAP_ID}/overview.png
-runtime_overview_path=assets/fallujah/runtime/maps/{MAP_ID}/overview.png
+layer.4.id=multistorey_mask
+layer.4.kind=mask
+layer.4.path={source_map_data}/05_multistorey_mask.png
+layer.4.z=40
+layer.4.alpha=mask
+overview_path={source_root}/imgs/{MAP_ID}_2400/preview_1400.png
+runtime_overview_path={runtime_root}/overview.png
 collision_output_path=assets/fallujah/maps/{MAP_ID}_collision.mask
 navigation_output_path=assets/fallujah/maps/{MAP_ID}_navigation.grid
 """
@@ -277,11 +692,43 @@ def building_manifest(regions: list[tuple[str, float, float, float, float, int]]
         ("level_03_upper_floor", 3, 6, "overlay"),
         ("level_04_roof_access", 4, 9, "overlay"),
     ]
+
+    def feature(
+        fid: str,
+        level_id: str,
+        kind: str,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+        blocks_los: bool,
+        blocks_movement: bool,
+        allows_los: bool,
+        allows_movement: bool,
+    ) -> dict[str, object]:
+        return {
+            "id": fid,
+            "level_id": level_id,
+            "kind": kind,
+            "x": x,
+            "y": y,
+            "width": width,
+            "height": height,
+            "blocks_los": blocks_los,
+            "blocks_movement": blocks_movement,
+            "allows_los": allows_los,
+            "allows_movement": allows_movement,
+        }
+
     features = []
     building_regions = []
     for name, x, y, width, height, storeys in regions:
         rid = name
         rx, ry, rw, rh = world_rect(x, y, width, height)
+        wall = 8
+        door_width = min(54, max(32, rw // 5))
+        door_x = rx + rw // 2 - door_width // 2
+        door_y = ry + rh - wall
         building_regions.append({
             "id": rid,
             "storeys": storeys,
@@ -290,49 +737,33 @@ def building_manifest(regions: list[tuple[str, float, float, float, float, int]]
             "width": rw,
             "height": rh,
             "roof_level_id": "level_04_roof_access" if storeys >= 3 else "level_02_roofs_and_second_floor",
+            "art_role": "reference_aligned_graphite_building_mass",
         })
         features.extend([
-            {
-                "id": f"{rid}_north_wall",
-                "level_id": "level_01_ground",
-                "kind": "wall",
-                "x": rx,
-                "y": ry,
-                "width": rw,
-                "height": 8,
-                "blocks_los": True,
-                "blocks_movement": True,
-                "allows_los": False,
-                "allows_movement": False,
-            },
-            {
-                "id": f"{rid}_south_door",
-                "level_id": "level_01_ground",
-                "kind": "door",
-                "x": rx + rw // 2 - 16,
-                "y": ry + rh - 8,
-                "width": 32,
-                "height": 8,
-                "blocks_los": False,
-                "blocks_movement": False,
-                "allows_los": True,
-                "allows_movement": True,
-            },
+            feature(f"{rid}_north_wall", "level_01_ground", "wall", rx, ry, rw, wall, True, True, False, False),
+            feature(f"{rid}_west_wall", "level_01_ground", "wall", rx, ry, wall, rh, True, True, False, False),
+            feature(f"{rid}_east_wall", "level_01_ground", "wall", rx + rw - wall, ry, wall, rh, True, True, False, False),
+            feature(f"{rid}_south_wall_left", "level_01_ground", "wall", rx, door_y, max(0, door_x - rx), wall, True, True, False, False),
+            feature(f"{rid}_south_wall_right", "level_01_ground", "wall", door_x + door_width, door_y, max(0, rx + rw - (door_x + door_width)), wall, True, True, False, False),
+            feature(f"{rid}_south_door", "level_01_ground", "door", door_x, door_y, door_width, wall, False, False, True, True),
+            feature(f"{rid}_north_window_left", "level_01_ground", "window", rx + rw // 3 - 14, ry, 28, wall, False, True, True, False),
+            feature(f"{rid}_north_window_right", "level_01_ground", "window", rx + (rw * 2) // 3 - 14, ry, 28, wall, False, True, True, False),
+            feature(f"{rid}_east_window", "level_01_ground", "window", rx + rw - wall, ry + rh // 2 - 18, wall, 36, False, True, True, False),
         ])
         if storeys >= 2:
-            features.append({
-                "id": f"{rid}_stair",
-                "level_id": "level_01_ground",
-                "kind": "stair",
-                "x": rx + rw - 28,
-                "y": ry + 18,
-                "width": 18,
-                "height": 26,
-                "blocks_los": False,
-                "blocks_movement": False,
-                "allows_los": True,
-                "allows_movement": True,
-            })
+            features.append(feature(
+                f"{rid}_stair",
+                "level_01_ground",
+                "stair",
+                rx + rw - 30,
+                ry + 18,
+                18,
+                28,
+                False,
+                False,
+                True,
+                True,
+            ))
 
     return {
         "schema_version": 1,
@@ -345,7 +776,9 @@ def building_manifest(regions: list[tuple[str, float, float, float, float, int]]
         "pixel_height": PIXELS,
         "pixels_per_meter": PPM,
         "origin": "top_left",
-        "art_style": "dark graphite line art; no baked static traffic vehicle ink",
+        "art_style": "Mosul-style dark graphite line art generated from Fallujah OSM streets, 1:10,000 Al Fallujah military/image graphic context, and 2002/2004 satellite-derived urban texture; LOS walls, door gaps, windows, stairs, and roof access aligned to authored building masses; no baked static traffic vehicle ink",
+        "source_map_root": f"assets/fallujah/source/maps/{MAP_ID}",
+        "source_vector_base": "vector/fallujah_sinaa_industrial_osm_20260614.json",
         "max_storeys": 4,
         "level_count": len(levels),
         "feature_count": len(features),
@@ -421,6 +854,7 @@ def topology_manifest() -> dict[str, object]:
         "map_id": MAP_ID,
         "gameplay_area_id": f"{MAP_ID}_building_levels",
         "name": "Fallujah Southern Industrial Foothold 2004 Tactical Topology",
+        "source_alignment": "Nodes and portals remain on the authored 1.6 km tactical slice, now drawn over the OSM-derived Sina’a / Industrial District street grid and reference-derived graphite city fabric.",
         "node_count": len(nodes),
         "portal_count": len(portals),
         "semantic_zone_count": len(zones),
@@ -1127,28 +1561,38 @@ unit.6.soldier.1.ammo=0
 """
 
 
+
 def main() -> None:
     runtime = ASSET_ROOT / "runtime" / "maps" / MAP_ID
     levels = runtime / "levels"
     manifests = ASSET_ROOT / "manifests"
-
-    regions = [
-        ("industrial_warehouse_west", 120, 930, 310, 210, 2),
-        ("repair_yards_east", 1030, 1030, 340, 250, 1),
-        ("district_office", 970, 610, 240, 210, 3),
-        ("residential_row_north", 520, 250, 390, 260, 2),
-        ("mosque_school_edge", 1130, 310, 250, 220, 2),
-        ("clinic_compound", 250, 620, 220, 170, 1),
-        ("market_shops", 580, 790, 320, 180, 2),
-        ("workshop_roof_watch", 1350, 760, 170, 210, 3),
-    ]
+    regions = BUILDING_REGIONS
 
     ground = draw_ground()
+    level_2 = draw_overlay(regions, 2)
+    level_3 = draw_overlay(regions, 3)
+    roof_access = draw_overlay(regions, 3)
+    mask = draw_multistorey_mask(regions)
+    multistorey_overview = compose_over(compose_over(ground, level_2), roof_access)
+
+    write_png(SOURCE_MAP_DATA / "01_ground_level.png", PIXELS, PIXELS, ground)
+    write_png(SOURCE_MAP_DATA / "02_level_2_alpha.png", PIXELS, PIXELS, level_2)
+    write_png(SOURCE_MAP_DATA / "03_level_3_alpha.png", PIXELS, PIXELS, level_3)
+    write_png(SOURCE_MAP_DATA / "04_roof_access_alpha.png", PIXELS, PIXELS, roof_access)
+    write_png(SOURCE_MAP_DATA / "05_multistorey_mask.png", PIXELS, PIXELS, mask)
+    write_png(SOURCE_MAP_DATA / "preview_multistorey_mask_1400.png", PREVIEW_PIXELS, PREVIEW_PIXELS, resize_nearest(mask, PIXELS, PIXELS, PREVIEW_PIXELS))
+
+    write_png(SOURCE_IMG_DIR / "00_minimap_composite.png", PIXELS, PIXELS, ground)
+    write_png(SOURCE_IMG_DIR / "06_multistorey_lineart_overview.png", PIXELS, PIXELS, multistorey_overview)
+    write_png(SOURCE_IMG_DIR / "preview_1400.png", PREVIEW_PIXELS, PREVIEW_PIXELS, resize_nearest(ground, PIXELS, PIXELS, PREVIEW_PIXELS))
+    write_png(SOURCE_IMG_DIR / "preview_multistorey_lineart_1400.png", PREVIEW_PIXELS, PREVIEW_PIXELS, resize_nearest(multistorey_overview, PIXELS, PIXELS, PREVIEW_PIXELS))
+    (SOURCE_IMG_DIR / "map_layers.json").write_text(json.dumps(map_layers_json(), indent=2) + "\n", encoding="utf-8")
+
     write_png(levels / "level_01_ground.png", PIXELS, PIXELS, ground)
     write_png(runtime / "overview.png", PIXELS, PIXELS, ground)
-    write_png(levels / "level_02_roofs_and_second_floor.png", PIXELS, PIXELS, draw_overlay(regions, 2))
-    write_png(levels / "level_03_upper_floor.png", PIXELS, PIXELS, draw_overlay(regions, 3))
-    write_png(levels / "level_04_roof_access.png", PIXELS, PIXELS, draw_overlay(regions, 3))
+    write_png(levels / "level_02_roofs_and_second_floor.png", PIXELS, PIXELS, level_2)
+    write_png(levels / "level_03_upper_floor.png", PIXELS, PIXELS, level_3)
+    write_png(levels / "level_04_roof_access.png", PIXELS, PIXELS, roof_access)
 
     manifests.mkdir(parents=True, exist_ok=True)
     (manifests / f"{MAP_ID}.mapmanifest").write_text(map_manifest_text(), encoding="utf-8")
